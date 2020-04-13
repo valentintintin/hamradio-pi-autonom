@@ -8,6 +8,7 @@ import { WebcamService } from './webcam.service';
 import { assetsFolder } from '../index';
 import ChildProcess = require('child_process');
 import PlaySound = require('play-sound');
+import fs = require('fs');
 
 export class SstvService {
 
@@ -18,9 +19,17 @@ export class SstvService {
         LogService.log('sstv', 'Start sending image');
 
         return new Observable<void>((observer: Observer<void>) => {
-            LogService.log('sstv', 'Get image', WebcamService.lastPhotoPath);
+            const filePath = WebcamService.lastPhotoPath ?? assetsFolder + '/test.jpg';
+
+            LogService.log('sstv', 'Get image', filePath);
+
+            if (!fs.existsSync(filePath)) {
+                observer.error(new Error('File does not exist'));
+                return;
+            }
+
             // @ts-ignore
-            Jimp.read(WebcamService.lastPhotoPath ?? assetsFolder + '/test.jpg')
+            Jimp.read(filePath)
                 .then(image => {
                     // @ts-ignore
                     Jimp.loadFont(Jimp.FONT_SANS_16_BLACK).then(font => {

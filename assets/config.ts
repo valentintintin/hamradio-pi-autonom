@@ -7,13 +7,16 @@ export const config: ConfigInterface = {
     debug: true,
     fakeGpio: true,
     audioDevice: 'pulse',
+    api: {
+        enable: true
+    },
     sensors: {
-        enable: false,
+        enable: true,
         csvPath: '/home/valentin/logic/sensors.csv',
-        interval: 60
+        interval: 30
     },
     webcam: {
-        enable: false,
+        enable: true,
         photosPath: '/home/valentin/logic/timelapses',
         interval: 30,
         fake: true
@@ -22,7 +25,7 @@ export const config: ConfigInterface = {
         dtmfCode: 'A25'
     },
     aprs: {
-        enable: false,
+        enable: true,
         lat: 45.196250,
         lng: 5.727160,
         altitude: 300,
@@ -49,6 +52,7 @@ export const config: ConfigInterface = {
     },
     mpptChd: {
         enable: false,
+        fake: true,
         powerOffVolt: 11400,
         watchdog: true,
         shutdownAlert: true,

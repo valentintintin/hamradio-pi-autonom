@@ -22,8 +22,7 @@ export class WebcamService {
 
     public static capture(config: WebcamConfigInterface): Observable<string> {
         return new Observable<string>((observer: Observer<string>) => {
-
-            LogService.log('webcam', 'Capture', new Date());
+            LogService.log('webcam', 'Start capturing');
 
             if (!WebcamService.USE_FAKE) {
                 // @ts-ignore

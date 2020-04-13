@@ -1,22 +1,45 @@
+import { DatabaseService } from './database.service';
+import { Logs } from '../models/logs';
+import fs = require('fs');
+
 export class LogService {
 
     public static LOG_PATH: string = process.cwd();
 
     public static log(action: string, message: string = null, ...data): void {
-        const now = new Date();
-        // const fileLog = assetsFolder + 'logs/' + now.getFullYear() + '-' + now.getMonth() + '-' + now.getDate() + '.log';
+        const logs = new Logs();
 
-        const log =
-            '[' + now.toLocaleString() + ']' +
-            '[' + action.toUpperCase() + ']' +
-            (message ? ' --> ' + message : '')
-        ;
-
+        logs.service = action;
+        logs.log = message;
         if (data && data.length) {
-            console.log(log, data);
-        } else {
-            console.log(log);
+            logs.data = JSON.stringify(data);
         }
-        // fs.appendFileSync(fileLog, log + '\n');
+
+        DatabaseService.insert(logs).subscribe(_ => {
+            const now = new Date();
+            const log =
+                '[' + now.toLocaleString() + ']' +
+                '[' + action.toUpperCase() + ']' +
+                ' --> ' + message
+            ;
+
+            if (data && data.length) {
+                console.log(log, data);
+            } else {
+                console.log(log);
+            }
+
+            const fileLog = LogService.LOG_PATH + '/' + now.getFullYear() + '-' + now.getMonth() + '-' + now.getDate() + '.log';
+
+            try {
+                if (!fs.existsSync(fileLog)) {
+                    fs.writeFileSync(fileLog, log + '\n');
+                } else {
+                    fs.appendFileSync(fileLog, log + '\n');
+                }
+            } catch (e) {
+                console.error(e, fileLog);
+            }
+        });
     }
 }

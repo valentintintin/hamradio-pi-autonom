@@ -1,85 +1,34 @@
 import { Observable, Observer, of } from 'rxjs';
 import { LogService } from './log.service';
-import { catchError, map, switchMap, tap } from 'rxjs/operators';
-import { CommandMpptChd, CommunicationMpptchdService } from './communication-mpptchd.service';
+import { map, switchMap, tap } from 'rxjs/operators';
+import { CommunicationMpptchdService } from './communication-mpptchd.service';
 import { SensorsConfigInterface } from '../config/sensors-config.interface';
 import { debug } from '../index';
+import { DatabaseService } from './database.service';
+import { Sensors } from '../models/sensors';
 import fs = require('fs');
 
 const si = require('systeminformation');
 
-export interface SensorsData {
-    voltageBatterie?: number;
-    voltageSolaire?: number;
-    intensiteBatterie?: number;
-    intensiteSolaire?: number;
-    intensiteCharge?: number;
-    temperatureBoite?: number;
-    temperatureCpu?: number;
-    temperatureRtc?: number;
-    uptime?: number;
-}
-
 export class SensorsService {
 
-    public static getVoltageBattery(): Observable<number> {
-        LogService.log('sensors', 'Get MpptChd battery voltage');
-        return CommunicationMpptchdService.instance.receive(CommandMpptChd.VB).pipe(catchError(_ => of(-1)));
-    }
-
-    public static getVoltageSolar(): Observable<number> {
-        LogService.log('sensors', 'Get MpptChd solar voltage');
-        return CommunicationMpptchdService.instance.receive(CommandMpptChd.VS).pipe(catchError(_ => of(-1)));
-    }
-
-    public static getCurrentBattery(): Observable<number> {
-        LogService.log('sensors', 'Get MpptChd battery current');
-        return CommunicationMpptchdService.instance.receive(CommandMpptChd.IB).pipe(catchError(_ => of(-1)));
-    }
-
-    public static getCurrentSolar(): Observable<number> {
-        LogService.log('sensors', 'Get MpptChd solar current');
-        return CommunicationMpptchdService.instance.receive(CommandMpptChd.IS).pipe(catchError(_ => of(-1)));
-    }
-
-    public static getCurrentCharge(): Observable<number> {
-        LogService.log('sensors', 'Get MpptChd charge current');
-        return CommunicationMpptchdService.instance.receive(CommandMpptChd.IC).pipe(catchError(_ => of(-1)));
-    }
-
-    public static getTemperatureBox(): Observable<number> {
-        LogService.log('sensors', 'Get MpptChd temperature');
-        return CommunicationMpptchdService.instance.receive(CommandMpptChd.IT).pipe(catchError(_ => of(-1)));
-    }
-
-    public static getMpptChgData(): Observable<SensorsData> {
+    public static getMpptChgData(): Observable<Sensors> {
         LogService.log('sensors', 'Get all');
 
-        return SensorsService.getVoltageBattery().pipe(map(data => {
-                return {
-                    voltageBatterie: data
-                } as SensorsData;
-            }),
-            switchMap(datas => SensorsService.getVoltageSolar().pipe(map(data => {
-                datas.voltageSolaire = data;
-                return datas;
-            }))),
-            switchMap(datas => SensorsService.getCurrentBattery().pipe(map(data => {
-                datas.intensiteBatterie = data;
-                return datas;
-            }))),
-            switchMap(datas => SensorsService.getCurrentSolar().pipe(map(data => {
-                datas.intensiteSolaire = data;
-                return datas;
-            }))),
-            switchMap(datas => SensorsService.getCurrentCharge().pipe(map(data => {
-                datas.intensiteSolaire = data;
-                return datas;
-            }))),
-            switchMap(datas => SensorsService.getTemperatureBox().pipe(map(data => {
-                datas.temperatureBoite = data;
-                return datas;
-            })))
+        return CommunicationMpptchdService.instance.getStatus().pipe(map(data => {
+                const sensorsObject = new Sensors();
+                sensorsObject.voltageBattery = data.values.batteryVoltage;
+                sensorsObject.voltageSolar = data.values.solarVoltage;
+                sensorsObject.currentBattery = data.values.batteryCurrent;
+                sensorsObject.currentSolar = data.values.solarCurrent;
+                sensorsObject.currentCharge = data.values.chargeCurrent;
+                sensorsObject.alertAsserted = data.alertAsserted ? 1 : 0;
+                sensorsObject.nightDetected = data.nightDetected ? 1 : 0;
+                sensorsObject.temperatureBattery = data.values.internalThermometer;
+                sensorsObject.rawMpptchg = JSON.stringify(data);
+                sensorsObject.voltageBattery = data.values.batteryVoltage;
+                return sensorsObject;
+            })
         )
     }
 
@@ -117,7 +66,7 @@ export class SensorsService {
         return si.time().uptime;
     }
 
-    public static getAll(): Observable<SensorsData> {
+    public static getAll(): Observable<Sensors> {
         LogService.log('sensors', 'Start get all');
 
         return SensorsService.getMpptChgData().pipe(
@@ -136,19 +85,23 @@ export class SensorsService {
         );
     }
 
-    public static getAllAndSave(config: SensorsConfigInterface): Observable<SensorsData> {
+    public static getAllAndSave(config: SensorsConfigInterface): Observable<Sensors> {
         return this.getAll().pipe(
             tap(data => this.save(data, config.csvPath))
         )
     }
 
-    private static save(datas: SensorsData, path: string): void {
-        if (!fs.existsSync(path)) {
-            fs.writeFileSync(path, 'date,' + Object.keys(datas).join(',') + '\n');
-            LogService.log('sensors', 'CSV created', path);
-        }
+    private static save(datas: Sensors, path: string): void {
+        DatabaseService.insert(datas).subscribe(_ => {
+            delete datas.rawMpptchg;
 
-        fs.appendFileSync(path, new Date().toLocaleString() + ',' + Object.values(datas).join(',') + '\n');
-        LogService.log('sensors', 'CSV saved with datas', path);
+            if (!fs.existsSync(path)) {
+                fs.writeFileSync(path, 'date,' + Object.keys(datas).join(',') + '\n');
+                LogService.log('sensors', 'CSV created', path);
+            }
+
+            fs.appendFileSync(path, new Date().toLocaleString() + ',' + Object.values(datas).join(',') + '\n');
+            LogService.log('sensors', 'CSV saved with datas', path);
+        });
     }
 }

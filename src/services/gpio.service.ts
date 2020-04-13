@@ -11,7 +11,7 @@ export class GpioService {
     private static gpios: any[] = [];
 
     public static set(pin: number, value: boolean): Observable<void> {
-        LogService.log('gpio', 'Set', GpioEnum[pin], value);
+        LogService.log('gpio', 'Set', GpioEnum[pin] + `(${pin})`, value);
 
         if (GpioService.USE_FAKE) {
             return of(null);

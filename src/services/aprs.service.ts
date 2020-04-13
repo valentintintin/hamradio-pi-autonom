@@ -92,7 +92,7 @@ export class AprsService {
                                 '-s ' + config.callSrc,
                                 '-d ' + (config.callDest ? config.callDest : 'APRS'),
                                 '-p ' + (config.path ? config.path : 'WIDE1-1,WIDE2-1'),
-                                `T#${AprsService.SEQ_TELEMETRY.toString().padStart(2, '0')},${telemetry.voltageBatterie},${telemetry.intensiteCharge},${telemetry.temperatureRtc}`
+                                `T#${AprsService.SEQ_TELEMETRY.toString().padStart(2, '0')},${telemetry.voltageBattery},${telemetry.currentCharge},${telemetry.temperatureRtc}`
                             ], {
                                 encoding: 'utf8'
                             });

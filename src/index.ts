@@ -4,6 +4,7 @@ import { LogService } from './services/log.service';
 import { config } from '../assets/config';
 import { ProcessService } from './services/process.service';
 import { WebcamService } from './services/webcam.service';
+import { DatabaseService } from './services/database.service';
 
 export const assetsFolder: string = process.cwd() + '/assets';
 
@@ -16,6 +17,7 @@ if (!config) {
 export let debug: boolean = !!config.debug;
 
 LogService.LOG_PATH = config.logsPath;
+
 GpioService.USE_FAKE = !!config.fakeGpio;
 
 if (config.mpptChd) {
@@ -26,4 +28,6 @@ if (config.webcam) {
     WebcamService.USE_FAKE = !!config.webcam.fake;
 }
 
-new ProcessService().run(config);
+DatabaseService.openDatabase(config.logsPath).subscribe(_ => {
+    new ProcessService().run(config);
+});

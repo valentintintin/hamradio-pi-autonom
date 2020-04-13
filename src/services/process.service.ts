@@ -3,20 +3,26 @@ import { LogService } from './log.service';
 import { MpptchgService } from './mpptchg.service';
 import { AprsService } from './aprs.service';
 import { SensorsService } from './sensors.service';
-import { timer } from 'rxjs';
-import { skip, switchMap } from 'rxjs/operators';
+import { of, Subscription, timer } from 'rxjs';
+import { catchError, skip, switchMap, tap } from 'rxjs/operators';
 import { VoiceService } from './voice.service';
 import { AudioDecoder, MultimonModeEnum } from 'nodejs-arecord-multimon';
 import { WebcamService } from './webcam.service';
 import { SstvService } from './sstv.service';
 import { RadioService } from './radio.service';
+import { DatabaseService } from './database.service';
+import { ApiService } from './api.service';
+
+const ON_DEATH = require('death');
 
 export class ProcessService {
 
     private audioDecoder = new AudioDecoder();
+    private mpptchgSubscription: Subscription;
+    private api: ApiService;
 
     public run(config: ConfigInterface): void {
-        LogService.log('program', 'Start');
+        LogService.log('program', 'Started');
 
         if (config.mpptChd && config.mpptChd.enable) {
             this.runMpptChd(config);
@@ -34,7 +40,36 @@ export class ProcessService {
             this.runWebcam(config);
         }
 
-        this.runDtmfDecoder(config);
+        if (config.api && config.api.enable) {
+            this.runApi(config);
+        }
+
+        ON_DEATH((signal: any, err: any) => {
+            LogService.log('program', 'Stopping');
+
+            let stop = of(null);
+
+            if (this.mpptchgSubscription) {
+                this.mpptchgSubscription.unsubscribe();
+
+                stop = stop.pipe(
+                    switchMap(_ =>
+                        MpptchgService.stop().pipe(
+                            tap(_ => LogService.log('mpptChd', 'Watchdog disabled if enabled')),
+                            catchError(e => {
+                                LogService.log('mpptChd', 'Watchdog impossible to disabled (if enabled) !');
+                                return of(null);
+                            })
+                        )
+                    )
+                );
+            }
+
+            stop.pipe(
+                switchMap(_ => DatabaseService.close()),
+                catchError(_ => process.exit(1))
+            ).subscribe(_ => process.exit(err ? 1 : 0))
+        });
     }
 
     private runMpptChd(config: ConfigInterface): void {
@@ -42,7 +77,8 @@ export class ProcessService {
     }
 
     private runAprs(config: ConfigInterface): void {
-        timer(60, 1000 * (config.aprs.interval ? config.aprs.interval : 900)).subscribe(_ =>
+        LogService.log('aprs', 'Started');
+        timer(60000, 1000 * (config.aprs.interval ? config.aprs.interval : 900)).subscribe(_ =>
             AprsService.sendAprsBeacon(config.aprs, true).pipe(
                 switchMap(_ => AprsService.sendAprsTelemetry(config.aprs, true))
             ).subscribe(_ => !!config.aprs.waitDtmfInterval ? this.runDtmfDecoder(config) : null)
@@ -88,26 +124,33 @@ export class ProcessService {
 
         const interval = 1000 * (config.aprs.waitDtmfInterval ? config.aprs.waitDtmfInterval : 60);
         const timerSubscription = timer(interval, interval).subscribe(_ => {
-            LogService.log('dtmf', 'Should timeout', interval);
             if (shouldStop) {
                 LogService.log('dtmf', 'Timeout');
                 this.audioDecoder.stop().subscribe();
                 RadioService.switchOff().subscribe();
                 decoderSubscription.unsubscribe();
                 timerSubscription.unsubscribe();
+            } else {
+                LogService.log('dtmf', 'Should timeout, restart', interval);
             }
         });
     }
 
     private runSensors(config: ConfigInterface): void {
-        timer(60, 1000 * (config.sensors.interval ? config.sensors.interval : 60)).subscribe(_ =>
+        LogService.log('sensors', 'Started');
+        timer(60000, 1000 * (config.sensors.interval ? config.sensors.interval : 60)).subscribe(_ =>
             SensorsService.getAllAndSave(config.sensors).subscribe()
         );
     }
 
     private runWebcam(config: ConfigInterface): void {
-        timer(30, 1000 * (config.webcam.interval ? config.webcam.interval : 30)).subscribe(_ =>
+        LogService.log('webcam', 'Started');
+        timer(30000, 1000 * (config.webcam.interval ? config.webcam.interval : 30)).subscribe(_ =>
             WebcamService.capture(config.webcam).subscribe()
         );
+    }
+
+    private runApi(config: ConfigInterface): void {
+        this.api = new ApiService(config);
     }
 }

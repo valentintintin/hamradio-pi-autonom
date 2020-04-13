@@ -1,6 +1,7 @@
 import { Observable, Observer } from 'rxjs';
 import { LogService } from './log.service';
 import { map, switchMap } from 'rxjs/operators';
+import { debug } from '../index';
 import i2c = require('i2c-bus');
 
 export enum CommandMpptChd {
@@ -46,6 +47,7 @@ export enum StatusMpptChd {
 }
 
 export interface MpptChdStatusInterface {
+    raw: number[];
     chargerState: MpptChdStatusChargerStateInterface, // 2:0
     nightDetected: boolean; // 3
     chargerTemperatureLimit: boolean; // 4
@@ -113,9 +115,10 @@ export class CommunicationMpptchdService {
 
     private static readonly COMMANDS: Command[] = [
         new Command('ID', false, true, false, CommandMpptChd.ID, 0x1000),
-        new Command('STATUS', false, true, false, CommandMpptChd.STATUS, CommunicationMpptchdService.getStatusDate({
+        new Command('STATUS', false, true, false, CommandMpptChd.STATUS, CommunicationMpptchdService.getStatusData({
+            raw: [0, 0],
             chargerState: {
-                night: true,
+                night: false,
                 idle: false,
                 vsrcv: false,
                 scan: false,
@@ -123,10 +126,10 @@ export class CommunicationMpptchdService {
                 absorption: false,
                 float: false
             },
-            nightDetected: true,
+            nightDetected: false,
             chargerTemperatureLimit: false,
             powerEnabledJumper: false,
-            alertAsserted: true,
+            alertAsserted: false,
             powerEnabled: true,
             watchdogRunning: false,
             externalTemperatureSensorMissing: false,
@@ -153,7 +156,7 @@ export class CommunicationMpptchdService {
         new Command('WDPWROFF', true, true, false, CommandMpptChd.WDPWROFF, 0)
     ];
 
-    private static readonly i2c = i2c.openSync(1);
+    private static i2c;
     private static _instance: CommunicationMpptchdService;
 
     private static readonly WDEN_MAGIC_BYTE = 0xEA;
@@ -161,6 +164,9 @@ export class CommunicationMpptchdService {
     public static get instance(): CommunicationMpptchdService {
         if (!this._instance) {
             this._instance = new CommunicationMpptchdService();
+            if (!CommunicationMpptchdService.USE_FAKE) {
+                CommunicationMpptchdService.i2c = i2c.openSync(1);
+            }
         }
         return this._instance;
     }
@@ -184,6 +190,7 @@ export class CommunicationMpptchdService {
             switchMap(status => this.receive(CommandMpptChd.STATUS).pipe(
                 map(status2 => {
                     return {
+                        raw: [status, status2],
                         chargerState: {
                             night: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_NIGHT, status, status2),
                             idle: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_IDLE, status, status2),
@@ -317,7 +324,9 @@ export class CommunicationMpptchdService {
                 observer.error(new Error('Command is not writable'));
             }
 
-            LogService.log('i2c-' + 'mpptChg', 'Send command', { command: commandObject.name, data: data });
+            if (debug) {
+                LogService.log('i2c-' + 'mpptChg', 'Send command', { command: commandObject.name, data: data });
+            }
 
             let receive = 0;
             if (!CommunicationMpptchdService.USE_FAKE) {
@@ -338,7 +347,7 @@ export class CommunicationMpptchdService {
         });
     }
 
-    public receive(command: CommandMpptChd, log: boolean = false): Observable<number> {
+    public receive(command: CommandMpptChd): Observable<number> {
         return new Observable<number>((observer: Observer<number>) => {
             const commandObject: Command = CommunicationMpptchdService.COMMANDS.find(c => c.regAddr === command);
             if (!commandObject) {
@@ -346,7 +355,7 @@ export class CommunicationMpptchdService {
                 observer.error(new Error('Command does not exist'));
             }
 
-            if (log) {
+            if (debug) {
                 LogService.log('i2c-' + 'mpptChg', 'Receive', commandObject.name);
             }
 
@@ -378,7 +387,7 @@ export class CommunicationMpptchdService {
                 }
             }
 
-            if (log) {
+            if (debug) {
                 LogService.log('i2c-' + 'mpptChg', 'Receive response', {
                     command: commandObject.name,
                     received: received
@@ -397,7 +406,7 @@ export class CommunicationMpptchdService {
         return value1 & mask;
     }
 
-    private static getStatusDate(config: MpptChdStatusInterface): number {
+    private static getStatusData(config: MpptChdStatusInterface): number {
         let value = config.chargerState.night ? StatusMpptChd.CHARGER_STATE_NIGHT : 0;
         value += config.chargerState.idle ? StatusMpptChd.CHARGER_STATE_IDLE : 0;
         value += config.chargerState.vsrcv ? StatusMpptChd.CHARGER_STATE_VSCR : 0;

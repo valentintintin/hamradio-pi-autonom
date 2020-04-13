@@ -1,5 +1,5 @@
 import SunCalc = require('suncalc');
-import { Observable, of, timer } from 'rxjs';
+import { Observable, of, throwError, timer } from 'rxjs';
 import { catchError, map, retry, switchMap, tap } from 'rxjs/operators';
 import { LogService } from './log.service';
 import { CommandMpptChd, CommunicationMpptchdService } from './communication-mpptchd.service';
@@ -65,23 +65,14 @@ export class MpptchgService {
         return wakeUp;
     }
 
+    public static stop(): Observable<void> {
+        return CommunicationMpptchdService.instance.disableWatchdog();
+    }
+
     public static battery(config: ConfigInterface): Observable<void> {
-        const mpptChd: CommunicationMpptchdService = CommunicationMpptchdService.instance as CommunicationMpptchdService;
+        const mpptChd: CommunicationMpptchdService = CommunicationMpptchdService.instance;
 
-        LogService.log('mpptChd', 'Starting manager');
-
-        ON_DEATH((signal: any, err: any) => {
-            mpptChd.disableWatchdog().subscribe({
-                next: _ => {
-                    LogService.log('mpptChd', 'Watchdog disabled if enabled');
-                    process.exit(0);
-                },
-                error: _ => {
-                    LogService.log('mpptChd', 'Watchdog impossible to disabled (if enabled) !');
-                    process.exit(1);
-                }
-            });
-        });
+        LogService.log('mpptChd', 'Started');
 
         const powerOnVolt = config.mpptChd.powerOnVolt ? config.mpptChd.powerOnVolt : MpptchgService.POWER_ON_VOLT;
         const powerOffVolt = config.mpptChd.powerOffVolt ? config.mpptChd.powerOffVolt : MpptchgService.POWER_OFF_VOLT;
@@ -90,9 +81,9 @@ export class MpptchgService {
             switchMap(_ => mpptChd.send(CommandMpptChd.PWROFFV, powerOffVolt)),
             tap(_ => LogService.log('mpptChd', 'Power values set', powerOffVolt, powerOnVolt)),
             retry(2),
-            catchError(err => { // todo : tester si throw ce qu'il se passe
+            catchError(err => {
                 LogService.log('mpptChd', 'Impossible to set all power values !', powerOffVolt, powerOnVolt);
-                return err;
+                return throwError(err);
             }),
             switchMap(_ => timer(0, this.WD_UPDATE_SECS * 1000)), // todo : check if pipe here the last one
             switchMap(_ => this.baterryManagerUpdate(config.lat, config.lng, config.mpptChd.watchdog))
@@ -100,9 +91,9 @@ export class MpptchgService {
     }
 
     private static baterryManagerUpdate(lat: number, lng: number, watchdog: boolean): Observable<void> {
-        return (CommunicationMpptchdService.instance as CommunicationMpptchdService).getStatus().pipe(
+        return (CommunicationMpptchdService.instance).getStatus().pipe(
             switchMap(status => {
-                LogService.log('mpptChd', 'Status', status);
+                LogService.log('mpptChd', 'Get status',);
 
                 if (status.alertAsserted) {
                     LogService.log('mpptChd', 'Alert ! Halt now');
@@ -133,15 +124,15 @@ export class MpptchgService {
                 }
 
                 if (wdShouldReset) {
-                    return (CommunicationMpptchdService.instance as CommunicationMpptchdService).enableWatchdog(this.wdPowerOffSec, this.wdInitSec).pipe(
+                    return (CommunicationMpptchdService.instance).enableWatchdog(this.wdPowerOffSec, this.wdInitSec).pipe(
                         map(_ => {
                             LogService.log('mpptChd', 'Watchdog enabled', this.wdPowerOffSec, this.wdInitSec);
                             return null;
                         }),
                         retry(2),
-                        catchError(err => { // todo : test si throw
+                        catchError(err => {
                             LogService.log('mpptChd', 'Watchdog impossible to enabled !', this.wdPowerOffSec, this.wdInitSec);
-                            return err;
+                            return throwError(err);
                         })
                     );
                 }
