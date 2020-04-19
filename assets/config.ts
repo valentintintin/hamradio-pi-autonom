@@ -51,8 +51,9 @@ export const config: ConfigInterface = {
         sentence: 'Station autonome de Foxtrote 4, Hotel Victor Victor'
     },
     mpptChd: {
-        enable: false,
+        enable: true,
         fake: true,
+        debugI2C: false,
         powerOffVolt: 11400,
         watchdog: true,
         shutdownAlert: true,

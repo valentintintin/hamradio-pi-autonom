@@ -15,20 +15,21 @@ export class LogService {
             logs.data = JSON.stringify(data);
         }
 
+        const now = new Date();
+        const log =
+            '[' + now.toLocaleString() + ']' +
+            '[' + action.toUpperCase() + ']' +
+            ' --> ' + message
+        ;
+
+        if (data && data.length) {
+            console.log(log, data);
+        } else {
+            console.log(log);
+        }
+
+        // todo Add send to server
         DatabaseService.insert(logs).subscribe(_ => {
-            const now = new Date();
-            const log =
-                '[' + now.toLocaleString() + ']' +
-                '[' + action.toUpperCase() + ']' +
-                ' --> ' + message
-            ;
-
-            if (data && data.length) {
-                console.log(log, data);
-            } else {
-                console.log(log);
-            }
-
             const fileLog = LogService.LOG_PATH + '/' + now.getFullYear() + '-' + now.getMonth() + '-' + now.getDate() + '.log';
 
             try {

@@ -7,7 +7,10 @@ export class RadioService {
 
     public static switchOn(): Observable<void> {
         LogService.log('radio', 'Relay', true);
-        return GpioService.set(GpioEnum.RelayRadio, true);
+
+        return GpioService.set(GpioEnum.RelayRadio, true).pipe(
+            delay(500), // todo check working
+        );
     }
 
     public static switchOff(): Observable<void> {
@@ -16,12 +19,10 @@ export class RadioService {
     }
 
     public static pttOn(): Observable<void> {
+        LogService.log('radio', 'PTT', true);
+
         return RadioService.switchOn().pipe(
-            switchMap(_ => {
-                LogService.log('radio', 'PTT', true);
-                return GpioService.set(GpioEnum.PTT, true);
-            }),
-            delay(500),
+            switchMap(_ => GpioService.set(GpioEnum.PTT, true))
         );
     }
 

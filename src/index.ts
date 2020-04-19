@@ -4,7 +4,6 @@ import { LogService } from './services/log.service';
 import { config } from '../assets/config';
 import { ProcessService } from './services/process.service';
 import { WebcamService } from './services/webcam.service';
-import { DatabaseService } from './services/database.service';
 
 export const assetsFolder: string = process.cwd() + '/assets';
 
@@ -17,17 +16,17 @@ if (!config) {
 export let debug: boolean = !!config.debug;
 
 LogService.LOG_PATH = config.logsPath;
-
 GpioService.USE_FAKE = !!config.fakeGpio;
 
 if (config.mpptChd) {
     CommunicationMpptchdService.USE_FAKE = !!config.mpptChd.fake;
+    CommunicationMpptchdService.DEBUG = !!config.mpptChd.debugI2C;
 }
 
 if (config.webcam) {
     WebcamService.USE_FAKE = !!config.webcam.fake;
 }
 
-DatabaseService.openDatabase(config.logsPath).subscribe(_ => {
-    new ProcessService().run(config);
-});
+new ProcessService().run(config);
+
+// todo Add Direwolf Service with option for baudrate and why not add beacon and telemetry ?

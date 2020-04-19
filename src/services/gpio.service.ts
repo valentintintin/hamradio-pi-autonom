@@ -13,7 +13,7 @@ export class GpioService {
     public static set(pin: number, value: boolean): Observable<void> {
         LogService.log('gpio', 'Set', GpioEnum[pin] + `(${pin})`, value);
 
-        if (GpioService.USE_FAKE) {
+        if (GpioService.USE_FAKE || pin === GpioEnum.RelayBorneWifi) {
             return of(null);
         }
 

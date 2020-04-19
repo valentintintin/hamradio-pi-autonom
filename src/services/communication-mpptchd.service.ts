@@ -1,7 +1,6 @@
 import { Observable, Observer } from 'rxjs';
 import { LogService } from './log.service';
 import { map, switchMap } from 'rxjs/operators';
-import { debug } from '../index';
 import i2c = require('i2c-bus');
 
 export enum CommandMpptChd {
@@ -112,6 +111,7 @@ class Command {
 export class CommunicationMpptchdService {
 
     public static USE_FAKE = false;
+    public static DEBUG = false;
 
     private static readonly COMMANDS: Command[] = [
         new Command('ID', false, true, false, CommandMpptChd.ID, 0x1000),
@@ -324,7 +324,7 @@ export class CommunicationMpptchdService {
                 observer.error(new Error('Command is not writable'));
             }
 
-            if (debug) {
+            if (CommunicationMpptchdService.DEBUG) {
                 LogService.log('i2c-' + 'mpptChg', 'Send command', { command: commandObject.name, data: data });
             }
 
@@ -355,7 +355,7 @@ export class CommunicationMpptchdService {
                 observer.error(new Error('Command does not exist'));
             }
 
-            if (debug) {
+            if (CommunicationMpptchdService.DEBUG) {
                 LogService.log('i2c-' + 'mpptChg', 'Receive', commandObject.name);
             }
 
@@ -387,7 +387,7 @@ export class CommunicationMpptchdService {
                 }
             }
 
-            if (debug) {
+            if (CommunicationMpptchdService.DEBUG) {
                 LogService.log('i2c-' + 'mpptChg', 'Receive response', {
                     command: commandObject.name,
                     received: received

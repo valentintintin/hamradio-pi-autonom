@@ -1,6 +1,6 @@
 drop table if exists logs;
-
 drop table if exists sensors;
+drop table if exists variables;
 
 create table logs
 (
@@ -31,3 +31,12 @@ create table sensors
     rawMpptchg         text
 );
 
+create table variables
+(
+    id        integer
+        primary key autoincrement,
+    updatedAt datetime    not null,
+    name       varchar(32) not null,
+    data       text        not null
+);
+insert into variables(updatedAt, log) values(1587229268000, 0)

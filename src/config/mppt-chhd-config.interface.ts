@@ -2,6 +2,7 @@ import { FeatureInterface } from './config.interface';
 
 export interface MpptChhdConfigInterface extends FeatureInterface {
     fake?: boolean;
+    debugI2C?: boolean;
     watchdog?: boolean;
     shutdownAlert?: boolean;
     shutdownNight?: boolean;

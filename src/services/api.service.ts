@@ -10,6 +10,7 @@ import { VoiceService } from './voice.service';
 import { GpioEnum, GpioService } from './gpio.service';
 import { catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
+import { MpptchgService } from './mpptchg.service';
 
 export class ApiService {
 
@@ -50,7 +51,19 @@ export class ApiService {
 
         if (config.sensors && config.sensors.enable) {
             this.app.get('/sensors', (req, res) => {
-                SensorsService.getAll().subscribe(datas => res.send(datas));
+                SensorsService.getAllAndSave(config.sensors).subscribe(datas => res.send(datas));
+            });
+        }
+
+        if (config.mpptChd && config.mpptChd.enable) {
+            this.app.post('/shutdown/{timestamp}', (req, res) => {
+                const restartDate = new Date(+req.params['timestamp'] * 1000);
+                MpptchgService.shutdownAndWakeUpAtDate(restartDate).pipe(
+                    catchError(e => {
+                        res.json(e);
+                        return of(null);
+                    })
+                ).subscribe(_ => res.send(true));
             });
         }
 
@@ -98,7 +111,7 @@ export class ApiService {
             });
 
             this.app.post('/aprs/telemetry', (req, res) => {
-                AprsService.sendAprsTelemetry(config.aprs).pipe(
+                AprsService.sendAprsTelemetry(config.aprs, config.sensors).pipe(
                     catchError(e => {
                         res.json(e);
                         return of(null);
@@ -106,6 +119,9 @@ export class ApiService {
                 ).subscribe(_ => res.send(true));
             });
         }
+
+        // todo Add route to disable watchdog mpptchg
+        // todo Add route to (de)activate direwolf packet radio
 
         const port = config.api.port ?? 3000;
         this.app.listen(port, () => {

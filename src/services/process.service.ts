@@ -1,6 +1,6 @@
 import { ConfigInterface } from '../config/config.interface';
 import { LogService } from './log.service';
-import { MpptchgService } from './mpptchg.service';
+import { EventMpptChg, MpptchgService } from './mpptchg.service';
 import { AprsService } from './aprs.service';
 import { SensorsService } from './sensors.service';
 import { of, Subscription, timer } from 'rxjs';
@@ -12,8 +12,8 @@ import { SstvService } from './sstv.service';
 import { RadioService } from './radio.service';
 import { DatabaseService } from './database.service';
 import { ApiService } from './api.service';
-
-const ON_DEATH = require('death');
+import { debug } from '../index';
+import { exec } from 'child_process';
 
 export class ProcessService {
 
@@ -21,67 +21,110 @@ export class ProcessService {
     private mpptchgSubscription: Subscription;
     private api: ApiService;
 
+    private stopDirectly: boolean;
+
     public run(config: ConfigInterface): void {
-        LogService.log('program', 'Started');
+        LogService.log('program', 'Starting');
 
-        if (config.mpptChd && config.mpptChd.enable) {
-            this.runMpptChd(config);
+        try {
+            DatabaseService.openDatabase(config.logsPath).pipe(
+                switchMap(_ => RadioService.pttOff(true))
+            ).subscribe(_ => {
+                if (config.mpptChd && config.mpptChd.enable) {
+                    this.runMpptChd(config);
+                }
+
+                if (config.aprs && config.aprs.enable) {
+                    this.runAprs(config);
+                }
+
+                if (config.sensors && config.sensors.enable) {
+                    this.runSensors(config);
+                }
+
+                if (config.webcam && config.webcam.enable) {
+                    this.runWebcam(config);
+                }
+
+                if (config.api && config.api.enable) {
+                    this.runApi(config);
+                }
+
+                process.on('exit', event => this.exitHandler(config, event));
+                process.on('SIGINT', event => this.exitHandler(config, event));
+                process.on('SIGTERM', event => this.exitHandler(config, event));
+                process.on('SIGQUIT', event => this.exitHandler(config, event));
+
+                LogService.log('program', 'Started');
+            });
+        } catch (e) {
+            this.exitHandler(config, 0);
         }
+    }
 
-        if (config.aprs && config.aprs.enable) {
-            this.runAprs(config);
-        }
+    private exitHandler(config: ConfigInterface, event) {
+        let stop = of(null);
 
-        if (config.sensors && config.sensors.enable) {
-            this.runSensors(config);
-        }
-
-        if (config.webcam && config.webcam.enable) {
-            this.runWebcam(config);
-        }
-
-        if (config.api && config.api.enable) {
-            this.runApi(config);
-        }
-
-        ON_DEATH((signal: any, err: any) => {
-            LogService.log('program', 'Stopping');
-
-            let stop = of(null);
+        if (!this.stopDirectly) {
+            LogService.log('program', 'Stopping', event);
 
             if (this.mpptchgSubscription) {
                 this.mpptchgSubscription.unsubscribe();
 
-                stop = stop.pipe(
-                    switchMap(_ =>
-                        MpptchgService.stop().pipe(
-                            tap(_ => LogService.log('mpptChd', 'Watchdog disabled if enabled')),
-                            catchError(e => {
-                                LogService.log('mpptChd', 'Watchdog impossible to disabled (if enabled) !');
-                                return of(null);
-                            })
+                if (event !== EventMpptChg.ALERT) {
+                    stop = stop.pipe(
+                        switchMap(_ =>
+                            MpptchgService.stop().pipe(
+                                tap(_ => LogService.log('mpptChd', 'Watchdog disabled if enabled')),
+                                catchError(e => {
+                                    LogService.log('mpptChd', 'Watchdog impossible to disabled (if enabled) !');
+                                    return of(null);
+                                })
+                            )
                         )
-                    )
+                    );
+                }
+            }
+
+            if (config.aprs && config.aprs.enable) {
+                stop = stop.pipe(
+                    switchMap(_ => AprsService.sendAprsBeacon(config.aprs, true)),
+                    switchMap(_ => AprsService.sendAprsTelemetry(config.aprs, config.sensors))
                 );
             }
 
-            stop.pipe(
-                switchMap(_ => DatabaseService.close()),
-                catchError(_ => process.exit(1))
-            ).subscribe(_ => process.exit(err ? 1 : 0))
+            stop = stop.pipe(
+                switchMap(_ => RadioService.pttOff(true)),
+                catchError(err => {
+                    LogService.log('program', 'Stopped KO', err);
+                    return RadioService.pttOff(true).pipe(catchError(_ => of(null)));
+                })
+            );
+        }
+
+        stop.subscribe(_ => {
+            if (this.stopDirectly) {
+                LogService.log('program', 'Stopped', event);
+            }
+            this.stopDirectly = true;
+            if (!debug) {
+                exec('halt');
+            }
+            process.exit(0);
         });
     }
 
     private runMpptChd(config: ConfigInterface): void {
-        MpptchgService.battery(config).subscribe();
+        this.mpptchgSubscription = MpptchgService.battery(config).subscribe();
+        MpptchgService.events.on(EventMpptChg.ALERT, _ => this.exitHandler(config, EventMpptChg.ALERT));
     }
 
     private runAprs(config: ConfigInterface): void {
         LogService.log('aprs', 'Started');
         timer(60000, 1000 * (config.aprs.interval ? config.aprs.interval : 900)).subscribe(_ =>
             AprsService.sendAprsBeacon(config.aprs, true).pipe(
-                switchMap(_ => AprsService.sendAprsTelemetry(config.aprs, true))
-            ).subscribe(_ => !!config.aprs.waitDtmfInterval ? this.runDtmfDecoder(config) : null)
+                switchMap(_ => AprsService.sendAprsTelemetry(config.aprs, config.sensors, true))
+            ).subscribe(_ => !!config.aprs.waitDtmfInterval && !AprsService.alreadyInUse ? this.runDtmfDecoder(config) : null)
         );
     }
 
@@ -106,17 +149,23 @@ export class ProcessService {
                     if (result.data === '#') {
                         LogService.log('dtmf', 'Reset code', dtmfCode);
                         dtmfCode = '';
-                    } else {
-                        if (config.sstv && config.sstv.enable) {
-                            if (!dtmfCode.endsWith(result.data)) {
-                                dtmfCode += result.data;
-                            }
-                            if (dtmfCode === config.sstv.dtmfCode) {
-                                dtmfCode = '';
-                                shouldStop = false;
+                    } else if (result.data === '*') {
+                        shouldStop = false;
+                        // todo Add code to activate direwolf packet radio and not restart APRS timer
+                        if (dtmfCode === config.sstv.dtmfCode) {
+                            if (config.sstv && config.sstv.enable) {
                                 SstvService.sendImage(config.sstv, true).subscribe(_ => shouldStop = true);
+                            } else {
+                                LogService.log('dtmf', 'Function disabled', dtmfCode);
+                                VoiceService.sendVoice('Fonction demandée désactivée. ' + config.voice.sentence, true).subscribe(_ => shouldStop = true);
                             }
+                        } else {
+                            LogService.log('dtmf', 'Code not recognized', dtmfCode);
+                            VoiceService.sendVoice('Erreur code, ' + dtmfCode + '. ' + config.voice.sentence, true).subscribe(_ => shouldStop = true);
                         }
+                        dtmfCode = '';
+                    } else if (!dtmfCode.endsWith(result.data)) {
+                        dtmfCode += result.data;
                     }
                 }
             }

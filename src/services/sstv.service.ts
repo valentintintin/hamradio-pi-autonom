@@ -1,6 +1,6 @@
-import { Observable, Observer } from 'rxjs';
+import { Observable, Observer, of } from 'rxjs';
 import { LogService } from './log.service';
-import { catchError, delay, switchMap } from 'rxjs/operators';
+import { catchError, delay, switchMap, tap } from 'rxjs/operators';
 import { RadioService } from './radio.service';
 import { SstvConfigInterface } from '../config/sstv-config.interface';
 import * as Jimp from 'jimp'
@@ -15,8 +15,17 @@ export class SstvService {
     private static readonly player = PlaySound();
     private static readonly tmpImage = '/tmp/sstv.jpg';
 
+    public static alreadyInUse: boolean;
+
     public static sendImage(config: SstvConfigInterface, keepRadioOn: boolean = false): Observable<void> {
         LogService.log('sstv', 'Start sending image');
+
+        if (SstvService.alreadyInUse) {
+            LogService.log('sstv', 'Already in use');
+            return of(null);
+        }
+
+        SstvService.alreadyInUse = true;
 
         return new Observable<void>((observer: Observer<void>) => {
             const filePath = WebcamService.lastPhotoPath ?? assetsFolder + '/test.jpg';
@@ -90,7 +99,12 @@ export class SstvService {
                 });
             }),
             switchMap(_ => RadioService.pttOff(!keepRadioOn)),
+            tap(_ => {
+                SstvService.alreadyInUse = false;
+                LogService.log('sstv', 'Send image OK');
+            }),
             catchError(err => {
+                SstvService.alreadyInUse = false;
                 LogService.log('sstv', 'Send image KO', err);
                 return RadioService.pttOff(!keepRadioOn);
             }),

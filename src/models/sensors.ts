@@ -1,16 +1,17 @@
 import { Entity } from './entity';
 
 export class Sensors extends Entity {
-    public voltageBattery: number;
-    public voltageSolar: number;
-    public currentBattery: number;
-    public currentSolar: number;
-    public currentCharge: number;
-    public temperatureBattery: number;
-    public temperatureCpu: number;
-    public temperatureRtc: number;
-    public uptime: number;
-    public nightDetected: number;
-    public alertAsserted: number;
+    public createdAt: number = new Date().getTime();
+    public voltageBattery: number = -1;
+    public voltageSolar: number = -1;
+    public currentBattery: number = -1;
+    public currentSolar: number = -1;
+    public currentCharge: number = -1;
+    public temperatureBattery: number = -1;
+    public temperatureCpu: number = -1;
+    public temperatureRtc: number = -1;
+    public uptime: number = -1;
+    public nightDetected: number = -1;
+    public alertAsserted: number = -1;
     public rawMpptchg: string;
 }

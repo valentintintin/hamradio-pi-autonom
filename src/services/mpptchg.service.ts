@@ -1,13 +1,11 @@
 import SunCalc = require('suncalc');
-import { Observable, of, throwError, timer } from 'rxjs';
+import { Observable, of, timer } from 'rxjs';
 import { catchError, map, retry, switchMap, tap } from 'rxjs/operators';
 import { LogService } from './log.service';
 import { CommandMpptChd, CommunicationMpptchdService } from './communication-mpptchd.service';
-import { exec } from 'child_process';
 import { debug } from '../index';
 import { ConfigInterface } from '../config/config.interface';
-
-const ON_DEATH = require('death');
+import * as events from 'events';
 
 export class MpptchgService {
 
@@ -25,6 +23,8 @@ export class MpptchgService {
     private static wdPowerOffSec;
     private static wdInitSec;
 
+    public static events = new events.EventEmitter();
+
     private static getSunCalcTime(lat: number, lng: number, tomorrow: boolean = false): SunCalcResultInterface {
         const date = new Date();
         if (tomorrow) {
@@ -33,7 +33,7 @@ export class MpptchgService {
         return SunCalc.getTimes(date, lat, lng);
     }
 
-    public static getWakeupDate(lat: number, lng: number, allowNight: boolean = false, tomorrow: boolean = false): Date {
+    public static getWakeupDate(lat: number, lng: number, allowNight: boolean = false, tomorrow: boolean = false): Date { // todo Add minSeconds args
         let wakeUp = new Date();
         if (tomorrow) {
             wakeUp.setDate(wakeUp.getDate() + 1);
@@ -66,7 +66,7 @@ export class MpptchgService {
     }
 
     public static stop(): Observable<void> {
-        return CommunicationMpptchdService.instance.disableWatchdog();
+        return CommunicationMpptchdService.instance.disableWatchdog(); // todo Security : not disable but set to 1 hour
     }
 
     public static battery(config: ConfigInterface): Observable<void> {
@@ -82,10 +82,10 @@ export class MpptchgService {
             tap(_ => LogService.log('mpptChd', 'Power values set', powerOffVolt, powerOnVolt)),
             retry(2),
             catchError(err => {
-                LogService.log('mpptChd', 'Impossible to set all power values !', powerOffVolt, powerOnVolt);
-                return throwError(err);
+                LogService.log('mpptChd', 'Impossible to set all power values', powerOffVolt, powerOnVolt);
+                return of(null);
             }),
-            switchMap(_ => timer(0, this.WD_UPDATE_SECS * 1000)), // todo : check if pipe here the last one
+            switchMap(_ => timer(0, this.WD_UPDATE_SECS * 1000)),
             switchMap(_ => this.baterryManagerUpdate(config.lat, config.lng, config.mpptChd.watchdog))
         );
     }
@@ -93,53 +93,55 @@ export class MpptchgService {
     private static baterryManagerUpdate(lat: number, lng: number, watchdog: boolean): Observable<void> {
         return (CommunicationMpptchdService.instance).getStatus().pipe(
             switchMap(status => {
-                LogService.log('mpptChd', 'Get status',);
+                LogService.log('mpptChd', 'Loop check',);
 
                 if (status.alertAsserted) {
-                    LogService.log('mpptChd', 'Alert ! Halt now');
-                    if (!debug) {
-                        exec('halt');
-                    }
-                    process.exit(0);
-                }
-
-                let wdShouldReset = watchdog;
-                if (status.nightDetected) {
-                    if (!this.nightTriggered) {
-                        LogService.log('mpptChd', 'Night detected');
-                        this.nightTriggered = true;
-                        this.wdInitSec = this.WD_INIT_NIGHT_SECS;
-                        const nextWakeUp = this.getWakeupDate(lat, lng, status.values && status.values.batteryVoltage >= this.NIGHT_LIMIT_VOLT);
-                        const timeNight = Math.round((nextWakeUp.getTime() - new Date().getTime()) / 1000);
-                        this.wdPowerOffSec = timeNight > this.WD_UPDATE_SECS + 20 ? timeNight : this.WD_PWROFF_NIGHT_SECS_DEFAULT;
-                        this.wdPowerOffSec = 10;
-                    } else {
-                        LogService.log('mpptChd', 'Night still here');
-                        wdShouldReset = false;
-                    }
+                    LogService.log('mpptChd', 'Alert asserted !');
+                    this.events.emit(EventMpptChg.ALERT);
                 } else {
-                    this.nightTriggered = false;
-                    this.wdPowerOffSec = this.WD_PWROFF_SECS;
-                    this.wdInitSec = this.WD_INIT_SECS;
-                }
+                    let wdShouldReset = watchdog;
+                    if (status.nightDetected) {
+                        if (!this.nightTriggered) {
+                            LogService.log('mpptChd', 'Night detected');
+                            this.nightTriggered = true;
+                            this.events.emit(EventMpptChg.NIGHT_DETECTED);
+                            this.wdInitSec = this.WD_INIT_NIGHT_SECS;
+                            const nextWakeUp = this.getWakeupDate(lat, lng, status.values && status.values.batteryVoltage >= this.NIGHT_LIMIT_VOLT);
+                            const timeNight = Math.round((nextWakeUp.getTime() - new Date().getTime()) / 1000);
+                            this.wdPowerOffSec = timeNight > this.WD_UPDATE_SECS + 20 ? timeNight : this.WD_PWROFF_NIGHT_SECS_DEFAULT;
+                            this.wdPowerOffSec = 10;
+                        } else {
+                            LogService.log('mpptChd', 'Night still here');
+                            wdShouldReset = false;
+                        }
+                    } else {
+                        this.nightTriggered = false;
+                        this.wdPowerOffSec = this.WD_PWROFF_SECS;
+                        this.wdInitSec = this.WD_INIT_SECS;
+                    }
 
-                if (wdShouldReset) {
-                    return (CommunicationMpptchdService.instance).enableWatchdog(this.wdPowerOffSec, this.wdInitSec).pipe(
-                        map(_ => {
-                            LogService.log('mpptChd', 'Watchdog enabled', this.wdPowerOffSec, this.wdInitSec);
-                            return null;
-                        }),
-                        retry(2),
-                        catchError(err => {
-                            LogService.log('mpptChd', 'Watchdog impossible to enabled !', this.wdPowerOffSec, this.wdInitSec);
-                            return throwError(err);
-                        })
-                    );
+                    if (wdShouldReset) {
+                        return (CommunicationMpptchdService.instance).enableWatchdog(this.wdPowerOffSec, this.wdInitSec).pipe(
+                            map(_ => {
+                                LogService.log('mpptChd', 'Watchdog enabled', this.wdPowerOffSec, this.wdInitSec);
+                                return null;
+                            }),
+                            retry(2),
+                            catchError(err => {
+                                LogService.log('mpptChd', 'Watchdog impossible to enabled !', this.wdPowerOffSec, this.wdInitSec);
+                                return of(null);
+                            })
+                        );
+                    }
+                    LogService.log('mpptChd', 'Nothing to do');
                 }
-                LogService.log('mpptChd', 'Nothing to do');
                 return of(null);
             })
         );
+    }
+
+    public static shutdownAndWakeUpAtDate(restartDate: Date): Observable<void> { // todo
+        return this.stop();
     }
 }
 
@@ -158,4 +160,9 @@ interface SunCalcResultInterface {
     nightEnd: Date;
     nauticalDawn: Date;
     dawn: Date;
+}
+
+export enum EventMpptChg {
+    NIGHT_DETECTED = 'NIGHT_DETECTED',
+    ALERT = 'ALERT'
 }
