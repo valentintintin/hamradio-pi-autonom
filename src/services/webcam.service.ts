@@ -3,6 +3,9 @@ import { Observable, Observer, of } from 'rxjs';
 import { LogService } from './log.service';
 import { WebcamConfigInterface } from '../config/webcam-config.interface';
 import { assetsFolder } from '../index';
+import { catchError, switchMap } from 'rxjs/operators';
+import { SftpService } from './sftp.service';
+import { SftpConfigInterface } from '../config/sftp-config.interface';
 
 export class WebcamService {
 
@@ -22,7 +25,7 @@ export class WebcamService {
 
     public static alreadyInUse: boolean;
 
-    public static capture(config: WebcamConfigInterface): Observable<string> {
+    public static captureAndSend(configWebcam: WebcamConfigInterface, configSftp: SftpConfigInterface): Observable<string> {
         LogService.log('webcam', 'Start capturing');
 
         if (WebcamService.alreadyInUse) {
@@ -35,8 +38,7 @@ export class WebcamService {
         return new Observable<string>((observer: Observer<string>) => {
             if (!WebcamService.USE_FAKE) {
                 // @ts-ignore
-                // todo Add send to server
-                this.webcam.capture(config.photosPath + '/' + new Date().format('{YYYY}_{MM}_{DD}-{hh}_{mm}_{ss}'), (err, data) => {
+                this.webcam.capture(configWebcam.photosPath + '/' + new Date().format('{YYYY}_{MM}_{DD}-{hh}_{mm}_{ss}'), (err, data) => {
                     WebcamService.alreadyInUse = false;
 
                     if (err) {
@@ -58,6 +60,11 @@ export class WebcamService {
                 observer.next(WebcamService.lastPhotoPath);
                 observer.complete();
             }
-        });
+        }).pipe(
+            switchMap(photoPath => SftpService.send(configSftp, photoPath).pipe(
+                catchError(_ => of(photoPath)),
+                switchMap(_ => of(photoPath))
+            ))
+        );
     }
 }

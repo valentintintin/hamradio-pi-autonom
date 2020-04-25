@@ -1,5 +1,10 @@
 import { DatabaseService } from './database.service';
 import { Logs } from '../models/logs';
+import { ProcessService } from './process.service';
+import { SftpConfigInterface } from '../config/sftp-config.interface';
+import { Observable } from 'rxjs';
+import { SftpService } from './sftp.service';
+import { map } from 'rxjs/operators';
 import fs = require('fs');
 
 export class LogService {
@@ -17,7 +22,7 @@ export class LogService {
 
         const now = new Date();
         const log =
-            '[' + now.toLocaleString() + ']' +
+            '[' + now.toLocaleString() + '] ' +
             '[' + action.toUpperCase() + ']' +
             ' --> ' + message
         ;
@@ -28,19 +33,24 @@ export class LogService {
             console.log(log);
         }
 
-        // todo Add send to server
-        DatabaseService.insert(logs).subscribe(_ => {
-            const fileLog = LogService.LOG_PATH + '/' + now.getFullYear() + '-' + now.getMonth() + '-' + now.getDate() + '.log';
+        if (!ProcessService.debug) {
+            DatabaseService.insert(logs).subscribe(_ => {
+                const fileLog = LogService.LOG_PATH + '/' + now.getFullYear() + '-' + now.getMonth().toString(10).padStart(2, '0') + '-' + now.getDate().toString(10).padStart(2, '0') + '.log';
 
-            try {
-                if (!fs.existsSync(fileLog)) {
-                    fs.writeFileSync(fileLog, log + '\n');
-                } else {
-                    fs.appendFileSync(fileLog, log + '\n');
+                try {
+                    if (!fs.existsSync(fileLog)) {
+                        fs.writeFileSync(fileLog, log + '\n');
+                    } else {
+                        fs.appendFileSync(fileLog, log + '\n');
+                    }
+                } catch (e) {
+                    console.error(e, fileLog);
                 }
-            } catch (e) {
-                console.error(e, fileLog);
-            }
-        });
+            });
+        }
+    }
+
+    public static send(config: SftpConfigInterface, logsPath: string): Observable<void> {
+        return SftpService.send(config, logsPath).pipe(map(_ => null));
     }
 }

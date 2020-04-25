@@ -3,7 +3,6 @@ import { Observable, of, timer } from 'rxjs';
 import { catchError, map, retry, switchMap, tap } from 'rxjs/operators';
 import { LogService } from './log.service';
 import { CommandMpptChd, CommunicationMpptchdService } from './communication-mpptchd.service';
-import { debug } from '../index';
 import { ConfigInterface } from '../config/config.interface';
 import * as events from 'events';
 
@@ -13,60 +12,35 @@ export class MpptchgService {
     public static readonly POWER_ON_VOLT = 12500;
     public static readonly NIGHT_LIMIT_VOLT = 11700;
 
-    private static readonly WD_INIT_SECS = 180 / (debug ? 10 : 1);
-    private static readonly WD_INIT_NIGHT_SECS = 600 / (debug ? 10 : 1);
-    private static readonly WD_UPDATE_SECS = 60 / (debug ? 10 : 1);
-    private static readonly WD_PWROFF_SECS = 10 / (debug ? 10 : 1);
-    private static readonly WD_PWROFF_NIGHT_SECS_DEFAULT = 3600 / (debug ? 100 : 1);
+    private static readonly WD_INIT_SECS = 180; // 2 minutes
+    private static readonly WD_INIT_NIGHT_SECS = 300; // 5 minutes
+    private static readonly WD_UPDATE_SECS = 60; // 1 minute
+    private static readonly WD_ALERT_SECS = 60; // 1 minute
+    private static readonly WD_PWROFF_SECS = 10; // 10 secondes
+    private static readonly WD_PWROFF_NIGHT_SECS_DEFAULT = 3600; // 1 heure
 
     private static nightTriggered;
-    private static wdPowerOffSec;
-    private static wdInitSec;
 
     public static events = new events.EventEmitter();
 
-    private static getSunCalcTime(lat: number, lng: number, tomorrow: boolean = false): SunCalcResultInterface {
+    private static getSunCalcTime(lat: number, lng: number): SunCalcResultInterface {
         const date = new Date();
-        if (tomorrow) {
+        const sunDate: SunCalcResultInterface = SunCalc.getTimes(date, lat, lng);
+        if (sunDate.dawn.getTime() < date.getTime()) {
             date.setDate(date.getDate() + 1);
+            return SunCalc.getTimes(date, lat, lng);
         }
-        return SunCalc.getTimes(date, lat, lng);
+        return sunDate;
     }
 
-    public static getWakeupDate(lat: number, lng: number, allowNight: boolean = false, tomorrow: boolean = false): Date { // todo Add minSeconds args
-        let wakeUp = new Date();
-        if (tomorrow) {
-            wakeUp.setDate(wakeUp.getDate() + 1);
-        }
-        const sunTimes: SunCalcResultInterface = this.getSunCalcTime(lat, lng, tomorrow);
-
-        if (wakeUp > sunTimes.dawn && wakeUp < sunTimes.dusk) {
-            if (wakeUp < sunTimes.goldenHourEnd || wakeUp > sunTimes.goldenHour) {
-                wakeUp.setMinutes(wakeUp.getMinutes() + 1);
-            } else {
-                wakeUp.setMinutes(wakeUp.getMinutes() + 3);
-            }
-        } else if (!allowNight) {
-            wakeUp = sunTimes.dawn;
-        } else {
-            wakeUp.setMinutes(0);
-            wakeUp.setHours(wakeUp.getHours() + 1);
-            if (wakeUp > sunTimes.dawn) {
-                wakeUp = sunTimes.dawn;
-            }
-        }
-
-        wakeUp.setSeconds(0);
-
-        if (wakeUp.getTime() < new Date().getTime()) {
-            return this.getWakeupDate(lat, lng, allowNight, true);
-        }
-
-        return wakeUp;
+    public static stopWatchdog(): Observable<Date> {
+        const date = new Date();
+        date.setHours(date.getHours() + 1);
+        return MpptchgService.shutdownAndWakeUpAtDate(date, 0);
     }
 
-    public static stop(): Observable<void> {
-        return CommunicationMpptchdService.instance.disableWatchdog(); // todo Security : not disable but set to 1 hour
+    public static startWatchdog(): Observable<void> {
+        return MpptchgService.enableWatchdog(this.WD_PWROFF_SECS, this.WD_INIT_SECS);
     }
 
     public static battery(config: ConfigInterface): Observable<void> {
@@ -90,7 +64,7 @@ export class MpptchgService {
         );
     }
 
-    private static baterryManagerUpdate(lat: number, lng: number, watchdog: boolean): Observable<void> {
+    private static baterryManagerUpdate(lat: number, lng: number, useWatchdog: boolean): Observable<void> {
         return (CommunicationMpptchdService.instance).getStatus().pipe(
             switchMap(status => {
                 LogService.log('mpptChd', 'Loop check',);
@@ -99,38 +73,28 @@ export class MpptchgService {
                     LogService.log('mpptChd', 'Alert asserted !');
                     this.events.emit(EventMpptChg.ALERT);
                 } else {
-                    let wdShouldReset = watchdog;
                     if (status.nightDetected) {
                         if (!this.nightTriggered) {
                             LogService.log('mpptChd', 'Night detected');
                             this.nightTriggered = true;
                             this.events.emit(EventMpptChg.NIGHT_DETECTED);
-                            this.wdInitSec = this.WD_INIT_NIGHT_SECS;
-                            const nextWakeUp = this.getWakeupDate(lat, lng, status.values && status.values.batteryVoltage >= this.NIGHT_LIMIT_VOLT);
-                            const timeNight = Math.round((nextWakeUp.getTime() - new Date().getTime()) / 1000);
-                            this.wdPowerOffSec = timeNight > this.WD_UPDATE_SECS + 20 ? timeNight : this.WD_PWROFF_NIGHT_SECS_DEFAULT;
-                            this.wdPowerOffSec = 10;
+                            let nextWakeUp = new Date();
+                            if (status.values && status.values.batteryVoltage >= this.NIGHT_LIMIT_VOLT) {
+                                nextWakeUp.setSeconds(this.WD_PWROFF_NIGHT_SECS_DEFAULT);
+                            } else {
+                                nextWakeUp = this.getSunCalcTime(lat, lng).dawn;
+                            }
+                            return MpptchgService.shutdownAndWakeUpAtDate(nextWakeUp, this.WD_INIT_NIGHT_SECS).pipe(
+                                catchError(err => of(null))
+                            );
                         } else {
                             LogService.log('mpptChd', 'Night still here');
-                            wdShouldReset = false;
                         }
-                    } else {
+                    } else if (useWatchdog) {
                         this.nightTriggered = false;
-                        this.wdPowerOffSec = this.WD_PWROFF_SECS;
-                        this.wdInitSec = this.WD_INIT_SECS;
-                    }
 
-                    if (wdShouldReset) {
-                        return (CommunicationMpptchdService.instance).enableWatchdog(this.wdPowerOffSec, this.wdInitSec).pipe(
-                            map(_ => {
-                                LogService.log('mpptChd', 'Watchdog enabled', this.wdPowerOffSec, this.wdInitSec);
-                                return null;
-                            }),
-                            retry(2),
-                            catchError(err => {
-                                LogService.log('mpptChd', 'Watchdog impossible to enabled !', this.wdPowerOffSec, this.wdInitSec);
-                                return of(null);
-                            })
+                        return MpptchgService.startWatchdog().pipe(
+                            catchError(err => of(null))
                         );
                     }
                     LogService.log('mpptChd', 'Nothing to do');
@@ -140,26 +104,55 @@ export class MpptchgService {
         );
     }
 
-    public static shutdownAndWakeUpAtDate(restartDate: Date): Observable<void> { // todo
-        return this.stop();
+    private static enableWatchdog(secondsBeforeWakeUp: number, secondsBeforeShutdown: number = this.WD_INIT_SECS): Observable<void> {
+        return (CommunicationMpptchdService.instance).enableWatchdog(secondsBeforeWakeUp, secondsBeforeShutdown).pipe(
+            map(_ => {
+                LogService.log('mpptChd', 'Watchdog enabled', secondsBeforeWakeUp, secondsBeforeShutdown);
+                return null;
+            }),
+            retry(2),
+            catchError(err => {
+                LogService.log('mpptChd', 'Watchdog impossible to enabled !', secondsBeforeWakeUp, secondsBeforeShutdown);
+                return err;
+            })
+        );
+    }
+
+    public static shutdownAndWakeUpAtDate(wakeUpDate: Date, secondsBeforeShutdown: number = 0): Observable<Date> {
+        const wakeUpDateNew = new Date(wakeUpDate);
+        wakeUpDateNew.setSeconds(secondsBeforeShutdown + this.WD_UPDATE_SECS + this.WD_ALERT_SECS + 20); // To be sure to trigger the timer one time + 60s alert asserted + 20s to be sure again
+        let secondsBedoreWakeUp = Math.round((wakeUpDateNew.getTime() - new Date().getTime()) / 1000);
+
+        LogService.log('mpptChd', 'Request to shutdown', {
+            'request': wakeUpDate,
+            'requestOk': wakeUpDateNew,
+            'secondsBedoreWakeUp': secondsBedoreWakeUp,
+            'secondsBeforeShutdown': secondsBeforeShutdown
+        })
+
+        return this.enableWatchdog(secondsBedoreWakeUp, secondsBeforeShutdown).pipe(
+            tap(_ => this.events.emit(EventMpptChg.ALERT)),
+            map(_ => wakeUpDateNew)
+        );
     }
 }
 
+// https://en.wikipedia.org/wiki/Twilight
 interface SunCalcResultInterface {
-    sunrise: Date;
-    sunriseEnd: Date;
-    goldenHourEnd: Date;
-    solarNoon: Date;
-    goldenHour: Date;
-    sunsetStart: Date;
-    sunset: Date;
-    dusk: Date;
-    nauticalDusk: Date;
-    night: Date;
-    nadir: Date;
-    nightEnd: Date;
-    nauticalDawn: Date;
-    dawn: Date;
+    sunrise: Date;          // sunrise (top edge of the sun appears on the horizon)
+    sunriseEnd: Date;       // sunrise ends (bottom edge of the sun touches the horizon)
+    goldenHourEnd: Date;    // morning golden hour (soft light, best time for photography) ends
+    solarNoon: Date;        // solar noon (sun is in the highest position)
+    goldenHour: Date;       // evening golden hour starts
+    sunsetStart: Date;      // sunset starts (bottom edge of the sun touches the horizon)
+    sunset: Date;           // sunset (sun disappears below the horizon, evening civil twilight starts)
+    dusk: Date;             // dusk (evening nautical twilight starts)
+    nauticalDusk: Date;     // nautical dusk (evening astronomical twilight starts)
+    night: Date;            // night starts (dark enough for astronomical observations)
+    nadir: Date;            // nadir (darkest moment of the night, sun is in the lowest position)
+    nightEnd: Date;         // night ends (morning astronomical twilight starts)
+    nauticalDawn: Date;     // nautical dawn (morning nautical twilight starts)
+    dawn: Date;             // dawn (morning nautical twilight ends, morning civil twilight starts)
 }
 
 export enum EventMpptChg {

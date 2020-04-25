@@ -26,9 +26,9 @@ export const config: ConfigInterface = {
     },
     aprs: {
         enable: true,
-        lat: 45.196250,
-        lng: 5.727160,
-        altitude: 300,
+        lat: 45.174651,
+        lng: 5.677257,
+        altitude: 440,
         callSrc: 'F4HVV-1',
         callDest: 'APFD38',
         path: 'WIDE1-1,WIDE2-1',
@@ -36,7 +36,6 @@ export const config: ConfigInterface = {
         symbolCode: 'I',
         comment: 'Hamnet 44.151.38.221',
         interval: 900,
-        ax25beaconPath: '/home/valentin/Softs/ax25beacon',
         waitDtmfInterval: 60
     },
     sstv: {
@@ -59,5 +58,14 @@ export const config: ConfigInterface = {
         shutdownAlert: true,
         shutdownNight: true,
         nightLimitVolt: 11600
+    },
+    sftp: {
+        enable: true,
+        host: 'valentin.ddns.info',
+        username: 'valentin',
+        interval: 60,
+        remotePath: '/',
+        privateKeyPath: '/home/valentin/.ssh/id_rsa',
+        privateKeyPassphrase: '******'
     }
 };

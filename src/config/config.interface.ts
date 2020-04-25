@@ -6,6 +6,7 @@ import { SensorsConfigInterface } from './sensors-config.interface';
 import { WebcamConfigInterface } from './webcam-config.interface';
 import { PacketRadioConfigInterface } from './packet-radio-config.interface';
 import { ApiConfigInterface } from './api-config.interface';
+import { SftpConfigInterface } from './sftp-config.interface';
 
 export interface ConfigInterface {
     lat: number;
@@ -22,6 +23,7 @@ export interface ConfigInterface {
     voice?: VoiceConfigInterface;
     mpptChd?: MpptChhdConfigInterface;
     api?: ApiConfigInterface;
+    sftp?: SftpConfigInterface;
 }
 
 export interface FeatureInterface {

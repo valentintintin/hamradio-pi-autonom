@@ -1,4 +1,4 @@
-import { Observable, Observer, of } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { LogService } from './log.service';
 import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import { RadioService } from './radio.service';
@@ -7,7 +7,7 @@ import { AprsConfigInterface } from '../config/aprs-config.interface';
 import { SensorsConfigInterface } from '../config/sensors-config.interface';
 import { DatabaseService } from './database.service';
 import { EnumVariable } from '../models/variables';
-import ChildProcess = require('child_process');
+import { TncService } from './tnc.service';
 
 export class AprsService {
 
@@ -25,29 +25,15 @@ export class AprsService {
 
         return RadioService.pttOn().pipe(
             switchMap(_ => {
-                return new Observable<void>((observer: Observer<void>) => {
-                    try {
-                        LogService.log('aprs', 'Send APRS beacon');
+                LogService.log('aprs', 'Send APRS beacon');
 
-                        ChildProcess.execFileSync(config.ax25beaconPath + '/ax25beacon', [
-                            '-s ' + config.callSrc,
-                            '-d ' + (config.callDest ? config.callDest : 'APRS'),
-                            '-p ' + (config.path ? config.path : 'WIDE1-1,WIDE2-1'),
-                            '-t ' + (config.symbolTable ? config.symbolTable : '/'),
-                            '-c ' + (config.symbolCode ? config.symbolCode : '"'),
-                            '' + config.lat,
-                            '' + config.lng,
-                            config.altitude ? '' + config.altitude : '0',
-                            config.comment ? config.comment : ''
-                        ], {
-                            encoding: 'utf8'
-                        });
-                        observer.next();
-                        observer.complete();
-                    } catch (e) {
-                        observer.error(e);
-                    }
-                });
+                const latitude = AprsService.convertToDmsAprs(config.lat).toString(10).padStart(7, '0') + 'N';
+                const longitude = AprsService.convertToDmsAprs(config.lng).toString(10).padStart(8, '0') + 'E';
+                const altitude = Math.round(config.altitude * 3.281).toString(10).padStart(6, '0');
+
+                return TncService.instance.send(config.callSrc, config.callDest,
+                    `!${latitude}${config.symbolTable}${longitude}${config.symbolCode}/A=${altitude}${config.comment}`,
+                    config.path);
             }),
             switchMap(_ => RadioService.pttOff(!keepRadioOn)),
             tap(_ => {
@@ -76,63 +62,18 @@ export class AprsService {
             switchMap(telemetry => RadioService.pttOn().pipe(
                 switchMap(_ => DatabaseService.readVariable<number>(EnumVariable.SEQ_TELEMETRY).pipe(map(d => +d))),
                 switchMap(seq => {
-                    return new Observable<void>((observer: Observer<void>) => {
-                        if (seq === 0) {
-                            try {
-                                LogService.log('aprs', 'Send APRS Telemetry Name');
+                    const framesToSend = [
+                        `T#${seq.toString().padStart(3, '0')},${telemetry.voltageBattery},${telemetry.currentCharge},${telemetry.temperatureRtc},0,0,00000000`
+                    ];
 
-                                ChildProcess.execFileSync(configAprs.ax25beaconPath + '/ax25frame', [
-                                    '-s ' + configAprs.callSrc,
-                                    '-d ' + (configAprs.callDest ? configAprs.callDest : 'APRS'),
-                                    '-p ' + (configAprs.path ? configAprs.path : 'WIDE1-1,WIDE2-1'),
-                                    `:${configAprs.callSrc}   :PARM,VBat,ICharge,Temp`
-                                ], {
-                                    encoding: 'utf8'
-                                });
-                            } catch (e) {
-                                LogService.log('aprs', 'Send APRS Telemetry Name KO', e);
-                            }
-                            try {
-                                LogService.log('aprs', 'Send APRS Telemetry Unit');
+                    if (seq === 0) {
+                        framesToSend.unshift(`:${configAprs.callSrc.padEnd(9, ' ')}:PARM.VBat,ICharge,Temp`);
+                        framesToSend.unshift(`:${configAprs.callSrc.padEnd(9, ' ')}:UNIT.Volts,Amps,Celcius`);
+                    }
 
-                                ChildProcess.execFileSync(configAprs.ax25beaconPath + '/ax25frame', [
-                                    '-s ' + configAprs.callSrc,
-                                    '-d ' + (configAprs.callDest ? configAprs.callDest : 'APRS'),
-                                    '-p ' + (configAprs.path ? configAprs.path : 'WIDE1-1,WIDE2-1'),
-                                    `:${configAprs.callSrc}   :UNIT,Volts,Amps,Celcius`
-                                ], {
-                                    encoding: 'utf8'
-                                });
-                            } catch (e) {
-                                LogService.log('aprs', 'Send APRS Telemetry Unit KO', e);
-                            }
-                        }
-
-                        try {
-                            LogService.log('aprs', 'Send APRS Telemetry');
-
-                            ChildProcess.execFileSync(configAprs.ax25beaconPath + '/ax25frame', [
-                                '-s ' + configAprs.callSrc,
-                                '-d ' + (configAprs.callDest ? configAprs.callDest : 'APRS'),
-                                '-p ' + (configAprs.path ? configAprs.path : 'WIDE1-1,WIDE2-1'),
-                                `T#${seq.toString().padStart(2, '0')},${telemetry.voltageBattery},${telemetry.currentCharge},${telemetry.temperatureRtc}`
-                            ], {
-                                encoding: 'utf8'
-                            });
-
-                            DatabaseService.updateVariable(EnumVariable.SEQ_TELEMETRY, (seq + 1) % 100).pipe(
-                                catchError(err => {
-                                    observer.error(err);
-                                    return err;
-                                })
-                            ).subscribe(_ => {
-                                observer.next(null);
-                                observer.complete();
-                            });
-                        } catch (e) {
-                            observer.error(e);
-                        }
-                    });
+                    return TncService.instance.sendMultiples(configAprs.callSrc, configAprs.callDest, framesToSend, configAprs.path).pipe(
+                        switchMap(_ => DatabaseService.updateVariable(EnumVariable.SEQ_TELEMETRY, (seq + 1) % 100))
+                    );
                 }),
                 switchMap(_ => RadioService.pttOff(!keepRadioOn)),
                 tap(_ => {
@@ -146,5 +87,13 @@ export class AprsService {
                 }),
             ))
         );
+    }
+
+    private static convertToDmsAprs(dd: number): number {
+        const absDd = Math.abs(dd);
+        const deg = Math.floor(absDd);
+        const frac = absDd - deg;
+        const min = frac * 60;
+        return +`${deg}${min.toFixed(2)}`;
     }
 }

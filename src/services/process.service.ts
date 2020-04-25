@@ -12,10 +12,13 @@ import { SstvService } from './sstv.service';
 import { RadioService } from './radio.service';
 import { DatabaseService } from './database.service';
 import { ApiService } from './api.service';
-import { debug } from '../index';
 import { exec } from 'child_process';
+import { GpioService } from './gpio.service';
+import { CommunicationMpptchdService } from './communication-mpptchd.service';
 
 export class ProcessService {
+
+    public static debug: boolean;
 
     private audioDecoder = new AudioDecoder();
     private mpptchgSubscription: Subscription;
@@ -24,6 +27,20 @@ export class ProcessService {
     private stopDirectly: boolean;
 
     public run(config: ConfigInterface): void {
+        ProcessService.debug = !!config.debug;
+
+        LogService.LOG_PATH = config.logsPath;
+        GpioService.USE_FAKE = !!config.fakeGpio;
+
+        if (config.mpptChd) {
+            CommunicationMpptchdService.USE_FAKE = !!config.mpptChd.fake;
+            CommunicationMpptchdService.DEBUG = !!config.mpptChd.debugI2C;
+        }
+
+        if (config.webcam) {
+            WebcamService.USE_FAKE = !!config.webcam.fake;
+        }
+
         LogService.log('program', 'Starting');
 
         try {
@@ -50,6 +67,10 @@ export class ProcessService {
                     this.runApi(config);
                 }
 
+                if (config.sftp && config.sftp.enable) {
+                    this.runSftp(config);
+                }
+
                 process.on('exit', event => this.exitHandler(config, event));
                 process.on('SIGINT', event => this.exitHandler(config, event));
                 process.on('SIGTERM', event => this.exitHandler(config, event));
@@ -74,7 +95,7 @@ export class ProcessService {
                 if (event !== EventMpptChg.ALERT) {
                     stop = stop.pipe(
                         switchMap(_ =>
-                            MpptchgService.stop().pipe(
+                            MpptchgService.stopWatchdog().pipe(
                                 tap(_ => LogService.log('mpptChd', 'Watchdog disabled if enabled')),
                                 catchError(e => {
                                     LogService.log('mpptChd', 'Watchdog impossible to disabled (if enabled) !');
@@ -107,7 +128,7 @@ export class ProcessService {
                 LogService.log('program', 'Stopped', event);
             }
             this.stopDirectly = true;
-            if (!debug) {
+            if (!ProcessService.debug) {
                 exec('halt');
             }
             process.exit(0);
@@ -151,7 +172,6 @@ export class ProcessService {
                         dtmfCode = '';
                     } else if (result.data === '*') {
                         shouldStop = false;
-                        // todo Add code to activate direwolf packet radio and not restart APRS timer
                         if (dtmfCode === config.sstv.dtmfCode) {
                             if (config.sstv && config.sstv.enable) {
                                 SstvService.sendImage(config.sstv, true).subscribe(_ => shouldStop = true);
@@ -195,11 +215,18 @@ export class ProcessService {
     private runWebcam(config: ConfigInterface): void {
         LogService.log('webcam', 'Started');
         timer(30000, 1000 * (config.webcam.interval ? config.webcam.interval : 30)).subscribe(_ =>
-            WebcamService.capture(config.webcam).subscribe()
+            WebcamService.captureAndSend(config.webcam, config.sftp).subscribe()
         );
     }
 
     private runApi(config: ConfigInterface): void {
         this.api = new ApiService(config);
+    }
+
+    private runSftp(config: ConfigInterface): void {
+        LogService.log('sftp', 'Started');
+        timer(60000, 1000 * (config.sftp.interval ? config.sftp.interval : 60)).subscribe(_ => {
+            LogService.send(config.sftp, config.logsPath).subscribe();
+        });
     }
 }

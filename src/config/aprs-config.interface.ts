@@ -5,11 +5,10 @@ export interface AprsConfigInterface extends FeatureIntervalInterface {
     lng: number;
     altitude: number;
     callSrc: string;
-    callDest?: string;
+    callDest: string;
     path?: string;
     symbolTable?: string;
     symbolCode?: string;
     comment?: string;
     waitDtmfInterval?: number;
-    ax25beaconPath: string;
 }

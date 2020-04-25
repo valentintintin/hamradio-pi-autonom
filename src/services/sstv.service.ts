@@ -6,6 +6,7 @@ import { SstvConfigInterface } from '../config/sstv-config.interface';
 import * as Jimp from 'jimp'
 import { WebcamService } from './webcam.service';
 import { assetsFolder } from '../index';
+import { ToneService } from './tone.service';
 import ChildProcess = require('child_process');
 import PlaySound = require('play-sound');
 import fs = require('fs');
@@ -70,20 +71,7 @@ export class SstvService {
                     }
                 });
             }),
-            switchMap(_ => RadioService.pttOn()),
-            switchMap(_ => {
-                return new Observable<void>((observer: Observer<void>) => {
-                    LogService.log('sstv', 'Sending 1750 Hz');
-                    this.player.play(assetsFolder + '/1750.wav', err => {
-                        if (err) {
-                            observer.error(err);
-                        } else {
-                            observer.next();
-                            observer.complete();
-                        }
-                    });
-                });
-            }),
+            switchMap(_ => ToneService.send1750(true, true)),
             switchMap(_ => {
                 return new Observable<void>((observer: Observer<void>) => {
                     LogService.log('sstv', 'Sending SSTV');

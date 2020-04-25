@@ -63,7 +63,25 @@ export class ApiService {
                         res.json(e);
                         return of(null);
                     })
-                ).subscribe(_ => res.send(true));
+                ).subscribe(wakeupDate => res.send(wakeupDate));
+            });
+
+            this.app.post('/watchdog/stop', (req, res) => {
+                MpptchgService.stopWatchdog().pipe(
+                    catchError(e => {
+                        res.json(e);
+                        return of(null);
+                    })
+                ).subscribe(wakeupDate => res.send(wakeupDate));
+            });
+
+            this.app.post('/watchdog/start', (req, res) => {
+                MpptchgService.startWatchdog().pipe(
+                    catchError(e => {
+                        res.json(e);
+                        return of(null);
+                    })
+                ).subscribe(wakeupDate => res.send(true));
             });
         }
 
@@ -80,7 +98,7 @@ export class ApiService {
 
         if (config.webcam && config.webcam.enable) {
             this.app.post('/webcam', (req, res) => {
-                WebcamService.capture(config.webcam).pipe(
+                WebcamService.captureAndSend(config.webcam, config.sftp).pipe(
                     catchError(e => {
                         res.json(e);
                         return of(null);
@@ -119,9 +137,6 @@ export class ApiService {
                 ).subscribe(_ => res.send(true));
             });
         }
-
-        // todo Add route to disable watchdog mpptchg
-        // todo Add route to (de)activate direwolf packet radio
 
         const port = config.api.port ?? 3000;
         this.app.listen(port, () => {

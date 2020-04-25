@@ -3,9 +3,9 @@ import { LogService } from './log.service';
 import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import { CommunicationMpptchdService } from './communication-mpptchd.service';
 import { SensorsConfigInterface } from '../config/sensors-config.interface';
-import { debug } from '../index';
 import { DatabaseService } from './database.service';
 import { Sensors } from '../models/sensors';
+import { ProcessService } from './process.service';
 import fs = require('fs');
 
 const si = require('systeminformation');
@@ -55,7 +55,7 @@ export class SensorsService {
 
     public static getTemperatureRtc(): number {
         try {
-            const result = debug ? 20.5 : parseInt(fs.readFileSync('/sys/bus/i2c/devices/1-0068/hwmon/hwmon1/temp1_input', 'utf8'), 10) / 1000;
+            const result = ProcessService.debug ? 20.5 : parseInt(fs.readFileSync('/sys/bus/i2c/devices/1-0068/hwmon/hwmon1/temp1_input', 'utf8'), 10) / 1000;
             LogService.log('sensors', 'Get temperature RTC', result);
             return result;
         } catch (e) {

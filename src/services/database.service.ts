@@ -73,7 +73,6 @@ export class DatabaseService {
         });
     }
 
-    // todo test
     public static update(data: Entity, key: string | number, ignoreErrors: boolean = true): Observable<Entity> {
         return new Observable<Entity>((observer: Observer<Entity>) => {
             const query = `UPDATE ${data.constructor.name} SET ${Object.keys(data).filter(d => d !== 'id' && !!data[d]).map(k => `${k} = '${data[k]}'`).join(',')} WHERE ${key} = '${data[key]}'`;
@@ -103,7 +102,6 @@ export class DatabaseService {
         });
     }
 
-    // todo test
     public static readVariable<T>(name: string, fallback: T = null, ignoreErrors: boolean = true): Observable<T> {
         return new Observable<T>((observer: Observer<T>) => {
             const query = `SELECT data FROM variables WHERE name = '${name}'`;
@@ -131,7 +129,6 @@ export class DatabaseService {
         });
     }
 
-    // todo test
     public static updateVariable<T>(name: string, value: T, ignoreErrors: boolean = true): Observable<T> {
         const variable = new Variables();
         variable.name = name;
