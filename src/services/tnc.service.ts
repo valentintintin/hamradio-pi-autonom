@@ -6,6 +6,7 @@ import { delay, tap } from 'rxjs/operators';
 export class TncService {
 
     private static _instance: TncService;
+
     private static readonly SEC_START: number = 2000;
     private static readonly SEC_TRAME: number = 500;
 
@@ -17,9 +18,10 @@ export class TncService {
     }
 
     private tnc: kissTNCTcp;
+    private connected: boolean;
 
     private connectTnc(): Observable<void> {
-        if (this.tnc) {
+        if (this.tnc && this.connected) {
             return of(null);
         }
 
@@ -27,17 +29,16 @@ export class TncService {
             LogService.log('tnc', 'Start connection');
 
             this.tnc = new kissTNCTcp({
-                ip: 'locazlhost',
+                ip: 'localhost',
                 port: 8001
             });
 
             this.tnc.on('error', err => {
-                LogService.log('tnc', 'Connection KO !', err);
                 observer.error(err);
             });
 
             this.tnc.on('opened', () => {
-                LogService.log('tnc', 'Connected');
+                this.connected = true;
                 observer.next(null);
                 observer.complete();
             });
@@ -45,7 +46,6 @@ export class TncService {
             this.tnc.on('frame', frame => {
                 const packet = new Packet();
                 packet.disassemble(frame);
-                LogService.log('tnc', 'Receive', packet.log());
             });
         });
     }

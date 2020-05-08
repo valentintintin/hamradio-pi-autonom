@@ -244,6 +244,8 @@ export class ProcessService {
     }
 
     private testFunction(config: ConfigInterface): void {
-
+        AprsService.sendAprsBeacon(config.aprs, true).pipe(
+            switchMap(_ => AprsService.sendAprsTelemetry(config.aprs, config.sensors, true))
+        ).subscribe();
     }
 }

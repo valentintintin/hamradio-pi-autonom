@@ -26,10 +26,11 @@ export class SftpService {
                 dryRun: ProcessService.debug,
             });
 
-            sftp.on('error', function (err) {
-                LogService.log('sftp', 'Send KO', err);
-                observer.error(err);
-            })
+            sftp
+                .on('error', function (err) {
+                    LogService.log('sftp', 'Send KO', err);
+                    observer.error(err);
+                })
                 .on('completed', function () {
                     LogService.log('sftp', 'Send OK');
 
