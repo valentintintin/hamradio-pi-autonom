@@ -23,6 +23,7 @@ export class ProcessService {
     private audioDecoder = new AudioDecoder();
     private mpptchgSubscription: Subscription;
     private api: ApiService;
+    private dtmfDecoderShouldStop: boolean;
 
     private stopDirectly: boolean;
 
@@ -53,6 +54,9 @@ export class ProcessService {
 
                 if (config.aprs && config.aprs.enable) {
                     this.runAprs(config);
+                    if (!!config.aprs.waitDtmfInterval) {
+                        this.runDtmfDecoder(config);
+                    }
                 }
 
                 if (config.sensors && config.sensors.enable) {
@@ -145,66 +149,64 @@ export class ProcessService {
         timer(60000, 1000 * (config.aprs.interval ? config.aprs.interval : 900)).subscribe(_ =>
             AprsService.sendAprsBeacon(config.aprs, true).pipe(
                 switchMap(_ => AprsService.sendAprsTelemetry(config.aprs, config.sensors, true))
-            ).subscribe(_ => !!config.aprs.waitDtmfInterval && !AprsService.alreadyInUse ? this.runDtmfDecoder(config) : null)
+            ).subscribe(_ => {
+                if (!AprsService.alreadyInUse) {
+                    const interval = 1000 * (config.aprs.waitDtmfInterval ? config.aprs.waitDtmfInterval : 60);
+                    const timerSubscription = timer(interval, interval).subscribe(_ => {
+                        if (this.dtmfDecoderShouldStop) {
+                            LogService.log('dtmf', 'Timeout');
+                            this.audioDecoder.stop().subscribe();
+                            RadioService.switchOff().subscribe();
+                            timerSubscription.unsubscribe();
+                        } else {
+                            LogService.log('dtmf', 'Should timeout, restart', interval);
+                        }
+                    });
+                }
+            })
         );
     }
 
     private runDtmfDecoder(config: ConfigInterface): void {
         LogService.log('dtmf', 'Start listening');
         let dtmfCode = '';
-        let shouldStop = true;
 
-        const decoderSubscription = this.audioDecoder.decode(config.audioDevice, [MultimonModeEnum.DTMF, MultimonModeEnum.TONE], [], ['-T 1750']).pipe(
+        this.audioDecoder.decode(config.audioDevice, [MultimonModeEnum.DTMF, MultimonModeEnum.TONE], [], ['-T 1750']).pipe(
             skip(1)
         ).subscribe(result => {
-            if (shouldStop) {
-                LogService.log('dtmf', 'Data decoded', result);
+            LogService.log('dtmf', 'Data decoded', result);
 
-                if (result.type === MultimonModeEnum.TONE) {
-                    dtmfCode = '';
-                    if (config.voice && config.voice.enable) {
-                        shouldStop = false;
-                        VoiceService.sendVoice(config.voice.sentence, true).subscribe(_ => shouldStop = true);
-                    }
-                } else if (result.type === MultimonModeEnum.DTMF) {
-                    if (result.data === '#') {
-                        LogService.log('dtmf', 'Reset code', dtmfCode);
-                        dtmfCode = '';
-                    } else if (result.data === '*') {
-                        shouldStop = false;
-                        if (dtmfCode === config.sstv.dtmfCode) {
-                            if (config.sstv && config.sstv.enable) {
-                                SstvService.sendImage(config.sstv, true).subscribe(_ => shouldStop = true);
-                            } else {
-                                LogService.log('dtmf', 'Function disabled', dtmfCode);
-                                VoiceService.sendVoice('Fonction demandée désactivée', true).subscribe(_ => shouldStop = true);
-                            }
-                        } else if (dtmfCode === config.packetRadio.dtmfCode) {
-                            RadioService.keepOn = !RadioService.keepOn;
-                            LogService.log('radio', 'State keepOn set by DTMF', RadioService.keepOn);
-                            VoiceService.sendVoice('Radio ' + (RadioService.keepOn ? 'allumée' : 'éteinte'), true).subscribe(_ => shouldStop = true);
-                        } else {
-                            LogService.log('dtmf', 'Code not recognized', dtmfCode);
-                            VoiceService.sendVoice('Erreur code, ' + dtmfCode, true).subscribe(_ => shouldStop = true);
-                        }
-                        dtmfCode = '';
-                    } else if (!dtmfCode.endsWith(result.data)) {
-                        dtmfCode += result.data;
-                    }
+            if (result.type === MultimonModeEnum.TONE) {
+                dtmfCode = '';
+                if (config.voice && config.voice.enable) {
+                    this.dtmfDecoderShouldStop = false;
+                    VoiceService.sendVoice(config.voice.sentence, true).subscribe(_ => this.dtmfDecoderShouldStop = true);
                 }
-            }
-        });
-
-        const interval = 1000 * (config.aprs.waitDtmfInterval ? config.aprs.waitDtmfInterval : 60);
-        const timerSubscription = timer(interval, interval).subscribe(_ => {
-            if (shouldStop) {
-                LogService.log('dtmf', 'Timeout');
-                this.audioDecoder.stop().subscribe();
-                RadioService.switchOff().subscribe();
-                decoderSubscription.unsubscribe();
-                timerSubscription.unsubscribe();
-            } else {
-                LogService.log('dtmf', 'Should timeout, restart', interval);
+            } else if (result.type === MultimonModeEnum.DTMF) {
+                if (result.data === '#') {
+                    LogService.log('dtmf', 'Reset code', dtmfCode);
+                    dtmfCode = '';
+                } else if (result.data === '*') {
+                    this.dtmfDecoderShouldStop = false;
+                    if (dtmfCode === config.sstv.dtmfCode) {
+                        if (config.sstv && config.sstv.enable) {
+                            SstvService.sendImage(config.sstv, true).subscribe(_ => this.dtmfDecoderShouldStop = true);
+                        } else {
+                            LogService.log('dtmf', 'Function disabled', dtmfCode);
+                            VoiceService.sendVoice('Fonction demandée désactivée', true).subscribe(_ => this.dtmfDecoderShouldStop = true);
+                        }
+                    } else if (dtmfCode === config.packetRadio.dtmfCode) {
+                        RadioService.keepOn = !RadioService.keepOn;
+                        LogService.log('radio', 'State keepOn set by DTMF', RadioService.keepOn);
+                        VoiceService.sendVoice('Radio ' + (RadioService.keepOn ? 'allumée' : 'éteinte'), true).subscribe(_ => this.dtmfDecoderShouldStop = true);
+                    } else {
+                        LogService.log('dtmf', 'Code not recognized', dtmfCode);
+                        VoiceService.sendVoice('Erreur code, ' + dtmfCode, true).subscribe(_ => this.dtmfDecoderShouldStop = true);
+                    }
+                    dtmfCode = '';
+                } else if (!dtmfCode.endsWith(result.data)) {
+                    dtmfCode += result.data;
+                }
             }
         });
     }
