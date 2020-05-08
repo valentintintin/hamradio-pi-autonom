@@ -177,11 +177,15 @@ export class ProcessService {
                                 SstvService.sendImage(config.sstv, true).subscribe(_ => shouldStop = true);
                             } else {
                                 LogService.log('dtmf', 'Function disabled', dtmfCode);
-                                VoiceService.sendVoice('Fonction demandée désactivée. ' + config.voice.sentence, true).subscribe(_ => shouldStop = true);
+                                VoiceService.sendVoice('Fonction demandée désactivée', true).subscribe(_ => shouldStop = true);
                             }
+                        } else if (dtmfCode === config.packetRadio.dtmfCode) {
+                            RadioService.keepOn = !RadioService.keepOn;
+                            LogService.log('radio', 'State keepOn set by DTMF', RadioService.keepOn);
+                            VoiceService.sendVoice('Radio ' + (RadioService.keepOn ? 'allumée' : 'éteinte'), true).subscribe(_ => shouldStop = true);
                         } else {
                             LogService.log('dtmf', 'Code not recognized', dtmfCode);
-                            VoiceService.sendVoice('Erreur code, ' + dtmfCode + '. ' + config.voice.sentence, true).subscribe(_ => shouldStop = true);
+                            VoiceService.sendVoice('Erreur code, ' + dtmfCode, true).subscribe(_ => shouldStop = true);
                         }
                         dtmfCode = '';
                     } else if (!dtmfCode.endsWith(result.data)) {

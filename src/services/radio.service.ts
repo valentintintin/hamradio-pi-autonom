@@ -5,6 +5,8 @@ import { GpioEnum, GpioService } from './gpio.service';
 
 export class RadioService {
 
+    public static keepOn: boolean = false;
+
     public static switchOn(): Observable<void> {
         LogService.log('radio', 'Relay', true);
 
@@ -15,6 +17,9 @@ export class RadioService {
 
     public static switchOff(): Observable<void> {
         LogService.log('radio', 'Relay', false);
+        if (RadioService.keepOn) {
+            return of(null);
+        }
         return GpioService.set(GpioEnum.RelayRadio, false);
     }
 

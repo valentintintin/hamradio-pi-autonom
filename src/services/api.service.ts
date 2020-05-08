@@ -11,6 +11,7 @@ import { GpioEnum, GpioService } from './gpio.service';
 import { catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
 import { MpptchgService } from './mpptchg.service';
+import { RadioService } from './radio.service';
 
 export class ApiService {
 
@@ -41,7 +42,15 @@ export class ApiService {
         });
 
         this.app.post('/gpio/:pin/:value', (req: Request, res) => {
-            GpioService.set(GpioEnum[req.params['pin']], req.params['value'] === '1').pipe(
+            const pin = GpioEnum[req.params['pin']];
+            const value = req.params['value'] === '1';
+
+            if (pin === GpioEnum.RelayRadio) {
+                RadioService.keepOn = value;
+                LogService.log('radio', 'State keepOn set by API', RadioService.keepOn);
+            }
+
+            GpioService.set(pin, value).pipe(
                 catchError(e => {
                     res.json(e);
                     return of(null);
