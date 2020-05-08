@@ -34,9 +34,7 @@ export class MpptchgService {
     }
 
     public static stopWatchdog(): Observable<Date> {
-        const date = new Date();
-        date.setHours(date.getHours() + 1);
-        return MpptchgService.shutdownAndWakeUpAtDate(date, 0);
+        return MpptchgService.shutdownAndWakeUpAtDate(new Date(), 3600);
     }
 
     public static startWatchdog(): Observable<void> {
