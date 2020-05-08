@@ -4,7 +4,7 @@ import { EventMpptChg, MpptchgService } from './mpptchg.service';
 import { AprsService } from './aprs.service';
 import { SensorsService } from './sensors.service';
 import { of, Subscription, timer } from 'rxjs';
-import { catchError, skip, switchMap, tap } from 'rxjs/operators';
+import { catchError, map, skip, switchMap, tap } from 'rxjs/operators';
 import { VoiceService } from './voice.service';
 import { AudioDecoder, MultimonModeEnum } from 'nodejs-arecord-multimon';
 import { WebcamService } from './webcam.service';
@@ -51,7 +51,15 @@ export class ProcessService {
                 if (config.mpptChd && config.mpptChd.enable) {
                     this.runMpptChd(config);
                 }
-
+                CommunicationMpptchdService.instance.getStatus().pipe(
+                    map(data => {
+                        return config.voice.sentence
+                            .replace('batteryVoltage', data.values.batteryVoltage / 1000 + '')
+                            .replace('chargeCurrent', data.values.chargeCurrent + '')
+                            ;
+                    }),
+                    switchMap(sentence => VoiceService.sendVoice(sentence, true))
+                ).subscribe(_ => this.dtmfDecoderShouldStop = true);
                 if (config.aprs && config.aprs.enable) {
                     this.runAprs(config);
                     if (!!config.aprs.waitDtmfInterval) {
@@ -180,7 +188,15 @@ export class ProcessService {
                 dtmfCode = '';
                 if (config.voice && config.voice.enable) {
                     this.dtmfDecoderShouldStop = false;
-                    VoiceService.sendVoice(config.voice.sentence, true).subscribe(_ => this.dtmfDecoderShouldStop = true);
+                    CommunicationMpptchdService.instance.getStatus().pipe(
+                        map(data => {
+                            return config.voice.sentence
+                                .replace('batteryVoltage', data.values.batteryVoltage + '')
+                                .replace('chargeCurrent', data.values.chargeCurrent + '')
+                                ;
+                        }),
+                        switchMap(sentence => VoiceService.sendVoice(sentence, true))
+                    ).subscribe(_ => this.dtmfDecoderShouldStop = true);
                 }
             } else if (result.type === MultimonModeEnum.DTMF) {
                 if (result.data === '#') {
