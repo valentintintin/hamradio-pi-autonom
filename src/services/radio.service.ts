@@ -1,7 +1,9 @@
 import { Observable, of } from 'rxjs';
 import { LogService } from './log.service';
-import { delay, switchMap } from 'rxjs/operators';
+import { catchError, delay, map, switchMap } from 'rxjs/operators';
 import { GpioEnum, GpioService } from './gpio.service';
+import { ToneService } from './tone.service';
+import { AudioService } from './audio.service';
 
 export class RadioService {
 
@@ -36,6 +38,21 @@ export class RadioService {
 
         return GpioService.set(GpioEnum.PTT, false).pipe(
             switchMap(_ => shutdownRadio ? RadioService.switchOff() : of(null))
+        );
+    }
+
+    public static listenAndRepeat(seconds: number = 10, shutdownRadio: boolean = true): Observable<void> {
+        LogService.log('radio', 'Start listening to repeat', seconds);
+
+        return ToneService.sendOk(false, true).pipe(
+            switchMap(_ => AudioService.record(seconds)),
+            switchMap(path => ToneService.sendOk(true, true).pipe(map(_ => path))),
+            switchMap(path => AudioService.play(path)),
+            switchMap(_ => ToneService.sendError(false, !shutdownRadio)),
+            catchError(err => {
+                LogService.log('radio', 'Send image KO', err);
+                return RadioService.pttOff(shutdownRadio);
+            })
         );
     }
 }

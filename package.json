@@ -21,7 +21,6 @@
     "node-webcam": "^0.6.0",
     "nodejs-arecord-multimon": "git+https://github.com/valentintintin/nodejs-arecord-multimon.git",
     "pico-speaker": "0.0.7",
-    "play-sound": "^1.1.3",
     "rxjs": "^6.5.5",
     "sftp-upload": "^1.0.1",
     "shelljs": "^0.8.4",

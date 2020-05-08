@@ -7,13 +7,12 @@ import * as Jimp from 'jimp'
 import { WebcamService } from './webcam.service';
 import { assetsFolder } from '../index';
 import { ToneService } from './tone.service';
+import { AudioService } from './audio.service';
 import ChildProcess = require('child_process');
-import PlaySound = require('play-sound');
 import fs = require('fs');
 
 export class SstvService {
 
-    private static readonly player = PlaySound();
     private static readonly tmpImage = '/tmp/sstv.jpg';
 
     public static alreadyInUse: boolean;
@@ -72,20 +71,7 @@ export class SstvService {
                 });
             }),
             switchMap(_ => ToneService.send1750(true, true)),
-            switchMap(_ => {
-                return new Observable<void>((observer: Observer<void>) => {
-                    LogService.log('sstv', 'Sending SSTV');
-                    this.player.play('/tmp/sstv.jpg.wav', err => {
-                        if (err) {
-                            LogService.log('sstv', 'Send image KO', err);
-                            observer.error(err);
-                        } else {
-                            observer.next();
-                            observer.complete();
-                        }
-                    });
-                });
-            }),
+            switchMap(_ => AudioService.play('/tmp/sstv.jpg.wav')),
             switchMap(_ => RadioService.pttOff(!keepRadioOn)),
             tap(_ => {
                 SstvService.alreadyInUse = false;

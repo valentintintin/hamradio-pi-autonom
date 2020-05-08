@@ -94,6 +94,17 @@ export class ApiService {
             });
         }
 
+        if (config.repeater && config.repeater.enable) {
+            this.app.post('/repeater', (req, res) => {
+                RadioService.listenAndRepeat(config.repeater.seconds).pipe(
+                    catchError(e => {
+                        res.json(e);
+                        return of(null);
+                    })
+                ).subscribe(_ => res.send(true));
+            });
+        }
+
         if (config.sstv && config.sstv.enable) {
             this.app.post('/sstv', (req, res) => {
                 SstvService.sendImage(config.sstv).pipe(

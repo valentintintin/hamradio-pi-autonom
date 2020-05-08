@@ -7,6 +7,7 @@ import { WebcamConfigInterface } from './webcam-config.interface';
 import { PacketRadioConfigInterface } from './packet-radio-config.interface';
 import { ApiConfigInterface } from './api-config.interface';
 import { SftpConfigInterface } from './sftp-config.interface';
+import { RepeaterRadioConfigInterface } from './repeater-radio-config.interface';
 
 export interface ConfigInterface {
     lat: number;
@@ -24,6 +25,7 @@ export interface ConfigInterface {
     mpptChd?: MpptChhdConfigInterface;
     api?: ApiConfigInterface;
     sftp?: SftpConfigInterface;
+    repeater?: RepeaterRadioConfigInterface
 }
 
 export interface FeatureInterface {

@@ -48,18 +48,12 @@ export class ProcessService {
             DatabaseService.openDatabase(config.logsPath).pipe(
                 switchMap(_ => RadioService.pttOff(true))
             ).subscribe(_ => {
+                this.testFunction(config);
+
                 if (config.mpptChd && config.mpptChd.enable) {
                     this.runMpptChd(config);
                 }
-                CommunicationMpptchdService.instance.getStatus().pipe(
-                    map(data => {
-                        return config.voice.sentence
-                            .replace('batteryVoltage', data.values.batteryVoltage / 1000 + '')
-                            .replace('chargeCurrent', data.values.chargeCurrent + '')
-                            ;
-                    }),
-                    switchMap(sentence => VoiceService.sendVoice(sentence, true))
-                ).subscribe(_ => this.dtmfDecoderShouldStop = true);
+
                 if (config.aprs && config.aprs.enable) {
                     this.runAprs(config);
                     if (!!config.aprs.waitDtmfInterval) {
@@ -191,7 +185,7 @@ export class ProcessService {
                     CommunicationMpptchdService.instance.getStatus().pipe(
                         map(data => {
                             return config.voice.sentence
-                                .replace('batteryVoltage', data.values.batteryVoltage + '')
+                                .replace('batteryVoltage', data.values.batteryVoltage / 1000 + '')
                                 .replace('chargeCurrent', data.values.chargeCurrent + '')
                                 ;
                         }),
@@ -204,17 +198,14 @@ export class ProcessService {
                     dtmfCode = '';
                 } else if (result.data === '*') {
                     this.dtmfDecoderShouldStop = false;
-                    if (dtmfCode === config.sstv.dtmfCode) {
-                        if (config.sstv && config.sstv.enable) {
-                            SstvService.sendImage(config.sstv, true).subscribe(_ => this.dtmfDecoderShouldStop = true);
-                        } else {
-                            LogService.log('dtmf', 'Function disabled', dtmfCode);
-                            VoiceService.sendVoice('Fonction demandée désactivée', true).subscribe(_ => this.dtmfDecoderShouldStop = true);
-                        }
+                    if (config.sstv && config.sstv.enable && dtmfCode === config.sstv.dtmfCode) {
+                        SstvService.sendImage(config.sstv, true).subscribe(_ => this.dtmfDecoderShouldStop = true);
                     } else if (dtmfCode === config.packetRadio.dtmfCode) {
                         RadioService.keepOn = !RadioService.keepOn;
                         LogService.log('radio', 'State keepOn set by DTMF', RadioService.keepOn);
                         VoiceService.sendVoice('Radio ' + (RadioService.keepOn ? 'allumée' : 'éteinte'), true).subscribe(_ => this.dtmfDecoderShouldStop = true);
+                    } else if (config.repeater && config.repeater.enable && dtmfCode === config.repeater.dtmfCode) {
+                        RadioService.listenAndRepeat(config.repeater.seconds, false).subscribe(_ => this.dtmfDecoderShouldStop = true);
                     } else {
                         LogService.log('dtmf', 'Code not recognized', dtmfCode);
                         VoiceService.sendVoice('Erreur code, ' + dtmfCode, true).subscribe(_ => this.dtmfDecoderShouldStop = true);
@@ -250,5 +241,9 @@ export class ProcessService {
         timer(60000, 1000 * (config.sftp.interval ? config.sftp.interval : 60)).subscribe(_ => {
             LogService.send(config.sftp, config.logsPath).subscribe();
         });
+    }
+
+    private testFunction(config: ConfigInterface): void {
+
     }
 }
