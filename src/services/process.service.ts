@@ -11,9 +11,8 @@ import { WebcamService } from './webcam.service';
 import { SstvService } from './sstv.service';
 import { RadioService } from './radio.service';
 import { DatabaseService } from './database.service';
-import { ApiService } from './api.service';
+import { DashboardService } from './dashboard.service';
 import { exec } from 'child_process';
-import { GpioService } from './gpio.service';
 import { CommunicationMpptchdService } from './communication-mpptchd.service';
 
 export class ProcessService {
@@ -22,26 +21,11 @@ export class ProcessService {
 
     private audioDecoder = new AudioDecoder();
     private mpptchgSubscription: Subscription;
-    private api: ApiService;
+    private api: DashboardService;
     private dtmfDecoderShouldStop: boolean;
-
     private stopDirectly: boolean;
 
     public run(config: ConfigInterface): void {
-        ProcessService.debug = !!config.debug;
-
-        LogService.LOG_PATH = config.logsPath;
-        GpioService.USE_FAKE = !!config.fakeGpio;
-
-        if (config.mpptChd) {
-            CommunicationMpptchdService.USE_FAKE = !!config.mpptChd.fake;
-            CommunicationMpptchdService.DEBUG = !!config.mpptChd.debugI2C;
-        }
-
-        if (config.webcam) {
-            WebcamService.USE_FAKE = !!config.webcam.fake;
-        }
-
         LogService.log('program', 'Starting');
 
         try {
@@ -69,7 +53,7 @@ export class ProcessService {
                     this.runWebcam(config);
                 }
 
-                if (config.api && config.api.enable) {
+                if (config.dashboard && config.dashboard.enable) {
                     this.runApi(config);
                 }
 
@@ -113,18 +97,10 @@ export class ProcessService {
                 }
             }
 
-            if (config.aprs && config.aprs.enable) {
-                stop = stop.pipe(
-                    switchMap(_ => AprsService.sendAprsBeacon(config.aprs, true)),
-                    switchMap(_ => AprsService.sendAprsTelemetry(config.aprs, config.sensors))
-                );
-            }
-
             stop = stop.pipe(
-                switchMap(_ => RadioService.pttOff(true)),
                 catchError(err => {
                     LogService.log('program', 'Stopped KO', err);
-                    return RadioService.pttOff(true).pipe(catchError(_ => of(null)));
+                    return of(null);
                 })
             );
         }
@@ -142,18 +118,19 @@ export class ProcessService {
     }
 
     private runMpptChd(config: ConfigInterface): void {
-        this.mpptchgSubscription = MpptchgService.battery(config).subscribe();
+        this.mpptchgSubscription = MpptchgService.startBatteryManager(config).subscribe();
         MpptchgService.events.on(EventMpptChg.ALERT, _ => this.exitHandler(config, EventMpptChg.ALERT));
     }
 
     private runAprs(config: ConfigInterface): void {
         LogService.log('aprs', 'Started');
-        timer(60000, 1000 * (config.aprs.interval ? config.aprs.interval : 900)).subscribe(_ =>
+        timer(1000 * (config.aprs.interval ?? 900), 1000 * (config.aprs.interval ?? 900)).subscribe(_ =>
             AprsService.sendAprsBeacon(config.aprs, true).pipe(
                 switchMap(_ => AprsService.sendAprsTelemetry(config.aprs, config.sensors, true))
             ).subscribe(_ => {
                 if (!AprsService.alreadyInUse) {
-                    const interval = 1000 * (config.aprs.waitDtmfInterval ? config.aprs.waitDtmfInterval : 60);
+                    this.dtmfDecoderShouldStop = true;
+                    const interval = 1000 * (config.aprs.waitDtmfInterval ?? 60);
                     const timerSubscription = timer(interval, interval).subscribe(_ => {
                         if (this.dtmfDecoderShouldStop) {
                             LogService.log('dtmf', 'Timeout');
@@ -189,7 +166,8 @@ export class ProcessService {
                                 .replace('chargeCurrent', data.values.chargeCurrent + '')
                                 ;
                         }),
-                        switchMap(sentence => VoiceService.sendVoice(sentence, true))
+                        switchMap(sentence => VoiceService.sendVoice(sentence, true)),
+                        switchMap(_ => RadioService.listenAndRepeat(config.repeater.seconds, false))
                     ).subscribe(_ => this.dtmfDecoderShouldStop = true);
                 }
             } else if (result.type === MultimonModeEnum.DTMF) {
@@ -204,8 +182,6 @@ export class ProcessService {
                         RadioService.keepOn = !RadioService.keepOn;
                         LogService.log('radio', 'State keepOn set by DTMF', RadioService.keepOn);
                         VoiceService.sendVoice('Radio ' + (RadioService.keepOn ? 'allumée' : 'éteinte'), true).subscribe(_ => this.dtmfDecoderShouldStop = true);
-                    } else if (config.repeater && config.repeater.enable && dtmfCode === config.repeater.dtmfCode) {
-                        RadioService.listenAndRepeat(config.repeater.seconds, false).subscribe(_ => this.dtmfDecoderShouldStop = true);
                     } else {
                         LogService.log('dtmf', 'Code not recognized', dtmfCode);
                         VoiceService.sendVoice('Erreur code, ' + dtmfCode, true).subscribe(_ => this.dtmfDecoderShouldStop = true);
@@ -220,25 +196,25 @@ export class ProcessService {
 
     private runSensors(config: ConfigInterface): void {
         LogService.log('sensors', 'Started');
-        timer(60000, 1000 * (config.sensors.interval ? config.sensors.interval : 60)).subscribe(_ =>
-            SensorsService.getAllAndSave(config.sensors).subscribe()
+        timer(1000 * (config.sensors.interval ?? 60), 1000 * (config.sensors.interval ?? 60)).subscribe(_ =>
+            SensorsService.getAllCurrentAndSave(config.sensors).subscribe()
         );
     }
 
     private runWebcam(config: ConfigInterface): void {
         LogService.log('webcam', 'Started');
-        timer(30000, 1000 * (config.webcam.interval ? config.webcam.interval : 30)).subscribe(_ =>
+        timer(1000 * (config.webcam.interval ?? 30), 1000 * (config.webcam.interval ?? 30)).subscribe(_ =>
             WebcamService.captureAndSend(config.webcam, config.sftp).subscribe()
         );
     }
 
     private runApi(config: ConfigInterface): void {
-        this.api = new ApiService(config);
+        this.api = new DashboardService(config);
     }
 
     private runSftp(config: ConfigInterface): void {
         LogService.log('sftp', 'Started');
-        timer(60000, 1000 * (config.sftp.interval ? config.sftp.interval : 60)).subscribe(_ => {
+        timer(60000, 1000 * (config.sftp.interval ?? 60)).subscribe(_ => {
             LogService.send(config.sftp, config.logsPath).subscribe();
         });
     }

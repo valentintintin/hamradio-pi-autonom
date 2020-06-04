@@ -5,11 +5,12 @@ import { AprsConfigInterface } from './aprs-config.interface';
 import { SensorsConfigInterface } from './sensors-config.interface';
 import { WebcamConfigInterface } from './webcam-config.interface';
 import { PacketRadioConfigInterface } from './packet-radio-config.interface';
-import { ApiConfigInterface } from './api-config.interface';
+import { DashboardConfigInterface } from './dashboard-config.interface';
 import { SftpConfigInterface } from './sftp-config.interface';
 import { RepeaterRadioConfigInterface } from './repeater-radio-config.interface';
 
 export interface ConfigInterface {
+    callsign: string;
     lat: number;
     lng: number;
     debug?: boolean;
@@ -23,7 +24,7 @@ export interface ConfigInterface {
     sstv?: SstvConfigInterface;
     voice?: VoiceConfigInterface;
     mpptChd?: MpptChhdConfigInterface;
-    api?: ApiConfigInterface;
+    dashboard?: DashboardConfigInterface;
     sftp?: SftpConfigInterface;
     repeater?: RepeaterRadioConfigInterface
 }

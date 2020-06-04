@@ -1,14 +1,17 @@
 import { ConfigInterface } from '../src/config/config.interface';
 
 export const config: ConfigInterface = {
+    callsign: 'F4HVV',
     lat: 45.196250,
     lng: 5.727160,
     logsPath: '/home/valentin/logic/logs',
     debug: true,
     fakeGpio: true,
     audioDevice: 'pulse',
-    api: {
-        enable: true
+    dashboard: {
+        enable: true,
+        port: 3000,
+        apikey: 'test'
     },
     sensors: {
         enable: true,
@@ -48,6 +51,10 @@ export const config: ConfigInterface = {
     voice: {
         enable: true,
         sentence: 'Station autonome de Foxtrote 4, Hotel Victor Victor'
+    },
+    repeater: {
+        enable: true,
+        seconds: 10
     },
     mpptChd: {
         enable: true,

@@ -87,6 +87,8 @@ export interface MpptChdValuesInterface {
     powerOffVoltage: number;
     powerOnVoltage: number;
     watchdogEnable: number;
+    watchdogPowerOff: number;
+    watchdogCounter: number;
 }
 
 export interface MpptChdStatusBuckInterface {
@@ -163,10 +165,10 @@ export class CommunicationMpptchdService {
 
     public static get instance(): CommunicationMpptchdService {
         if (!this._instance) {
-            this._instance = new CommunicationMpptchdService();
             if (!CommunicationMpptchdService.USE_FAKE) {
-                CommunicationMpptchdService.i2c = i2c.openSync(1);
+                CommunicationMpptchdService.i2c = i2c.openSync(0);
             }
+            this._instance = new CommunicationMpptchdService();
         }
         return this._instance;
     }
@@ -298,6 +300,18 @@ export class CommunicationMpptchdService {
                     return status;
                 }))
             }),
+            switchMap((status: MpptChdStatusInterface) => {
+                return CommunicationMpptchdService.instance.receive(CommandMpptChd.WDCNT).pipe(map(value => {
+                    status.values.watchdogCounter = value;
+                    return status;
+                }))
+            }),
+            switchMap((status: MpptChdStatusInterface) => {
+                return CommunicationMpptchdService.instance.receive(CommandMpptChd.WDPWROFF).pipe(map(value => {
+                    status.values.watchdogPowerOff = value;
+                    return status;
+                }))
+            }),
         );
     }
 
@@ -330,10 +344,18 @@ export class CommunicationMpptchdService {
 
             let receive = 0;
             if (!CommunicationMpptchdService.USE_FAKE) {
-                if (commandObject.isWord) {
-                    receive = CommunicationMpptchdService.i2c.writeWordSync(this.i2cAddr, commandObject.regAddr, ((data >> 8) & 0xFF) | ((data & 0xFF) << 8));
-                } else {
-                    receive = CommunicationMpptchdService.i2c.writeByteSync(this.i2cAddr, commandObject.regAddr, data & 0xFF);
+                try {
+                    if (commandObject.isWord) {
+                        receive = CommunicationMpptchdService.i2c.writeWordSync(this.i2cAddr, commandObject.regAddr, ((data >> 8) & 0xFF) | ((data & 0xFF) << 8));
+                    } else {
+                        if (data > 255) {
+                            observer.error(new Error(`Data not 8 bits : ${data} !`))
+                        }
+                        receive = CommunicationMpptchdService.i2c.writeByteSync(this.i2cAddr, commandObject.regAddr, data & 0xFF);
+                    }
+                } catch (e) {
+                    LogService.log('i2c-' + 'mpptChg', 'Send command KO', commandObject.name, data, e);
+                    observer.error(e);
                 }
             }
 
@@ -361,13 +383,18 @@ export class CommunicationMpptchdService {
 
             let received = commandObject.fake;
             if (!CommunicationMpptchdService.USE_FAKE) {
-                if (commandObject.isWord) {
-                    received = CommunicationMpptchdService.i2c.readWordSync(this.i2cAddr, commandObject.regAddr);
-                    if (received !== -1) {
-                        received = ((received & 0xFF) << 8) | ((received >> 8) & 0xFF);
+                try {
+                    if (commandObject.isWord) {
+                        received = CommunicationMpptchdService.i2c.readWordSync(this.i2cAddr, commandObject.regAddr);
+                        if (received !== -1) {
+                            received = ((received & 0xFF) << 8) | ((received >> 8) & 0xFF);
+                        }
+                    } else {
+                        received = CommunicationMpptchdService.i2c.readByteSync(this.i2cAddr, commandObject.regAddr);
                     }
-                } else {
-                    received = CommunicationMpptchdService.i2c.readByteSync(this.i2cAddr, commandObject.regAddr);
+                } catch (e) {
+                    LogService.log('i2c-' + 'mpptChg', 'Send command KO', commandObject.name, e);
+                    observer.error(e);
                 }
             }
 

@@ -5,15 +5,17 @@ import { CommunicationMpptchdService } from './communication-mpptchd.service';
 import { SensorsConfigInterface } from '../config/sensors-config.interface';
 import { DatabaseService } from './database.service';
 import { Sensors } from '../models/sensors';
-import { ProcessService } from './process.service';
+import { GpioService } from './gpio.service';
 import fs = require('fs');
 
 const si = require('systeminformation');
 
 export class SensorsService {
 
+    public static lastSensors: Sensors = null;
+
     public static getMpptChgData(): Observable<Sensors> {
-        LogService.log('sensors', 'Start getting all');
+        LogService.log('sensors', 'Start getting all MpptChg');
 
         return CommunicationMpptchdService.instance.getStatus().pipe(
             map(data => {
@@ -27,7 +29,6 @@ export class SensorsService {
                 sensorsObject.nightDetected = data.nightDetected ? 1 : 0;
                 sensorsObject.temperatureBattery = data.values.internalThermometer;
                 sensorsObject.voltageBattery = data.values.batteryVoltage;
-                LogService.log('sensors', 'Get all mpptChd OK', sensorsObject);
                 sensorsObject.rawMpptchg = JSON.stringify(data);
                 return sensorsObject;
             }),
@@ -55,7 +56,7 @@ export class SensorsService {
 
     public static getTemperatureRtc(): number {
         try {
-            const result = ProcessService.debug ? 20.5 : parseInt(fs.readFileSync('/sys/bus/i2c/devices/1-0068/hwmon/hwmon1/temp1_input', 'utf8'), 10) / 1000;
+            const result = GpioService.USE_FAKE ? 20.5 : parseInt(fs.readFileSync('/sys/bus/i2c/devices/i2c-0/0-0068/hwmon/hwmon0/temp1_input', 'utf8'), 10) / 1000;
             LogService.log('sensors', 'Get temperature RTC', result);
             return result;
         } catch (e) {
@@ -69,7 +70,7 @@ export class SensorsService {
         return si.time().uptime;
     }
 
-    public static getAll(): Observable<Sensors> {
+    public static getAllCurrent(): Observable<Sensors> {
         LogService.log('sensors', 'Get all');
 
         return SensorsService.getMpptChgData().pipe(
@@ -83,15 +84,44 @@ export class SensorsService {
             }),
             map(datas => {
                 datas.uptime = SensorsService.getUptime();
+                SensorsService.lastSensors = datas;
+                LogService.log('sensors', 'Get all OK', datas);
                 return datas;
             }),
         );
     }
 
-    public static getAllAndSave(config: SensorsConfigInterface): Observable<Sensors> {
-        return this.getAll().pipe(
+    public static getAllCurrentAndSave(config: SensorsConfigInterface): Observable<Sensors> {
+        return this.getAllCurrent().pipe(
             tap(data => this.save(data, config.csvPath))
         )
+    }
+
+    public static getLast(): Observable<Sensors> {
+        if (SensorsService.lastSensors) {
+            return of(SensorsService.lastSensors);
+        }
+        return DatabaseService.selectLast<Sensors>(Sensors.name).pipe(tap(data => {
+            if (data) {
+                (data[0] as any).createdAt = new Date(data[0].createdAt);
+                if (!SensorsService.lastSensors) {
+                    SensorsService.lastSensors = data;
+                }
+            }
+        }));
+    }
+
+    public static getAll(): Observable<Sensors[]> {
+        return DatabaseService.selectAll<Sensors>(Sensors.name).pipe(tap(datas => {
+            if (datas.length > 0) {
+                datas.forEach(data => {
+                    (data as any).createdAt = new Date(data.createdAt);
+                });
+                if (!SensorsService.lastSensors && datas.length > 0) {
+                    SensorsService.lastSensors = datas[0];
+                }
+            }
+        }));
     }
 
     private static save(datas: Sensors, path: string): void {
@@ -103,7 +133,7 @@ export class SensorsService {
                 LogService.log('sensors', 'CSV created', path);
             }
 
-            fs.appendFileSync(path, new Date().toLocaleString() + ',' + Object.values(datas).join(',') + '\n');
+            fs.appendFileSync(path, new Date().toString() + ',' + Object.values(datas).join(',') + '\n');
             LogService.log('sensors', 'CSV saved');
         });
     }

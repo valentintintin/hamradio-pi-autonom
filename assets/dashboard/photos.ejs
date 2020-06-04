@@ -1,0 +1,44 @@
+<%- include('includes/header.ejs', {page: 'photos'}); %>
+
+<div class="photos">
+    <header>
+        <h2>Photos</h2>
+    </header>
+
+    <section>
+        <% if (photos.length > 0) { %>
+            <% photos.slice(0, 3).forEach(function(photo) { %>
+                <article class="photo align-center">
+                    <a href="/timelapse/<%= photo %>" target="_blank">
+                        <div class="align-center">
+                            <img src="/timelapse/<%= photo %>" alt="Prise le <%= photo %>>"/>
+                            <span><%= photo %></span>
+                        </div>
+                    </a>
+                </article>
+            <% }); %>
+        <% } %>
+    </section>
+
+    <% if (photos.length > 3) { %>
+        <header>
+            <h2>Autres photos</h2>
+        </header>
+
+        <section class="align-left">
+            <article>
+                <ul>
+                    <% photos.slice(3).forEach(function(photo) { %>
+                        <li>
+                            <a href="/timelapse/<%= photo %>" target="_blank">
+                                <%= photo %>
+                            </a>
+                        </li>
+                    <% }); %>
+                </ul>
+            </article>
+        </section>
+    <% } %>
+</div>
+
+<%- include('includes/footer.ejs', {page: 'photos'}); %>

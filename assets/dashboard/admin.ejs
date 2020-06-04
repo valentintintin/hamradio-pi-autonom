@@ -1,0 +1,48 @@
+<%- include('includes/header.ejs', {page: 'admin'}); %>
+
+<div class="admin">
+    <header>
+        <h2>Actions</h2>
+        <div>
+            <label for="apikey">Mot de passe</label>
+            <input type="password" name="apikey" id="apikey" value="pixel"/>
+        </div>
+    </header>
+
+    <section>
+        <article class="action">
+            <button class="button" id="see-logs">Voir les logs</button>
+            <button class="button" id="see-sensors">Voir les données de capteurs</button>
+        </article>
+        <article class="action">
+            <button class="button" id="switch-on-radio">Allumer radio</button>
+            <button class="button" id="switch-off-radio">Éteindre radio</button>
+            <button class="button" id="take-photo">Prendre photo</button>
+        </article>
+        <article class="action">
+            <button class="button" id="send-sstv">Envoyer SSTV</button>
+            <button class="button" id="send-voice">Envoyer voix</button>
+            <button class="button" id="send-aprs-beacon">Envoyer APRS Beacon</button>
+            <button class="button" id="send-aprs-telem">Envoyer APRS Télémtrie</button>
+            <button class="button" id="run-repeater">Lancer répéteur</button>
+        </article>
+        <article class="action">
+            <button class="button" id="enable-watchdog">Activer Watchdog</button>
+            <button class="button" id="disable-watchdog">Désactiver Watchdog</button>
+            <button class="button" id="shutdown-pi">Éteindre Pi</button>
+        </article>
+    </section>
+
+    <section class="align-left">
+        <article>
+            <details id="data-json-wrapper">
+                <summary>Données reçues</summary>
+                <pre id="data-json">
+                        Néant
+                    </pre>
+            </details>
+        </article>
+    </section>
+</div>
+
+<%- include('includes/footer.ejs', {page: 'admin', scripts: ['vendor/jquery.min', 'js/admin']}); %>

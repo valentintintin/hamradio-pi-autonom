@@ -2,7 +2,7 @@ import { Observable, Observer, of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { LogService } from './log.service';
 
-const gpio = require('gpio');
+const gpio = require('wpi-gpio');
 
 export class GpioService {
 
@@ -11,37 +11,39 @@ export class GpioService {
     private static gpios: any[] = [];
 
     public static set(pin: number, value: boolean): Observable<void> {
-        LogService.log('gpio', 'Set', GpioEnum[pin] + `(${pin})`, value);
+        if (pin === GpioEnum.RelayBorneWifi || pin === GpioEnum.RelayRadio) {
+            value = !value;
+        }
 
         if (GpioService.USE_FAKE || pin === GpioEnum.RelayBorneWifi) {
+            LogService.log('gpio', 'Set fake', GpioEnum[pin] + `(${pin})`, value);
             return of(null);
         }
 
-        return GpioService.init(pin, gpio.DIRECTION.OUT).pipe(
-            switchMap((gpio: any) => {
+        return GpioService.initOutput(pin).pipe(
+            switchMap(_ => {
                 return new Observable<void>((observer: Observer<void>) => {
-                    gpio.set(value, _ => {
-                        observer.next();
+                    LogService.log('gpio', 'Write', GpioEnum[pin] + `(${pin})`, value);
+                    gpio.write(pin, value).then(_ => {
+                        observer.next(null);
                         observer.complete();
-                    });
+                    }).catch(e => observer.error(e));
                 });
             })
         );
     }
 
-    private static init(pin: number, direction: string): Observable<any> {
-        return new Observable<any>((observer: Observer<any>) => {
+    private static initOutput(pin: number): Observable<void> {
+        return new Observable<void>((observer: Observer<void>) => {
             if (!this.gpios[pin]) {
-                this.gpios[pin] = gpio.export(pin, {
-                    direction: direction,
-                    ready: _ => {
-                        LogService.log('gpio', 'Export pin ' + pin, direction);
-                        observer.next(this.gpios[pin]);
-                        observer.complete();
-                    }
-                });
+                LogService.log('gpio', 'Set mode OUTPUT', GpioEnum[pin] + `(${pin})`);
+                gpio.output(pin).then(_ => {
+                    this.gpios[pin] = true;
+                    observer.next(null);
+                    observer.complete();
+                }).catch(e => observer.error(e));
             } else {
-                observer.next(GpioService.gpios[pin]);
+                observer.next(null);
                 observer.complete();
             }
         });
@@ -50,6 +52,6 @@ export class GpioService {
 
 export enum GpioEnum {
     RelayRadio = 0,
-    RelayBorneWifi = 1,
-    PTT = 2
+    RelayBorneWifi = 2,
+    PTT = 3
 }

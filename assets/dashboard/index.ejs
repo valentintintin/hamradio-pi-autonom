@@ -1,0 +1,57 @@
+<%- include('includes/header.ejs', {page: 'index'}); %>
+
+<div class="sensors">
+    <header>
+        <h2>
+            Capteurs
+            <% if (sensors) { %>
+                - Dernier relevé à <%= sensors.createdAt.toLocaleString() %>
+            <% } %>
+        </h2>
+    </header>
+
+    <section>
+        <% if (sensors) { %>
+            <article class="card card-number bg-green">
+                <span class="title">Température boîte</span>
+                <strong class="value"><%= sensors.temperatureRtc %>°C</strong>
+            </article>
+
+            <article class="card card-number bg-blue">
+                <span class="title">Voltage batterie</span>
+                <strong class="value"><%= sensors.voltageBattery / 1000 %>V</strong>
+            </article>
+
+            <article class="card card-number bg-orange">
+                <span class="title">Intensité de charge</span>
+                <strong class="value"><%= sensors.currentCharge %>mA</strong>
+            </article>
+        <% } else { %>
+            <strong>Aucune donnée pour le moment</strong>
+        <% } %>
+    </section>
+</div>
+
+<div class="photos">
+    <header>
+        <h2>
+            Dernière photo
+            <% if (lastPhoto) { %>
+                - Prise le <%= lastPhoto %>
+            <% } %>
+        </h2>
+    </header>
+
+    <section>
+        <% if (lastPhoto) { %>
+            <article class="photo">
+                <a href="/timelapse/<%= lastPhoto %>" target="_blank"><img src="/timelapse/<%= lastPhoto %>"
+                                                                           alt="Dernière photo"/></a>
+            </article>
+        <% } else { %>
+            <strong>Aucune photo</strong>
+        <% } %>
+    </section>
+</div>
+
+<%- include('includes/footer.ejs', {page: 'index'}); %>

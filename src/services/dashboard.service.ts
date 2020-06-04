@@ -9,11 +9,13 @@ import { AprsService } from './aprs.service';
 import { VoiceService } from './voice.service';
 import { GpioEnum, GpioService } from './gpio.service';
 import { catchError } from 'rxjs/operators';
-import { of } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
 import { MpptchgService } from './mpptchg.service';
 import { RadioService } from './radio.service';
+import { DatabaseService } from './database.service';
+import { Logs } from '../models/logs';
 
-export class ApiService {
+export class DashboardService {
 
     private readonly app: express.Application = express();
 
@@ -21,14 +23,21 @@ export class ApiService {
         this.app.use(express.json());
 
         this.app.use((req, res, next) => {
-            LogService.log('api', 'Request start', req.method, req.path);
+            LogService.log('dashboard', 'Request start', req.method, req.path);
 
             res.header('Access-Control-Allow-Origin', '*');
             res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
 
             res.on('finish', () => {
-                LogService.log('api', 'Request end', req.method, req.path, res.statusCode);
+                LogService.log('dashboard', 'Request end', req.method, req.path, res.statusCode);
             });
+
+            if (req.path.startsWith('/api')) {
+                if (config.dashboard.apikey && req.query.apikey !== config.dashboard.apikey) {
+                    res.sendStatus(403);
+                    return;
+                }
+            }
 
             next();
         });
@@ -38,16 +47,52 @@ export class ApiService {
             res.send();
         });
 
-        this.app.get('/logs', (req, res) => {
+        this.app.use('/assets', express.static(__dirname + '/../../assets/dashboard/assets'));
+        this.app.use('/logs', express.static(config.logsPath));
+
+        this.app.get('/', (req, res) => {
+            forkJoin([SensorsService.getLast(), WebcamService.getLastPhotos(config.webcam)])
+                .subscribe(datas => {
+                    res.render(__dirname + '/../../assets/dashboard/index.ejs', {
+                        sensors: datas[0],
+                        lastPhoto: datas[1].length > 0 ? datas[1][0] : null
+                    });
+                });
         });
 
-        this.app.post('/gpio/:pin/:value', (req: Request, res) => {
+        this.app.get('/photos', (req, res) => {
+            WebcamService.getLastPhotos(config.webcam).subscribe(photos => {
+                res.render(__dirname + '/../../assets/dashboard/photos.ejs', {
+                    photos: photos
+                });
+            });
+        });
+
+        this.app.get('/stats', (req, res) => {
+            res.render(__dirname + '/../../assets/dashboard/stats.ejs');
+        });
+
+        this.app.get('/admin', (req, res) => {
+            res.render(__dirname + '/../../assets/dashboard/admin.ejs');
+        });
+
+        this.app.get('/api/logs', (req, res) => {
+            DatabaseService.selectAll(Logs.name).subscribe((logs: Logs[]) => {
+                logs.forEach(log => {
+                    (log as any).createdAt = new Date(log.createdAt);
+                    log.data = JSON.parse(log.data);
+                })
+                res.send(logs);
+            });
+        });
+
+        this.app.post('/api/gpio/:pin/:value', (req: Request, res) => {
             const pin = GpioEnum[req.params['pin']];
             const value = req.params['value'] === '1';
 
             if (pin === GpioEnum.RelayRadio) {
                 RadioService.keepOn = value;
-                LogService.log('radio', 'State keepOn set by API', RadioService.keepOn);
+                LogService.log('radio', 'State keepOn set by dashboard', RadioService.keepOn);
             }
 
             GpioService.set(pin, value).pipe(
@@ -58,14 +103,38 @@ export class ApiService {
             ).subscribe(_ => res.send(true));
         });
 
+        this.app.get('/api/config', (req, res) => {
+            res.send(config);
+        });
+
         if (config.sensors && config.sensors.enable) {
-            this.app.get('/sensors', (req, res) => {
-                SensorsService.getAllAndSave(config.sensors).subscribe(datas => res.send(datas));
+            this.app.get('/api/sensors', (req, res) => {
+                SensorsService.getAllCurrent().subscribe(datas => {
+                    (datas as any).createdAt = new Date(datas.createdAt);
+                    datas.rawMpptchg = JSON.parse(datas.rawMpptchg);
+                    res.send(datas);
+                });
+            });
+
+            this.app.use('/sensors.csv', express.static(config.sensors.csvPath));
+            this.app.use('/sensors.json', (req, res) => {
+                SensorsService.getAll().subscribe(datas => {
+                    res.send(datas.map(data => {
+                        return {
+                            createdAt: data.createdAt,
+                            voltageBattery: data.voltageBattery,
+                            voltageSolar: data.voltageSolar,
+                            currentCharge: data.currentCharge,
+                            currentBattery: data.currentBattery,
+                            currentSolar: data.currentSolar
+                        }
+                    }));
+                });
             });
         }
 
         if (config.mpptChd && config.mpptChd.enable) {
-            this.app.post('/shutdown/{timestamp}', (req, res) => {
+            this.app.post('/api/shutdown/{timestamp}', (req, res) => {
                 const restartDate = new Date(+req.params['timestamp'] * 1000);
                 MpptchgService.shutdownAndWakeUpAtDate(restartDate).pipe(
                     catchError(e => {
@@ -75,7 +144,7 @@ export class ApiService {
                 ).subscribe(wakeupDate => res.send(wakeupDate));
             });
 
-            this.app.post('/watchdog/stop', (req, res) => {
+            this.app.post('/api/watchdog/stop', (req, res) => {
                 MpptchgService.stopWatchdog().pipe(
                     catchError(e => {
                         res.json(e);
@@ -84,18 +153,20 @@ export class ApiService {
                 ).subscribe(wakeupDate => res.send(wakeupDate));
             });
 
-            this.app.post('/watchdog/start', (req, res) => {
-                MpptchgService.startWatchdog().pipe(
-                    catchError(e => {
-                        res.json(e);
-                        return of(null);
-                    })
-                ).subscribe(wakeupDate => res.send(true));
-            });
+            if (config.mpptChd.watchdog) {
+                this.app.post('/api/watchdog/start', (req, res) => {
+                    MpptchgService.startWatchdog().pipe(
+                        catchError(e => {
+                            res.json(e);
+                            return of(null);
+                        })
+                    ).subscribe(wakeupDate => res.send(true));
+                });
+            }
         }
 
         if (config.repeater && config.repeater.enable) {
-            this.app.post('/repeater', (req, res) => {
+            this.app.post('/api/repeater', (req, res) => {
                 RadioService.listenAndRepeat(config.repeater.seconds).pipe(
                     catchError(e => {
                         res.json(e);
@@ -106,7 +177,7 @@ export class ApiService {
         }
 
         if (config.sstv && config.sstv.enable) {
-            this.app.post('/sstv', (req, res) => {
+            this.app.post('/api/sstv', (req, res) => {
                 SstvService.sendImage(config.sstv).pipe(
                     catchError(e => {
                         res.json(e);
@@ -117,7 +188,7 @@ export class ApiService {
         }
 
         if (config.webcam && config.webcam.enable) {
-            this.app.post('/webcam', (req, res) => {
+            this.app.post('/api/webcam', (req, res) => {
                 WebcamService.captureAndSend(config.webcam, config.sftp).pipe(
                     catchError(e => {
                         res.json(e);
@@ -125,10 +196,12 @@ export class ApiService {
                     })
                 ).subscribe(filePath => res.sendFile(filePath));
             });
+
+            this.app.use('/timelapse', express.static(config.webcam.photosPath));
         }
 
         if (config.voice && config.voice.enable) {
-            this.app.post('/voice', (req, res) => {
+            this.app.post('/api/voice', (req, res) => {
                 VoiceService.sendVoice(config.voice.sentence).pipe(
                     catchError(e => {
                         res.json(e);
@@ -139,7 +212,7 @@ export class ApiService {
         }
 
         if (config.aprs && config.aprs.enable) {
-            this.app.post('/aprs/beacon', (req, res) => {
+            this.app.post('/api/aprs/beacon', (req, res) => {
                 AprsService.sendAprsBeacon(config.aprs).pipe(
                     catchError(e => {
                         res.json(e);
@@ -148,7 +221,7 @@ export class ApiService {
                 ).subscribe(_ => res.send(true));
             });
 
-            this.app.post('/aprs/telemetry', (req, res) => {
+            this.app.post('/api/aprs/telemetry', (req, res) => {
                 AprsService.sendAprsTelemetry(config.aprs, config.sensors).pipe(
                     catchError(e => {
                         res.json(e);
@@ -158,9 +231,9 @@ export class ApiService {
             });
         }
 
-        const port = config.api.port ?? 3000;
+        const port = config.dashboard.port ?? 3000;
         this.app.listen(port, () => {
-            LogService.log('api', 'Started', port);
+            LogService.log('dashboard', 'Started', port);
         });
     }
 }

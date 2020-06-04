@@ -1,14 +1,14 @@
 import { Defs, kissTNCTcp, Packet } from 'ax25';
 import { LogService } from './log.service';
-import { Observable, Observer, of } from 'rxjs';
-import { delay, tap } from 'rxjs/operators';
+import { Observable, Observer, of, Subject } from 'rxjs';
+import { delay, switchMap, tap } from 'rxjs/operators';
 
 export class TncService {
 
     private static _instance: TncService;
 
     private static readonly SEC_START: number = 2000;
-    private static readonly SEC_TRAME: number = 500;
+    private static readonly SEC_TRAME: number = 750;
 
     public static get instance(): TncService {
         if (!this._instance) {
@@ -19,8 +19,9 @@ export class TncService {
 
     private tnc: kissTNCTcp;
     private connected: boolean;
+    private packets: Subject<Packet> = new Subject<Packet>();
 
-    private connectTnc(): Observable<void> {
+    public connectTnc(): Observable<void> {
         if (this.tnc && this.connected) {
             return of(null);
         }
@@ -44,8 +45,7 @@ export class TncService {
             });
 
             this.tnc.on('frame', frame => {
-                const packet = new Packet();
-                packet.disassemble(frame);
+                this.packets.next(new Packet().disassemble(frame));
             });
         });
     }
@@ -94,7 +94,13 @@ export class TncService {
                 infos.forEach(info => this.tnc.send(this.createFrame(from, to, info, path).assemble()));
             }),
             delay(TncService.SEC_START + TncService.SEC_TRAME * infos.length),
-            tap(_ => LogService.log('tnc', 'Send OK'))
+            tap(_ => LogService.log('tnc', 'Send OK')),
+        );
+    }
+
+    public get packetsRecevied(): Observable<Packet> {
+        return this.connectTnc().pipe(
+            switchMap(_ => this.packets.asObservable())
         );
     }
 }

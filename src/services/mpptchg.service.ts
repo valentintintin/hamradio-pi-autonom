@@ -5,6 +5,7 @@ import { LogService } from './log.service';
 import { CommandMpptChd, CommunicationMpptchdService } from './communication-mpptchd.service';
 import { ConfigInterface } from '../config/config.interface';
 import * as events from 'events';
+import { MpptChhdConfigInterface } from '../config/mppt-chhd-config.interface';
 
 export class MpptchgService {
 
@@ -13,7 +14,7 @@ export class MpptchgService {
     public static readonly NIGHT_LIMIT_VOLT = 11700;
 
     private static readonly WD_INIT_SECS = 180; // 2 minutes
-    private static readonly WD_INIT_NIGHT_SECS = 300; // 5 minutes
+    private static readonly WD_INIT_NIGHT_SECS = 255; // 4 minutes 15
     private static readonly WD_UPDATE_SECS = 60; // 1 minute
     private static readonly WD_ALERT_SECS = 60; // 1 minute
     private static readonly WD_PWROFF_SECS = 10; // 10 secondes
@@ -34,20 +35,22 @@ export class MpptchgService {
     }
 
     public static stopWatchdog(): Observable<Date> {
-        return MpptchgService.shutdownAndWakeUpAtDate(new Date(), 3600);
+        return CommunicationMpptchdService.instance.disableWatchdog().pipe(
+            map(_ => new Date(new Date().getTime() + (3600 * 1000)))
+        );
     }
 
     public static startWatchdog(): Observable<void> {
         return MpptchgService.enableWatchdog(this.WD_PWROFF_SECS, this.WD_INIT_SECS);
     }
 
-    public static battery(config: ConfigInterface): Observable<void> {
+    public static startBatteryManager(config: ConfigInterface): Observable<void> {
         const mpptChd: CommunicationMpptchdService = CommunicationMpptchdService.instance;
 
         LogService.log('mpptChd', 'Started');
 
-        const powerOnVolt = config.mpptChd.powerOnVolt ? config.mpptChd.powerOnVolt : MpptchgService.POWER_ON_VOLT;
-        const powerOffVolt = config.mpptChd.powerOffVolt ? config.mpptChd.powerOffVolt : MpptchgService.POWER_OFF_VOLT;
+        const powerOnVolt = config.mpptChd.powerOnVolt ?? MpptchgService.POWER_ON_VOLT;
+        const powerOffVolt = config.mpptChd.powerOffVolt ?? MpptchgService.POWER_OFF_VOLT;
 
         return mpptChd.send(CommandMpptChd.PWRONV, powerOnVolt).pipe(
             switchMap(_ => mpptChd.send(CommandMpptChd.PWROFFV, powerOffVolt)),
@@ -58,26 +61,27 @@ export class MpptchgService {
                 return of(null);
             }),
             switchMap(_ => timer(0, this.WD_UPDATE_SECS * 1000)),
-            switchMap(_ => this.baterryManagerUpdate(config.lat, config.lng, config.mpptChd.watchdog))
+            switchMap(_ => this.baterryManagerUpdate(config.lat, config.lng, config.mpptChd))
         );
     }
 
-    private static baterryManagerUpdate(lat: number, lng: number, useWatchdog: boolean): Observable<void> {
-        return (CommunicationMpptchdService.instance).getStatus().pipe(
+    private static baterryManagerUpdate(lat: number, lng: number, config: MpptChhdConfigInterface): Observable<void> {
+        return CommunicationMpptchdService.instance.disableWatchdog().pipe(
+            switchMap(_ => CommunicationMpptchdService.instance.getStatus()),
             switchMap(status => {
-                LogService.log('mpptChd', 'Loop check',);
+                LogService.log('mpptChd', 'Loop check', status);
 
-                if (status.alertAsserted) {
+                if (status.alertAsserted && config.shutdownAlert) {
                     LogService.log('mpptChd', 'Alert asserted !');
                     this.events.emit(EventMpptChg.ALERT);
                 } else {
-                    if (status.nightDetected) {
+                    if (status.nightDetected && config.shutdownNight) {
                         if (!this.nightTriggered) {
                             LogService.log('mpptChd', 'Night detected');
                             this.nightTriggered = true;
                             this.events.emit(EventMpptChg.NIGHT_DETECTED);
                             let nextWakeUp = new Date();
-                            if (status.values && status.values.batteryVoltage >= this.NIGHT_LIMIT_VOLT) {
+                            if (status.values && status.values.batteryVoltage >= (config.nightLimitVolt ?? this.NIGHT_LIMIT_VOLT)) {
                                 nextWakeUp.setSeconds(this.WD_PWROFF_NIGHT_SECS_DEFAULT);
                             } else {
                                 nextWakeUp = this.getSunCalcTime(lat, lng).dawn;
@@ -88,7 +92,7 @@ export class MpptchgService {
                         } else {
                             LogService.log('mpptChd', 'Night still here');
                         }
-                    } else if (useWatchdog) {
+                    } else if (config.watchdog) {
                         this.nightTriggered = false;
 
                         return MpptchgService.startWatchdog().pipe(
@@ -102,8 +106,12 @@ export class MpptchgService {
         );
     }
 
-    private static enableWatchdog(secondsBeforeWakeUp: number, secondsBeforeShutdown: number = this.WD_INIT_SECS): Observable<void> {
-        return (CommunicationMpptchdService.instance).enableWatchdog(secondsBeforeWakeUp, secondsBeforeShutdown).pipe(
+    private static enableWatchdog(secondsBeforeWakeUp: number, secondsBeforeShutdown: number): Observable<void> {
+        if (secondsBeforeShutdown > 255) {
+            throw new Error('Impossible to set more than 255 seconds before shutdown');
+        }
+
+        return CommunicationMpptchdService.instance.enableWatchdog(secondsBeforeWakeUp, secondsBeforeShutdown).pipe(
             map(_ => {
                 LogService.log('mpptChd', 'Watchdog enabled', secondsBeforeWakeUp, secondsBeforeShutdown);
                 return null;
@@ -129,7 +137,6 @@ export class MpptchgService {
         })
 
         return this.enableWatchdog(secondsBedoreWakeUp, secondsBeforeShutdown).pipe(
-            tap(_ => this.events.emit(EventMpptChg.ALERT)),
             map(_ => wakeUpDateNew)
         );
     }

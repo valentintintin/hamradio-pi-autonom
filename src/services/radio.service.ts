@@ -13,7 +13,7 @@ export class RadioService {
         LogService.log('radio', 'Relay', true);
 
         return GpioService.set(GpioEnum.RelayRadio, true).pipe(
-            delay(500)
+            delay(2500)
         );
     }
 

@@ -39,4 +39,5 @@ create table variables
     name       varchar(32) not null,
     data       text        not null
 );
-insert into variables(updatedAt, log) values(1587229268000, 0)
+insert into variables(updatedAt, name, data)
+values (1587229268000, 'seq_telemetry', 0)

@@ -58,7 +58,7 @@ export class AprsService {
 
         AprsService.alreadyInUse = true;
 
-        return SensorsService.getAllAndSave(configSensors).pipe(
+        return SensorsService.getAllCurrent().pipe(
             switchMap(telemetry => RadioService.pttOn().pipe(
                 switchMap(_ => DatabaseService.readVariable<number>(EnumVariable.SEQ_TELEMETRY).pipe(map(d => +d))),
                 switchMap(seq => {

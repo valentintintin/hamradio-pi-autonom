@@ -43,6 +43,56 @@ export class DatabaseService {
         });
     }
 
+    public static selectAll<T>(entity: string, limit: number = 100, order: string = 'DESC', ignoreErrors: boolean = true): Observable<T[]> {
+        return new Observable<T[]>((observer: Observer<T[]>) => {
+            const query = `SELECT * FROM ${entity} ORDER BY id ${order} LIMIT ${limit}`;
+            try {
+                DatabaseService.db.all(query, (err, rows) => {
+                    if (err) {
+                        LogService.log('database', 'Select KO', err, query);
+                        if (!ignoreErrors) {
+                            observer.error(err);
+                        }
+                    }
+                    observer.next(rows);
+                    observer.complete();
+                });
+            } catch (e) {
+                LogService.log('database', 'Select KO', e, query);
+                if (!ignoreErrors) {
+                    observer.error(e);
+                }
+                observer.next([]);
+                observer.complete();
+            }
+        });
+    }
+
+    public static selectLast<T>(entity: string, ignoreErrors: boolean = true): Observable<T> {
+        return new Observable<T>((observer: Observer<T>) => {
+            const query = `SELECT * FROM ${entity} ORDER BY id DESC LIMIT 1`;
+            try {
+                DatabaseService.db.get(query, (err, row) => {
+                    if (err) {
+                        LogService.log('database', 'Select KO', err, query);
+                        if (!ignoreErrors) {
+                            observer.error(err);
+                        }
+                    }
+                    observer.next(row);
+                    observer.complete();
+                });
+            } catch (e) {
+                LogService.log('database', 'Select KO', e, query);
+                if (!ignoreErrors) {
+                    observer.error(e);
+                }
+                observer.next(null);
+                observer.complete();
+            }
+        });
+    }
+
     public static insert(data: Entity, ignoreErrors: boolean = true): Observable<Entity> {
         return new Observable<Entity>((observer: Observer<Entity>) => {
             const keys = Object.keys(data).filter(d => d !== 'id' && !!data[d]);

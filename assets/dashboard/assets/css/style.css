@@ -1,0 +1,152 @@
+:root {
+    --fg-primary: darkblue;
+    --bg-primary: #cbdaed;
+    --shadown: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+.fg-primary {
+    color: var(--fg-primary);
+}
+
+.bg-primary {
+    background: var(--bg-primary);
+}
+
+.bg-blue {
+    background: lightblue;
+}
+
+.bg-green {
+    background: lightgreen;
+}
+
+.bg-orange {
+    background: orange;
+}
+
+h1, h2, h3 {
+    margin: 0;
+    color: var(--fg-primary);
+}
+
+body {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+body > * {
+    margin: 10px;
+    padding: 10px;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+ul {
+    margin: 0;
+}
+
+aside {
+    width: 300px;
+    box-shadow: var(--shadown);
+}
+
+nav ul {
+    list-style: none;
+    padding: 0;
+}
+
+nav .button {
+    border-radius: 0 10px 10px 0;
+}
+
+.button {
+    cursor: pointer;
+    border: none;
+    height: 30px;
+    padding: 5px;
+    background: var(--bg-primary);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    border-radius: 10px;
+    margin: 10px;
+}
+
+.button:hover, .button:focus, a.selected, a:hover {
+    color: var(--fg-primary);
+    font-weight: bold;
+    outline: none;
+}
+
+.card {
+    display: flex;
+    flex-wrap: wrap;
+    padding: 20px;
+    min-width: 300px;
+    box-shadow: var(--shadown);
+}
+
+.card-number {
+    align-items: center;
+    flex-direction: column;
+    height: 150px;
+}
+
+.card-number .title {
+    font-size: 20px;
+    margin-bottom: 50px;
+}
+
+.card-number .value {
+    font-size: 30px;
+}
+
+.align-left {
+    justify-content: left;
+}
+
+.align-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+main {
+    flex: 1;
+}
+
+main > div {
+    margin: 10px;
+}
+
+header {
+    margin-bottom: 10px;
+}
+
+section {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+}
+
+article {
+    margin: 10px;
+}
+
+footer {
+    margin-top: 30px;
+    margin-bottom: -10px;
+    padding: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: center;
+    justify-content: center;
+    box-shadow: var(--shadown);
+    background: var(--bg-primary);
+}

@@ -1,6 +1,6 @@
 import SftpUpload = require('sftp-upload');
 import fs = require('fs');
-import { Observable, Observer } from 'rxjs';
+import { Observable, Observer, of } from 'rxjs';
 import { LogService } from './log.service';
 import { SftpConfigInterface } from '../config/sftp-config.interface';
 import { ProcessService } from './process.service';
@@ -13,6 +13,10 @@ export class SftpService {
     }
 
     public static sendMultiple(config: SftpConfigInterface, toSend: string[]): Observable<string[]> {
+        if (!config.enable) {
+            return of(toSend);
+        }
+
         return new Observable<string[]>((observer: Observer<string[]>) => {
             LogService.log('sftp', 'Start sending', toSend);
 

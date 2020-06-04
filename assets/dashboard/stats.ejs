@@ -1,0 +1,46 @@
+<%- include('includes/header.ejs', {page: 'stats', styles: ['vendor/dygraph.min', 'css/stats']}); %>
+
+<div class="stats">
+    <header>
+        <h2>Graphiques</h2>
+    </header>
+
+    <section>
+        <article>
+            <div id="g"></div>
+            <div id="actions">
+                <div id="series">
+                    <input type=checkbox id="voltBattery" checked><label style="color: #D00" for="voltBattery"> Voltage
+                        batterie</label>&nbsp;
+                    <input type=checkbox id="voltSolar"><label style="color: #FD0" for="voltSolar"> Voltage
+                        solaire</label>&nbsp;
+                    <input type=checkbox id="currentCharge" checked><label style="color: #00F" for="currentCharge">
+                        Intensité charge</label>&nbsp;
+                    <input type=checkbox id="currentBattery"><label style="color: #933" for="currentBattery"> Intensité
+                        batterie</label>&nbsp;
+                    <input type=checkbox id="currentSolar"><label style="color: #F93" for="currentSolar"> Intensité
+                        solaire</label>
+                </div>
+            </div>
+        </article>
+    </section>
+
+    <section class="align-left">
+        <article>
+            <details id="data-json-wrapper">
+                <summary>Données brutes</summary>
+                <pre id="data-json">
+                        Néant
+                    </pre>
+            </details>
+        </article>
+    </section>
+
+    <section>
+        <article>
+            <a href="/sensors.csv" class="button">Télécharger toutes les données en CSV</a>
+        </article>
+    </section>
+</div>
+
+<%- include('includes/footer.ejs', {page: 'stats', scripts: ['vendor/jquery.min', 'vendor/dygraph.min', 'vendor/moment-with-locales.min', 'js/stats']}); %>

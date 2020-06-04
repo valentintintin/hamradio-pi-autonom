@@ -22,7 +22,7 @@ export class LogService {
 
         const now = new Date();
         const log =
-            '[' + now.toLocaleString() + '] ' +
+            '[' + now.toISOString() + '] ' +
             '[' + action.toUpperCase() + ']' +
             ' --> ' + message
         ;
