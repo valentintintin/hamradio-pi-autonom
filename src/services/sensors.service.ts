@@ -103,7 +103,7 @@ export class SensorsService {
         }
         return DatabaseService.selectLast<Sensors>(Sensors.name).pipe(tap(data => {
             if (data) {
-                (data[0] as any).createdAt = new Date(data[0].createdAt);
+                (data as any).createdAt = new Date(data.createdAt);
                 if (!SensorsService.lastSensors) {
                     SensorsService.lastSensors = data;
                 }

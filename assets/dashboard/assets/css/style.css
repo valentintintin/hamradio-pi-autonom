@@ -50,8 +50,16 @@ ul {
 }
 
 aside {
-    width: 300px;
+    max-width: 300px;
+    min-width: 200px;
     box-shadow: var(--shadown);
+}
+
+@media screen and (max-width: 600px) {
+    aside {
+        width: 100%;
+        max-width: 100%;
+    }
 }
 
 nav ul {
@@ -87,19 +95,19 @@ nav .button {
     display: flex;
     flex-wrap: wrap;
     padding: 20px;
-    min-width: 300px;
+    min-width: 200px;
     box-shadow: var(--shadown);
 }
 
 .card-number {
     align-items: center;
     flex-direction: column;
-    height: 150px;
+    height: 80px;
 }
 
 .card-number .title {
     font-size: 20px;
-    margin-bottom: 50px;
+    margin-bottom: 20px;
 }
 
 .card-number .value {
@@ -118,6 +126,7 @@ nav .button {
 }
 
 main {
+    min-width: 300px;
     flex: 1;
 }
 
@@ -149,4 +158,9 @@ footer {
     justify-content: center;
     box-shadow: var(--shadown);
     background: var(--bg-primary);
+}
+
+pre {
+    overflow: auto;
+    max-width: 69vw;
 }

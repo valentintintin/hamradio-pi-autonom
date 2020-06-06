@@ -45,12 +45,57 @@
     <section>
         <% if (lastPhoto) { %>
             <article class="photo">
-                <a href="/timelapse/<%= lastPhoto %>" target="_blank"><img src="/timelapse/<%= lastPhoto %>"
-                                                                           alt="Dernière photo"/></a>
+                <a href="/timelapse/<%= lastPhoto %>" target="_blank">
+                    <img src="/timelapse/<%= lastPhoto %>" alt="Dernière photo"/>
+                </a>
             </article>
         <% } else { %>
             <strong>Aucune photo</strong>
         <% } %>
+    </section>
+</div>
+
+<div class="infos">
+    <header>
+        <h2>La station</h2>
+    </header>
+
+    <section>
+        <article>
+            <ul>
+                <li>
+                    <a href="http://www.orangepi.org/orangepizerolts/" target="_blank">Un Orange Pi Zero LTS</a>
+                </li>
+                <li>
+                    <a href="https://www.all-batteries.fr/batterie-plomb/sonnenschein/a512-10s.html" target="_blank">Une
+                        batterie Plomb/Gel 10Ah</a>
+                </li>
+                <li>
+                    <a href="https://www.amazon.fr/gp/product/B07KG2TB6V" target="_blank">Un panneau de 25W</a>
+                </li>
+                <li>
+                    <a href="http://www.danjuliodesigns.com/products/makerpower.html" target="_blank">Un chargeur
+                        MPPT</a>
+                </li>
+                <li>
+                    <a href="http://www.rigpix.com/protrx/icom_ich16t.htm" target="_blank">Un ICOM H16T</a>
+                </li>
+                <li>
+                    <a href="https://www.wifi-france.com/ubiquiti/bullet-2" target="_blank">Une borne Ubiquiti Bullet
+                        2</a>
+                </li>
+                <li>
+                    <a href="https://www.amazon.fr/gp/product/B00N2NEUKS/ref=ppx_yo_dt_b_asin_image_o01_s00"
+                       target="_blank">Une antenne 2.4Ghz 14dBi</a>
+                </li>
+            </ul>
+        </article>
+
+        <article>
+            <a href="/assets/images/station.jpg" target="_blank">
+                <img src="/assets/images/station.jpg" alt="Intérieur de la boîte" width="300px"/>
+            </a>
+        </article>
     </section>
 </div>
 

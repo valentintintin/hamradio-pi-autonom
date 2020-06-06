@@ -15,6 +15,10 @@ $(function () {
         getSensors();
     });
 
+    $('#see-config').click(function () {
+        getConfig();
+    });
+
     $('#switch-off-radio').click(function () {
         switchRadio(false);
     });
@@ -69,6 +73,12 @@ $(function () {
 
     function getSensors() {
         $.get(url + 'sensors?apikey=' + apikeyInput.val())
+            .done(showData)
+            .fail(showData);
+    }
+
+    function getConfig() {
+        $.get(url + 'config?apikey=' + apikeyInput.val())
             .done(showData)
             .fail(showData);
     }
