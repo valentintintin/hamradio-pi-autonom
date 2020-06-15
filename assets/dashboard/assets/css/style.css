@@ -164,3 +164,7 @@ pre {
     overflow: auto;
     max-width: 69vw;
 }
+
+img {
+    width: 100%;
+}

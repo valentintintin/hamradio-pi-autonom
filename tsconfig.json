@@ -22,9 +22,10 @@
   },
   "include": [
     "src/**/*",
-    "assets/config.ts"
+    "assets/**/*"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "assets/config.dist.ts"
   ]
 }

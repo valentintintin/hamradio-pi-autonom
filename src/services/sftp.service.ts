@@ -13,7 +13,7 @@ export class SftpService {
     }
 
     public static sendMultiple(config: SftpConfigInterface, toSend: string[]): Observable<string[]> {
-        if (!config.enable) {
+        if (!config?.enable) {
             return of(toSend);
         }
 

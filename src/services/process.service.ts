@@ -18,6 +18,7 @@ import { CommunicationMpptchdService } from './communication-mpptchd.service';
 export class ProcessService {
 
     public static debug: boolean;
+    public static doNotShutdown: boolean;
 
     private audioDecoder = new AudioDecoder();
     private mpptchgSubscription: Subscription;
@@ -29,7 +30,7 @@ export class ProcessService {
         LogService.log('program', 'Starting');
 
         try {
-            DatabaseService.openDatabase(config.logsPath).pipe(
+            DatabaseService.openDatabase(config.databasePath).pipe(
                 switchMap(_ => RadioService.pttOff(true))
             ).subscribe(_ => {
                 this.testFunction(config);
@@ -109,11 +110,11 @@ export class ProcessService {
             if (this.stopDirectly) {
                 LogService.log('program', 'Stopped', event);
             }
-            this.stopDirectly = true;
-            if (!ProcessService.debug) {
+            if (ProcessService.debug || ProcessService.doNotShutdown) {
+                process.exit(0);
+            } else {
                 exec('halt');
             }
-            process.exit(0);
         });
     }
 
@@ -215,7 +216,7 @@ export class ProcessService {
     private runSftp(config: ConfigInterface): void {
         LogService.log('sftp', 'Started');
         timer(60000, 1000 * (config.sftp.interval ?? 60)).subscribe(_ => {
-            LogService.send(config.sftp, config.logsPath).subscribe();
+            LogService.send(config.sftp, config.databasePath).subscribe();
         });
     }
 

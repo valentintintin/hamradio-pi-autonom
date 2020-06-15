@@ -5,7 +5,7 @@
         <h2>Actions</h2>
         <div>
             <label for="apikey">Mot de passe</label>
-            <input type="password" name="apikey" id="apikey" value="pixel"/>
+            <input type="password" name="apikey" id="apikey" value="<%= apikey %>"/>
         </div>
     </header>
 
@@ -28,6 +28,8 @@
             <button class="button" id="run-repeater">Lancer répéteur</button>
         </article>
         <article class="action">
+            <button class="button" id="enable-halt">Activer Halt</button>
+            <button class="button" id="disable-halt">Désactiver Halt</button>
             <button class="button" id="enable-watchdog">Activer Watchdog</button>
             <button class="button" id="disable-watchdog">Désactiver Watchdog</button>
             <button class="button" id="shutdown-pi">Éteindre Pi</button>

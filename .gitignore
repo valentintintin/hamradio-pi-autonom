@@ -3,3 +3,5 @@ node_modules
 pi
 dist
 assets/config.ts
+assets/config-pi.ts
+data.db

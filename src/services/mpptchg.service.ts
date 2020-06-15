@@ -34,10 +34,8 @@ export class MpptchgService {
         return sunDate;
     }
 
-    public static stopWatchdog(): Observable<Date> {
-        return CommunicationMpptchdService.instance.disableWatchdog().pipe(
-            map(_ => new Date(new Date().getTime() + (3600 * 1000)))
-        );
+    public static stopWatchdog(): Observable<void> {
+        return CommunicationMpptchdService.instance.disableWatchdog();
     }
 
     public static startWatchdog(): Observable<void> {
@@ -60,23 +58,23 @@ export class MpptchgService {
                 LogService.log('mpptChd', 'Impossible to set all power values', powerOffVolt, powerOnVolt);
                 return of(null);
             }),
+            switchMap(_ => this.stopWatchdog()),
             switchMap(_ => timer(0, this.WD_UPDATE_SECS * 1000)),
             switchMap(_ => this.baterryManagerUpdate(config.lat, config.lng, config.mpptChd))
         );
     }
 
     private static baterryManagerUpdate(lat: number, lng: number, config: MpptChhdConfigInterface): Observable<void> {
-        return CommunicationMpptchdService.instance.disableWatchdog().pipe(
-            switchMap(_ => CommunicationMpptchdService.instance.getStatus()),
+        return CommunicationMpptchdService.instance.getStatus().pipe(
             switchMap(status => {
                 LogService.log('mpptChd', 'Loop check', status);
 
-                if (status.alertAsserted && config.shutdownAlert) {
+                if (status.alertAsserted && config.batteryLowAlert) {
                     LogService.log('mpptChd', 'Alert asserted !');
                     this.events.emit(EventMpptChg.ALERT);
                 } else {
-                    if (status.nightDetected && config.shutdownNight) {
-                        if (!this.nightTriggered) {
+                    if (status.nightDetected && config.nightAlert) {
+                        if (!this.nightTriggered || !status.watchdogRunning) {
                             LogService.log('mpptChd', 'Night detected');
                             this.nightTriggered = true;
                             this.events.emit(EventMpptChg.NIGHT_DETECTED);
@@ -98,6 +96,8 @@ export class MpptchgService {
                         return MpptchgService.startWatchdog().pipe(
                             catchError(err => of(null))
                         );
+                    } else {
+                        this.nightTriggered = false;
                     }
                     LogService.log('mpptChd', 'Nothing to do');
                 }

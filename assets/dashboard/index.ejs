@@ -5,7 +5,7 @@
         <h2>
             Capteurs
             <% if (sensors) { %>
-                - Dernier relevé à <%= sensors.createdAt.toLocaleString() %>
+                - Dernier relevé à <%= new Date(sensors.createdAt).toLocaleString() %>
             <% } %>
         </h2>
     </header>
@@ -93,7 +93,7 @@
 
         <article>
             <a href="/assets/images/station.jpg" target="_blank">
-                <img src="/assets/images/station.jpg" alt="Intérieur de la boîte" width="300px"/>
+                <img src="/assets/images/station.jpg" alt="Intérieur de la boîte" style="width: 300px"/>
             </a>
         </article>
     </section>

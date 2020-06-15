@@ -41,26 +41,40 @@ export class WebcamService {
 
         return new Observable<string>((observer: Observer<string>) => {
             if (!WebcamService.USE_FAKE) {
-                WebcamService.webcam.list(function (list) {
-                    WebcamService.opts.device = list[list.length - 1];
-                    WebcamService.webcam = NodeWebcam.create(WebcamService.opts);
+                const errors = [];
 
-                    // @ts-ignore
-                    WebcamService.webcam.capture(configWebcam.photosPath + '/' + new Date().format('{YYYY}_{MM}_{DD}-{hh}_{mm}_{ss}'), (err, data) => {
-                        WebcamService.alreadyInUse = false;
+                WebcamService.webcam.list(list => {
+                    let ended = false;
+                    list.reverse().forEach(cam => {
+                        if (!ended) {
+                            WebcamService.opts.device = cam;
+                            WebcamService.webcam = NodeWebcam.create(WebcamService.opts);
 
-                        if (err) {
-                            LogService.log('webcam', 'Capture error', err);
-                            observer.error(err);
-                        } else {
-                            LogService.log('webcam', 'Capture OK');
+                            // @ts-ignore
+                            WebcamService.webcam.capture(configWebcam.photosPath + '/' + new Date().format('{YYYY}_{MM}_{DD}-{hh}_{mm}_{ss}'), (err, data) => {
+                                WebcamService.alreadyInUse = false;
 
-                            WebcamService.lastPhotoPath = data;
-                            observer.next(data);
-                            observer.complete();
+                                if (err) {
+                                    errors.push(err);
+                                } else if (!fs.existsSync(data)) {
+                                    errors.push(new Error('File not found (webcam taken : ' + cam + ')'));
+                                } else {
+                                    LogService.log('webcam', 'Capture OK');
+
+                                    WebcamService.lastPhotoPath = data;
+                                    observer.next(data);
+                                    observer.complete();
+                                    ended = true;
+                                }
+                            });
                         }
                     });
                 });
+
+                if (errors.length) {
+                    LogService.log('webcam', 'Capture error', errors);
+                    observer.error(errors);
+                }
             } else {
                 WebcamService.alreadyInUse = false;
                 LogService.log('webcam', 'Capture fake OK');

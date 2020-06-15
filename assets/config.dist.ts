@@ -4,7 +4,7 @@ export const config: ConfigInterface = {
     callsign: 'F4HVV',
     lat: 45.196250,
     lng: 5.727160,
-    logsPath: '/home/valentin/logic/logs',
+    databasePath: '/home/valentin/logic/data.db',
     debug: true,
     fakeGpio: true,
     audioDevice: 'pulse',
@@ -62,8 +62,8 @@ export const config: ConfigInterface = {
         debugI2C: false,
         powerOffVolt: 11400,
         watchdog: true,
-        shutdownAlert: true,
-        shutdownNight: true,
+        batteryLowAlert: true,
+        nightAlert: true,
         nightLimitVolt: 11600
     },
     sftp: {

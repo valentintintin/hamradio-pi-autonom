@@ -3,8 +3,9 @@ import { LogService } from './log.service';
 import { Observable, Observer } from 'rxjs';
 import { Entity } from '../models/entity';
 import { Logs } from '../models/logs';
-import { map } from 'rxjs/operators';
+import { map, switchMap } from 'rxjs/operators';
 import { Variables } from '../models/variables';
+import fs = require('fs');
 
 const sqlite3 = require('sqlite3').verbose();
 
@@ -12,15 +13,17 @@ export class DatabaseService {
 
     private static db: Database;
 
-    public static openDatabase(pathDatabase: string): Observable<void> {
-        return new Observable<void>((observer: Observer<void>) => {
+    public static openDatabase(pathDatabase: string): Observable<Database> {
+        let flag = sqlite3.OPEN_READWRITE;
+
+        let req = new Observable<Database>((observer: Observer<Database>) => {
             try {
-                DatabaseService.db = new sqlite3.Database(pathDatabase + '/data.db', err => {
+                DatabaseService.db = new sqlite3.Database(pathDatabase, flag, err => {
                     if (err) {
                         LogService.log('database', 'Open KO', err);
                         observer.error(err);
                     }
-                    observer.next(null);
+                    observer.next(DatabaseService.db);
                     observer.complete();
                 });
             } catch (e) {
@@ -28,6 +31,29 @@ export class DatabaseService {
                 observer.error(e);
             }
         });
+
+        if (!fs.existsSync(pathDatabase)) {
+            flag |= sqlite3.OPEN_CREATE;
+            req = req.pipe(
+                switchMap(_ => {
+                    const sql = fs.readFileSync(__dirname + '/../create.sql', 'utf8');
+                    return new Observable<Database>((observer: Observer<Database>) => {
+                        LogService.log('database', 'Creating tables');
+
+                        DatabaseService.db.exec(sql, err => {
+                            if (err) {
+                                LogService.log('database', 'Create KO', err);
+                                observer.error(err);
+                            }
+                            observer.next(DatabaseService.db);
+                            observer.complete();
+                        });
+                    });
+                }),
+            )
+        }
+
+        return req;
     }
 
     public static close(): Observable<void> {

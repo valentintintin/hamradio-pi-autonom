@@ -111,7 +111,7 @@ export class SensorsService {
         }));
     }
 
-    public static getAll(): Observable<Sensors[]> {
+    public static getAllSaved(): Observable<Sensors[]> {
         return DatabaseService.selectAll<Sensors>(Sensors.name).pipe(tap(datas => {
             if (datas.length > 0) {
                 datas.forEach(data => {

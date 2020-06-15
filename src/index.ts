@@ -1,7 +1,6 @@
 import { ProcessService } from './services/process.service';
 import { CommunicationMpptchdService } from './services/communication-mpptchd.service';
 import { skip, switchMap } from 'rxjs/operators';
-import { LogService } from './services/log.service';
 import { GpioEnum, GpioService } from './services/gpio.service';
 import { WebcamService } from './services/webcam.service';
 import { ConfigInterface } from './config/config.interface';
@@ -24,7 +23,6 @@ const config = loadConfig();
 
 ProcessService.debug = !!config.debug;
 
-LogService.LOG_PATH = config.logsPath;
 GpioService.USE_FAKE = !!config.fakeGpio;
 
 if (config.mpptChd) {
@@ -111,8 +109,8 @@ switch (process.argv[process.argv.length - 1]) {
         ).subscribe(d => console.log(d));
         break;
 
-    case 'api':
-        DatabaseService.openDatabase(config.logsPath).subscribe(_ => new DashboardService(config));
+    case 'dashboard':
+        DatabaseService.openDatabase(config.databasePath).subscribe(_ => new DashboardService(config));
         break;
 
     case 'program':

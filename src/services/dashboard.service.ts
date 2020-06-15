@@ -14,6 +14,7 @@ import { MpptchgService } from './mpptchg.service';
 import { RadioService } from './radio.service';
 import { DatabaseService } from './database.service';
 import { Logs } from '../models/logs';
+import { ProcessService } from './process.service';
 
 export class DashboardService {
 
@@ -23,13 +24,17 @@ export class DashboardService {
         this.app.use(express.json());
 
         this.app.use((req, res, next) => {
-            LogService.log('dashboard', 'Request start', req.method, req.path);
+            if (!req.path.startsWith('/assets')) {
+                LogService.log('dashboard', 'Request start', req.method, req.path);
+            }
 
             res.header('Access-Control-Allow-Origin', '*');
             res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
 
             res.on('finish', () => {
-                LogService.log('dashboard', 'Request end', req.method, req.path, res.statusCode);
+                if (!req.path.includes('assets')) {
+                    LogService.log('dashboard', 'Request end', req.method, req.path, res.statusCode);
+                }
             });
 
             if (req.path.startsWith('/api')) {
@@ -48,7 +53,7 @@ export class DashboardService {
         });
 
         this.app.use('/assets', express.static(__dirname + '/../../assets/dashboard/assets'));
-        this.app.use('/logs', express.static(config.logsPath));
+        this.app.use('/logs', express.static(config.databasePath));
 
         this.app.get('/', (req, res) => {
             forkJoin([SensorsService.getLast(), WebcamService.getLastPhotos(config.webcam)])
@@ -73,17 +78,24 @@ export class DashboardService {
         });
 
         this.app.get('/admin', (req, res) => {
-            res.render(__dirname + '/../../assets/dashboard/admin.ejs');
+            res.render(__dirname + '/../../assets/dashboard/admin.ejs', {
+                apikey: config.debug ? config.dashboard.apikey : ''
+            });
         });
 
         this.app.get('/api/logs', (req, res) => {
-            DatabaseService.selectAll(Logs.name).subscribe((logs: Logs[]) => {
+            DatabaseService.selectAll(Logs.name, 500).subscribe((logs: Logs[]) => {
                 logs.forEach(log => {
                     (log as any).createdAt = new Date(log.createdAt);
                     log.data = JSON.parse(log.data);
                 })
                 res.send(logs);
             });
+        });
+
+        this.app.post('/api/do-not-shutdown/:value', (req, res) => {
+            ProcessService.doNotShutdown = req.params['value'] === '1';
+            res.send(true);
         });
 
         this.app.post('/api/gpio/:pin/:value', (req: Request, res) => {
@@ -118,7 +130,7 @@ export class DashboardService {
 
             this.app.use('/sensors.csv', express.static(config.sensors.csvPath));
             this.app.use('/sensors.json', (req, res) => {
-                SensorsService.getAll().subscribe(datas => {
+                SensorsService.getAllSaved().subscribe(datas => {
                     res.send(datas.map(data => {
                         return {
                             createdAt: data.createdAt,
@@ -150,7 +162,7 @@ export class DashboardService {
                         res.json(e);
                         return of(null);
                     })
-                ).subscribe(wakeupDate => res.send(wakeupDate));
+                ).subscribe(_ => res.send(true));
             });
 
             if (config.mpptChd.watchdog) {
@@ -160,7 +172,7 @@ export class DashboardService {
                             res.json(e);
                             return of(null);
                         })
-                    ).subscribe(wakeupDate => res.send(true));
+                    ).subscribe(_ => res.send(true));
                 });
             }
         }
@@ -189,7 +201,7 @@ export class DashboardService {
 
         if (config.webcam && config.webcam.enable) {
             this.app.post('/api/webcam', (req, res) => {
-                WebcamService.captureAndSend(config.webcam, config.sftp).pipe(
+                WebcamService.captureAndSend(config.webcam, config?.sftp).pipe(
                     catchError(e => {
                         res.json(e);
                         return of(null);

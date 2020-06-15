@@ -15,7 +15,7 @@ export interface ConfigInterface {
     lng: number;
     debug?: boolean;
     fakeGpio?: boolean;
-    logsPath: string;
+    databasePath: string;
     audioDevice?: string;
     packetRadio?: PacketRadioConfigInterface;
     sensors?: SensorsConfigInterface;

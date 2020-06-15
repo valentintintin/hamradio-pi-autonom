@@ -66,7 +66,7 @@ export class AprsService {
                         `T#${seq.toString().padStart(3, '0')},${telemetry.voltageBattery},${telemetry.currentCharge},${telemetry.temperatureRtc},0,0,00000000`
                     ];
 
-                    if (seq === 0) {
+                    if ((seq % 100) === 0) {
                         framesToSend.unshift(`:${configAprs.callSrc.padEnd(9, ' ')}:PARM.VBat,ICharge,Temp`);
                         framesToSend.unshift(`:${configAprs.callSrc.padEnd(9, ' ')}:UNIT.Volts,Amps,Celcius`);
                     }
