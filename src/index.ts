@@ -1,6 +1,6 @@
 import { ProcessService } from './services/process.service';
-import { CommunicationMpptchdService } from './services/communication-mpptchd.service';
-import { skip, switchMap } from 'rxjs/operators';
+import { CommandMpptChd, CommunicationMpptchdService } from './services/communication-mpptchd.service';
+import { delay, skip, switchMap } from 'rxjs/operators';
 import { GpioEnum, GpioService } from './services/gpio.service';
 import { WebcamService } from './services/webcam.service';
 import { ConfigInterface } from './config/config.interface';
@@ -14,6 +14,8 @@ import { TncService } from './services/tnc.service';
 import { DatabaseService } from './services/database.service';
 import { EnumVariable } from './models/variables';
 import { DashboardService } from './services/dashboard.service';
+import { ToneService } from './services/tone.service';
+import { exec } from 'child_process';
 
 export const assetsFolder: string = process.cwd() + '/assets';
 
@@ -36,12 +38,14 @@ if (config.webcam) {
 
 switch (process.argv[process.argv.length - 1]) {
     case 'dtmf':
-        new AudioDecoder().decode(config.audioDevice,
-            [MultimonModeEnum.DTMF, MultimonModeEnum.TONE, MultimonModeEnum.AFSK1200, MultimonModeEnum.AFSK2400],
-            [], ['-T 1750']).pipe(
-            skip(1)
-        ).subscribe(result => {
-            console.log(result);
+        RadioService.switchOn().subscribe(_ => {
+            new AudioDecoder().decode(config.audioDevice,
+                [MultimonModeEnum.DTMF, MultimonModeEnum.TONE, MultimonModeEnum.AFSK1200, MultimonModeEnum.AFSK2400],
+                [], ['-T 1750']).pipe(
+                skip(1)
+            ).subscribe(result => {
+                console.log(result);
+            });
         });
         break;
 
@@ -49,8 +53,17 @@ switch (process.argv[process.argv.length - 1]) {
         RadioService.listenAndRepeat(config.repeater.seconds).subscribe();
         break;
 
+    case 'tones':
+        ToneService.send1750(true, true, 5).pipe(
+            delay(2500),
+            switchMap(_ => ToneService.sendOk(true, true)),
+            delay(2500),
+            switchMap(_ => ToneService.sendError()),
+        ).subscribe();
+        break;
+
     case 'voice':
-        VoiceService.sendVoice(config.voice.sentence).subscribe();
+        VoiceService.sendVoice(config.voice.sentence, false, config.voice).subscribe();
         break;
 
     case 'direwolf-connection':
@@ -109,13 +122,56 @@ switch (process.argv[process.argv.length - 1]) {
         ).subscribe(d => console.log(d));
         break;
 
+    case 'mppt-stop-wd-loop':
+        CommunicationMpptchdService.instance.send(CommandMpptChd.PWROFFV, 11000).subscribe(_ => {
+            setInterval(_ => {
+                CommunicationMpptchdService.instance.disableWatchdog().pipe(
+                    switchMap(_ => CommunicationMpptchdService.instance.getStatus())
+                ).subscribe(d => {
+                    if (d.alertAsserted) {
+                        setTimeout(_ => {
+                            exec('halt');
+                        }, 30000);
+                        console.log('Alert !!', d);
+                    } else {
+                        console.log(d.values.batteryVoltage);
+                    }
+                });
+            }, 1500);
+        });
+        break;
+
     case 'dashboard':
         DatabaseService.openDatabase(config.databasePath).subscribe(_ => new DashboardService(config));
         break;
 
     case 'program':
-    default:
         new ProcessService().run(config);
+        break;
+
+    default:
+        console.log('Liste des commandes :');
+        console.table({
+            'dtmf': 'Listen to DTMF code or 1750 Hz tone',
+            'tones': 'Send 1750, OK and error',
+            'repeat': 'Listen 10s the frequency and replay it over the air',
+            'voice': 'Do the voice command',
+            'direwolf-connection': 'Test connection to Direwolf',
+            'direwolf-listen': 'Listen for AX25 packets',
+            'aprs-beacon': 'Send APRS beacon',
+            'aprs-telem': 'Send APRS telemetry',
+            'db-reset-seqtelem': 'Reset sequence current APRS telemetry packet',
+            'sstv': 'Send the last photo take over the air in Robot36',
+            'webcam': 'Capture one photo',
+            'sensors': 'Read all sensors values',
+            'gpio-on': 'Set all GPIO used as HIGH',
+            'gpio-off': 'Set all GPIO used as LOW',
+            'mppt-status': 'Get the status of the MPPTChg board',
+            'mppt-stop-wd': 'Stop the watchdog of the MPPTChg board',
+            'mppt-stop-wd-loop': 'Stop the watchdog of the MPPTChg board in loop',
+            'dashboard': 'Run only the dashboard Web interface',
+            'program': 'Run the program',
+        });
         break;
 }
 

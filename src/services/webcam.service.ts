@@ -102,13 +102,17 @@ export class WebcamService {
                     observer.error(err);
                 }
 
-                const filesSortedDesc = files.sort((a, b) => a < b ? 1 : -1);
+                if (files) {
+                    const filesSortedDesc = files.sort((a, b) => a < b ? 1 : -1);
 
-                if (!WebcamService.lastPhotoPath && filesSortedDesc.length > 0) {
-                    WebcamService.lastPhotoPath = filesSortedDesc[0];
+                    if (!WebcamService.lastPhotoPath && filesSortedDesc.length > 0) {
+                        WebcamService.lastPhotoPath = filesSortedDesc[0];
+                    }
+
+                    observer.next(filesSortedDesc);
+                } else {
+                    observer.next(null);
                 }
-
-                observer.next(filesSortedDesc);
                 observer.complete();
             });
         });

@@ -12,6 +12,10 @@ export class RadioService {
     public static switchOn(): Observable<void> {
         LogService.log('radio', 'Relay', true);
 
+        if (RadioService.keepOn) {
+            return of(null);
+        }
+
         return GpioService.set(GpioEnum.RelayRadio, true).pipe(
             delay(2500)
         );
@@ -29,7 +33,8 @@ export class RadioService {
         LogService.log('radio', 'PTT', true);
 
         return RadioService.switchOn().pipe(
-            switchMap(_ => GpioService.set(GpioEnum.PTT, true))
+            switchMap(_ => GpioService.set(GpioEnum.PTT, true)),
+            delay(500)
         );
     }
 
@@ -45,10 +50,10 @@ export class RadioService {
         LogService.log('radio', 'Start listening to repeat', seconds);
 
         return ToneService.sendOk(false, true).pipe(
-            switchMap(_ => AudioService.record(seconds)),
+            switchMap(_ => AudioService.record(seconds, 2)),
             switchMap(path => ToneService.sendOk(true, true).pipe(map(_ => path))),
-            switchMap(path => AudioService.play(path)),
-            switchMap(_ => ToneService.sendError(false, !shutdownRadio)),
+            switchMap(path => AudioService.play(path, 2)),
+            switchMap(_ => ToneService.sendOk(false, !shutdownRadio)),
             catchError(err => {
                 LogService.log('radio', 'Send image KO', err);
                 return RadioService.pttOff(shutdownRadio);

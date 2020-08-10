@@ -199,22 +199,24 @@ export class DashboardService {
             });
         }
 
-        if (config.webcam && config.webcam.enable) {
-            this.app.post('/api/webcam', (req, res) => {
-                WebcamService.captureAndSend(config.webcam, config?.sftp).pipe(
-                    catchError(e => {
-                        res.json(e);
-                        return of(null);
-                    })
-                ).subscribe(filePath => res.sendFile(filePath));
-            });
+        if (config.webcam) {
+            if (config.webcam.enable) {
+                this.app.post('/api/webcam', (req, res) => {
+                    WebcamService.captureAndSend(config.webcam, config?.sftp).pipe(
+                        catchError(e => {
+                            res.json(e);
+                            return of(null);
+                        })
+                    ).subscribe(filePath => res.sendFile(filePath));
+                });
+            }
 
             this.app.use('/timelapse', express.static(config.webcam.photosPath));
         }
 
         if (config.voice && config.voice.enable) {
             this.app.post('/api/voice', (req, res) => {
-                VoiceService.sendVoice(config.voice.sentence).pipe(
+                VoiceService.sendVoice(config.voice.sentence, false, config.voice).pipe(
                     catchError(e => {
                         res.json(e);
                         return of(null);

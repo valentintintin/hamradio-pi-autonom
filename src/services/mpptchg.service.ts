@@ -15,7 +15,7 @@ export class MpptchgService {
 
     private static readonly WD_INIT_SECS = 180; // 2 minutes
     private static readonly WD_INIT_NIGHT_SECS = 255; // 4 minutes 15
-    private static readonly WD_UPDATE_SECS = 60; // 1 minute
+    private static readonly WD_UPDATE_SECS = 10; // 10 secondes
     private static readonly WD_ALERT_SECS = 60; // 1 minute
     private static readonly WD_PWROFF_SECS = 10; // 10 secondes
     private static readonly WD_PWROFF_NIGHT_SECS_DEFAULT = 3600; // 1 heure
@@ -80,11 +80,11 @@ export class MpptchgService {
                             this.events.emit(EventMpptChg.NIGHT_DETECTED);
                             let nextWakeUp = new Date();
                             if (status.values && status.values.batteryVoltage >= (config.nightLimitVolt ?? this.NIGHT_LIMIT_VOLT)) {
-                                nextWakeUp.setSeconds(this.WD_PWROFF_NIGHT_SECS_DEFAULT);
+                                nextWakeUp.setSeconds(config.nightSleepTimeSeconds ?? this.WD_PWROFF_NIGHT_SECS_DEFAULT);
                             } else {
                                 nextWakeUp = this.getSunCalcTime(lat, lng).dawn;
                             }
-                            return MpptchgService.shutdownAndWakeUpAtDate(nextWakeUp, this.WD_INIT_NIGHT_SECS).pipe(
+                            return MpptchgService.shutdownAndWakeUpAtDate(nextWakeUp, config.nightRunSleepTimeSeconds ?? this.WD_INIT_NIGHT_SECS).pipe(
                                 catchError(err => of(null))
                             );
                         } else {
@@ -126,7 +126,7 @@ export class MpptchgService {
 
     public static shutdownAndWakeUpAtDate(wakeUpDate: Date, secondsBeforeShutdown: number = 0): Observable<Date> {
         const wakeUpDateNew = new Date(wakeUpDate);
-        wakeUpDateNew.setSeconds(secondsBeforeShutdown + this.WD_UPDATE_SECS + this.WD_ALERT_SECS + 20); // To be sure to trigger the timer one time + 60s alert asserted + 20s to be sure again
+        wakeUpDateNew.setSeconds(secondsBeforeShutdown + 20); // To be sure to trigger the timer one time + 20 seconds to be sure
         let secondsBedoreWakeUp = Math.round((wakeUpDateNew.getTime() - new Date().getTime()) / 1000);
 
         LogService.log('mpptChd', 'Request to shutdown', {

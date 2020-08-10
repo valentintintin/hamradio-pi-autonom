@@ -14,7 +14,11 @@ export class LogService {
         logs.service = action;
         logs.log = message;
         if (data && data.length) {
-            logs.data = JSON.stringify(data);
+            try {
+                logs.data = JSON.stringify(data);
+            } catch (e) {
+                logs.data = e.message;
+            }
         }
 
         const now = new Date();

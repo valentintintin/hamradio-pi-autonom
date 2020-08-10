@@ -4,12 +4,12 @@ import ChildProcess = require('child_process');
 
 export class AudioService {
 
-    public static record(seconds: number = 10): Observable<string> {
+    public static record(seconds: number = 10, volume: number = 1): Observable<string> {
         return new Observable<string>((observer: Observer<string>) => {
             LogService.log('record', 'Start recording audio', seconds);
             const pathWav = '/tmp/record.wav';
             try {
-                ChildProcess.execSync(`rec -c 1 ${pathWav} trim 0 ${seconds}`, {
+                ChildProcess.execSync(`rec -c 1 ${pathWav} trim 0 ${seconds} vol ${volume}`, {
                     encoding: 'utf8',
                     stdio: 'pipe'
                 });
@@ -22,11 +22,11 @@ export class AudioService {
         });
     }
 
-    public static play(file: string): Observable<void> {
+    public static play(file: string, volume: number = 1): Observable<void> {
         return new Observable<void>((observer: Observer<void>) => {
             LogService.log('play', 'Start playing file', file);
             try {
-                ChildProcess.execSync(`play ${file}`, {
+                ChildProcess.execSync(`play ${file} vol ${volume}`, {
                     encoding: 'utf8',
                     stdio: 'pipe'
                 });

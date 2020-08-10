@@ -21,7 +21,6 @@
     "jimp": "^0.10.3",
     "node-webcam": "^0.6.2",
     "nodejs-arecord-multimon": "git+https://github.com/valentintintin/nodejs-arecord-multimon.git",
-    "pico-speaker": "0.0.7",
     "rxjs": "^6.5.5",
     "sftp-upload": "^1.0.1",
     "sqlite3": "^4.2.0",

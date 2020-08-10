@@ -9,4 +9,6 @@ export interface MpptChhdConfigInterface extends FeatureInterface {
     powerOffVolt?: number;
     powerOnVolt?: number;
     nightLimitVolt?: number;
+    nightSleepTimeSeconds?: number;
+    nightRunSleepTimeSeconds?: number;
 }

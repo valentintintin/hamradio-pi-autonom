@@ -70,14 +70,15 @@ export class ProcessService {
                 LogService.log('program', 'Started');
             });
         } catch (e) {
-            this.exitHandler(config, 0);
+            LogService.log('program', 'exception', e);
+            this.exitHandler(config, 'SIGALRM');
         }
     }
 
     private exitHandler(config: ConfigInterface, event) {
-        let stop = of(null);
-
         if (!this.stopDirectly) {
+            let stop = of(null);
+
             LogService.log('program', 'Stopping', event);
 
             if (this.mpptchgSubscription) {
@@ -98,24 +99,27 @@ export class ProcessService {
                 }
             }
 
-            stop = stop.pipe(
+            stop.pipe(
                 catchError(err => {
                     LogService.log('program', 'Stopped KO', err);
                     return of(null);
                 })
-            );
-        }
-
-        stop.subscribe(_ => {
-            if (this.stopDirectly) {
+            ).subscribe(_ => {
                 LogService.log('program', 'Stopped', event);
-            }
+                this.stopDirectly = true;
+                if (ProcessService.debug || ProcessService.doNotShutdown) {
+                    process.exit(0);
+                } else {
+                    exec('halt');
+                }
+            });
+        } else {
             if (ProcessService.debug || ProcessService.doNotShutdown) {
                 process.exit(0);
             } else {
                 exec('halt');
             }
-        });
+        }
     }
 
     private runMpptChd(config: ConfigInterface): void {
@@ -167,7 +171,7 @@ export class ProcessService {
                                 .replace('chargeCurrent', data.values.chargeCurrent + '')
                                 ;
                         }),
-                        switchMap(sentence => VoiceService.sendVoice(sentence, true)),
+                        switchMap(sentence => VoiceService.sendVoice(sentence, true, config.voice)),
                         switchMap(_ => RadioService.listenAndRepeat(config.repeater.seconds, false))
                     ).subscribe(_ => this.dtmfDecoderShouldStop = true);
                 }
@@ -182,10 +186,10 @@ export class ProcessService {
                     } else if (dtmfCode === config.packetRadio.dtmfCode) {
                         RadioService.keepOn = !RadioService.keepOn;
                         LogService.log('radio', 'State keepOn set by DTMF', RadioService.keepOn);
-                        VoiceService.sendVoice('Radio ' + (RadioService.keepOn ? 'allumée' : 'éteinte'), true).subscribe(_ => this.dtmfDecoderShouldStop = true);
+                        VoiceService.sendVoice('Radio ' + (RadioService.keepOn ? 'allumée' : 'éteinte'), true, config.voice).subscribe(_ => this.dtmfDecoderShouldStop = true);
                     } else {
                         LogService.log('dtmf', 'Code not recognized', dtmfCode);
-                        VoiceService.sendVoice('Erreur code, ' + dtmfCode, true).subscribe(_ => this.dtmfDecoderShouldStop = true);
+                        VoiceService.sendVoice('Erreur code, ' + dtmfCode, true, config.voice).subscribe(_ => this.dtmfDecoderShouldStop = true);
                     }
                     dtmfCode = '';
                 } else if (!dtmfCode.endsWith(result.data)) {

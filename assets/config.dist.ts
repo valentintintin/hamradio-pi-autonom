@@ -50,7 +50,8 @@ export const config: ConfigInterface = {
     },
     voice: {
         enable: true,
-        sentence: 'Station autonome de Foxtrote 4, Hotel Victor Victor'
+        sentence: 'Station autonome de Foxtrote 4, Hotel Victor Victor',
+        language: 'fr-FR'
     },
     repeater: {
         enable: true,

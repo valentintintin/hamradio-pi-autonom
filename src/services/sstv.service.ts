@@ -57,7 +57,7 @@ export class SstvService {
                 return new Observable<void>((observer: Observer<void>) => {
                     LogService.log('sstv', 'Generating SSTV');
                     try {
-                        ChildProcess.execFileSync(config.pisstvPath + '/pisstv', [
+                        ChildProcess.execFileSync(config.pisstvPath, [
                             '-p' + config.mode,
                             SstvService.tmpImage
                         ], {

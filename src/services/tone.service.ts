@@ -8,23 +8,23 @@ export class ToneService {
 
     public static alreadyInUse: boolean;
 
-    public static send1750(keepPttOn: boolean = false, keepRadioOn: boolean = false): Observable<void> {
-        return ToneService.sendTone(1750, 2, keepPttOn, keepRadioOn);
+    public static send1750(keepPttOn: boolean = false, keepRadioOn: boolean = false, seconds: number = 2): Observable<void> {
+        return ToneService.sendTone(1750, seconds, 0.1, keepPttOn, keepRadioOn);
     }
 
     public static sendOk(keepPttOn: boolean = false, keepRadioOn: boolean = false): Observable<void> {
-        return ToneService.sendTones([525, 0, 525], [0.1, 0.1, 0.1], keepPttOn, keepRadioOn);
+        return ToneService.sendTones([525, 0, 525, 0, 525], [0.1, 0.1, 0.1, 0.1, 0.1], 1, keepPttOn, keepRadioOn);
     }
 
     public static sendError(keepPttOn: boolean = false, keepRadioOn: boolean = false): Observable<void> {
-        return ToneService.sendTones([400, 0, 400, 0, 400, 0, 400], [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1], keepPttOn, keepRadioOn);
+        return ToneService.sendTones([400, 0, 400, 0, 400], [0.3, 0.1, 0.3, 0.1, 0.3], 1, keepPttOn, keepRadioOn);
     }
 
-    public static sendTone(freq: number, seconds: number = 2, keepPttOn: boolean = false, keepRadioOn: boolean = false): Observable<void> {
-        return ToneService.sendTones([freq], [seconds], keepPttOn, keepRadioOn);
+    public static sendTone(freq: number, seconds: number = 2, volume: number = 1, keepPttOn: boolean = false, keepRadioOn: boolean = false): Observable<void> {
+        return ToneService.sendTones([freq], [seconds], volume, keepPttOn, keepRadioOn);
     }
 
-    public static sendTones(freqs: number[], seconds: number[], keepPttOn: boolean = false, keepRadioOn: boolean = false): Observable<void> {
+    public static sendTones(freqs: number[], seconds: number[], volume: number = 1, keepPttOn: boolean = false, keepRadioOn: boolean = false): Observable<void> {
         LogService.log('tone', 'Start sending tones', freqs);
 
         if (ToneService.alreadyInUse) {
@@ -38,7 +38,7 @@ export class ToneService {
 
         freqs.forEach((value, index) => {
             return todoSubscription = todoSubscription.pipe(
-                switchMap(_ => ToneService.playTone(value, seconds[index])),
+                switchMap(_ => ToneService.playTone(value, seconds[index], volume)),
                 catchError(_ => of(null))
             );
         });
@@ -47,7 +47,7 @@ export class ToneService {
             switchMap(_ => keepPttOn ? of(null) : RadioService.pttOff(!keepRadioOn)),
             tap(_ => {
                 ToneService.alreadyInUse = false;
-                LogService.log('tone', 'Send tones  OK');
+                LogService.log('tone', 'Send tones OK');
             }),
             catchError(err => {
                 ToneService.alreadyInUse = false;
@@ -57,11 +57,11 @@ export class ToneService {
         );
     }
 
-    private static playTone(freq: number, seconds: number): Observable<void> {
+    private static playTone(freq: number, seconds: number, volume: number = 1): Observable<void> {
         return new Observable<void>((observer: Observer<void>) => {
             LogService.log('tone', 'Playing tone', freq, seconds);
             try {
-                ChildProcess.execSync(`play -n synth ${seconds} sine ${freq}`, {
+                ChildProcess.execSync(`play -n synth ${seconds} sine ${freq} vol ${volume}`, {
                     encoding: 'utf8',
                     stdio: 'pipe'
                 });

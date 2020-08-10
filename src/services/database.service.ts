@@ -121,7 +121,7 @@ export class DatabaseService {
 
     public static insert(data: Entity, ignoreErrors: boolean = true): Observable<Entity> {
         return new Observable<Entity>((observer: Observer<Entity>) => {
-            const keys = Object.keys(data).filter(d => d !== 'id' && !!data[d]);
+            const keys = Object.keys(data).filter(d => d !== 'id' && data[d] !== null);
             const query = `INSERT INTO ${data.constructor.name}(${keys.join(',')}) VALUES(${keys.map(k => `'${data[k]}'`).join(',')})`;
             try {
                 DatabaseService.db.exec(query, err => {
