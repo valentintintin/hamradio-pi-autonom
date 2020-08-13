@@ -16,6 +16,7 @@ import { EnumVariable } from './models/variables';
 import { DashboardService } from './services/dashboard.service';
 import { ToneService } from './services/tone.service';
 import { exec } from 'child_process';
+import { MpptchgService } from './services/mpptchg.service';
 
 export const assetsFolder: string = process.cwd() + '/assets';
 
@@ -122,6 +123,17 @@ switch (process.argv[process.argv.length - 1]) {
         ).subscribe(d => console.log(d));
         break;
 
+    case 'shutdown':
+        const restartDate = new Date();
+        restartDate.setMinutes(restartDate.getMinutes() + 2);
+        MpptchgService.shutdownAndWakeUpAtDate(restartDate).subscribe(wakeupDate => {
+            setInterval(_ => CommunicationMpptchdService.instance.getStatus().subscribe(d => console.log(wakeupDate, d)), 1500);
+            setTimeout(_ => {
+                exec('halt');
+            }, 30000);
+        });
+        break;
+
     case 'mppt-stop-wd-loop':
         CommunicationMpptchdService.instance.send(CommandMpptChd.PWROFFV, 11000).subscribe(_ => {
             setInterval(_ => {
@@ -169,6 +181,7 @@ switch (process.argv[process.argv.length - 1]) {
             'mppt-status': 'Get the status of the MPPTChg board',
             'mppt-stop-wd': 'Stop the watchdog of the MPPTChg board',
             'mppt-stop-wd-loop': 'Stop the watchdog of the MPPTChg board in loop',
+            'shutdown': 'Shutdown the PI in 30 seconds and restart it 2 minutes later',
             'dashboard': 'Run only the dashboard Web interface',
             'program': 'Run the program',
         });

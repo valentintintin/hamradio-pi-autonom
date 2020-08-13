@@ -27,7 +27,7 @@ export class SensorsService {
                 sensorsObject.currentCharge = data.values.chargeCurrent;
                 sensorsObject.alertAsserted = data.alertAsserted ? 1 : 0;
                 sensorsObject.nightDetected = data.nightDetected ? 1 : 0;
-                sensorsObject.temperatureBattery = data.values.internalThermometer;
+                sensorsObject.temperatureBattery = data.values.internalThermometer / 10;
                 sensorsObject.voltageBattery = data.values.batteryVoltage;
                 sensorsObject.rawMpptchg = JSON.stringify(data);
                 return sensorsObject;

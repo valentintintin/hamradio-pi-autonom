@@ -10,26 +10,46 @@
         </h2>
     </header>
 
-    <section>
-        <% if (sensors) { %>
+    <% if (sensors) { %>
+        <section>
             <article class="card card-number bg-green">
                 <span class="title">Température boîte</span>
-                <strong class="value"><%= sensors.temperatureRtc %>°C</strong>
+                <strong class="value"><%= (sensors.temperatureRtc + sensors.temperatureBattery) / 2 %>°C</strong>
             </article>
 
+            <article class="card card-number bg-green">
+                <span class="title">Température CPU</span>
+                <strong class="value"><%= Math.round(sensors.temperatureCpu) %>°C</strong>
+            </article>
+
+            <article class="card card-number bg-orange">
+                <span class="title">Uptime</span>
+                <strong class="value"><%= Math.round(sensors.uptime / 60) %>min</strong>
+            </article>
+        </section>
+
+        <section>
             <article class="card card-number bg-blue">
                 <span class="title">Voltage batterie</span>
                 <strong class="value"><%= sensors.voltageBattery / 1000 %>V</strong>
+            </article>
+
+            <article class="card card-number bg-blue">
+                <span class="title">Voltage solaire</span>
+                <strong class="value"><%= sensors.voltageSolar / 1000 %>V</strong>
             </article>
 
             <article class="card card-number bg-orange">
                 <span class="title">Intensité de charge</span>
                 <strong class="value"><%= sensors.currentCharge %>mA</strong>
             </article>
-        <% } else { %>
+        </section>
+    <% } else { %>
+        <section>
             <strong>Aucune donnée pour le moment</strong>
-        <% } %>
-    </section>
+        </section>
+
+    <% } %>
 </div>
 
 <div class="photos">

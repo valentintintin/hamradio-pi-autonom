@@ -78,11 +78,17 @@ export class MpptchgService {
                             LogService.log('mpptChd', 'Night detected');
                             this.nightTriggered = true;
                             this.events.emit(EventMpptChg.NIGHT_DETECTED);
+
+                            const goodHour = this.getSunCalcTime(lat, lng).dawn;
                             let nextWakeUp = new Date();
+
                             if (status.values && status.values.batteryVoltage >= (config.nightLimitVolt ?? this.NIGHT_LIMIT_VOLT)) {
-                                nextWakeUp.setSeconds(config.nightSleepTimeSeconds ?? this.WD_PWROFF_NIGHT_SECS_DEFAULT);
+                                nextWakeUp.setSeconds(nextWakeUp.getSeconds() + (config.nightSleepTimeSeconds ?? this.WD_PWROFF_NIGHT_SECS_DEFAULT));
+                                if (nextWakeUp.getTime() > goodHour.getTime()) {
+                                    nextWakeUp = goodHour;
+                                }
                             } else {
-                                nextWakeUp = this.getSunCalcTime(lat, lng).dawn;
+                                nextWakeUp = goodHour;
                             }
                             return MpptchgService.shutdownAndWakeUpAtDate(nextWakeUp, config.nightRunSleepTimeSeconds ?? this.WD_INIT_NIGHT_SECS).pipe(
                                 catchError(err => of(null))
@@ -107,6 +113,15 @@ export class MpptchgService {
     }
 
     private static enableWatchdog(secondsBeforeWakeUp: number, secondsBeforeShutdown: number): Observable<void> {
+        if (secondsBeforeWakeUp < 1) {
+            secondsBeforeWakeUp = 1;
+        }
+        if (secondsBeforeWakeUp > 65535) {
+            throw new Error('Impossible to set more than 65535 seconds before run');
+        }
+        if (secondsBeforeShutdown < 1) {
+            secondsBeforeShutdown = 1;
+        }
         if (secondsBeforeShutdown > 255) {
             throw new Error('Impossible to set more than 255 seconds before shutdown');
         }
@@ -125,19 +140,28 @@ export class MpptchgService {
     }
 
     public static shutdownAndWakeUpAtDate(wakeUpDate: Date, secondsBeforeShutdown: number = 0): Observable<Date> {
-        const wakeUpDateNew = new Date(wakeUpDate);
-        wakeUpDateNew.setSeconds(secondsBeforeShutdown + 20); // To be sure to trigger the timer one time + 20 seconds to be sure
-        let secondsBedoreWakeUp = Math.round((wakeUpDateNew.getTime() - new Date().getTime()) / 1000);
+        const now = new Date();
+
+        let wakeUpDateOk = new Date(wakeUpDate);
+        if (wakeUpDateOk.getTime() < now.getTime() + 10000) {
+            wakeUpDateOk.setSeconds(wakeUpDateOk.getSeconds() + 10);
+        }
+
+        let secondsBeforeWakeUp = Math.round((wakeUpDateOk.getTime() - now.getTime()) / 1000) - secondsBeforeShutdown - 60;
+        if (secondsBeforeWakeUp < 1) {
+            secondsBeforeWakeUp = 1;
+        }
 
         LogService.log('mpptChd', 'Request to shutdown', {
+            'now': now,
             'request': wakeUpDate,
-            'requestOk': wakeUpDateNew,
-            'secondsBedoreWakeUp': secondsBedoreWakeUp,
+            'requestOk': wakeUpDateOk,
+            'secondsBeforeWakeUp': secondsBeforeWakeUp,
             'secondsBeforeShutdown': secondsBeforeShutdown
         })
 
-        return this.enableWatchdog(secondsBedoreWakeUp, secondsBeforeShutdown).pipe(
-            map(_ => wakeUpDateNew)
+        return this.enableWatchdog(secondsBeforeWakeUp, secondsBeforeShutdown).pipe(
+            map(_ => wakeUpDateOk)
         );
     }
 }

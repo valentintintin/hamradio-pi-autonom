@@ -52,7 +52,7 @@ export class RadioService {
         return ToneService.sendOk(false, true).pipe(
             switchMap(_ => AudioService.record(seconds, 2)),
             switchMap(path => ToneService.sendOk(true, true).pipe(map(_ => path))),
-            switchMap(path => AudioService.play(path, 2)),
+            switchMap(path => AudioService.play(path, 1)),
             switchMap(_ => ToneService.sendOk(false, !shutdownRadio)),
             catchError(err => {
                 LogService.log('radio', 'Send image KO', err);

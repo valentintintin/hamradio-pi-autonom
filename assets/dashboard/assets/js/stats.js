@@ -2,14 +2,14 @@ $(function () {
     const dataBrut = $('#data-json');
     const dataJsonWrapper = $('#data-json-wrapper');
 
-    $.get("/sensors.json", function (data) {
+    $.get('/sensors.json', function (data) {
         const dataSorted = data.sort((a, b) => a < b ? 1 : -1);
         showData(dataSorted);
 
         const dataGraph = [];
         dataSorted.forEach(d => {
             dataGraph.push([
-                moment(d.createdAt).toDate(), d.voltageBattery, d.voltageSolar, d.currentCharge, d.currentBattery, d.currentSolar
+                moment(d.createdAt).toDate(), d.voltageBattery / 1000, d.voltageSolar / 1000, d.currentCharge, d.currentBattery, d.currentSolar
             ]);
         });
 
@@ -52,7 +52,6 @@ $(function () {
                     },
                     'click': function clickV3(event, g, context) {
                         event.preventDefault();
-                        ;
                     },
                     'mousewheel': function scrollV3(event, g, context) {
                         const percentages = offsetToPercentage(g, event.offsetX, event.offsetY);
