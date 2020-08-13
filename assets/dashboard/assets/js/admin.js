@@ -72,6 +72,14 @@ $(function () {
         shutdownPi(prompt('Timestamp', date.getTime()));
     });
 
+    $('#program-stop').click(function () {
+        programStop();
+    });
+
+    $('#program-restart').click(function () {
+        programRestart();
+    });
+
     function getLogs() {
         $.get('/api/logs?apikey=' + apikeyInput.val())
             .done(showData)
@@ -140,6 +148,18 @@ $(function () {
 
     function watchdog(state) {
         $.post('/api/watchdog/' + (state ? 'start' : 'stop') + '?apikey=' + apikeyInput.val())
+            .done(showData)
+            .fail(showData);
+    }
+
+    function programStop() {
+        $.post('/api/program/stop' + '?apikey=' + apikeyInput.val())
+            .done(showData)
+            .fail(showData);
+    }
+
+    function programRestart() {
+        $.post('/api/program/restart' + '?apikey=' + apikeyInput.val())
             .done(showData)
             .fail(showData);
     }

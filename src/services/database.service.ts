@@ -71,7 +71,10 @@ export class DatabaseService {
 
     public static selectAll<T>(entity: string, limit: number = 100, order: string = 'DESC', ignoreErrors: boolean = true): Observable<T[]> {
         return new Observable<T[]>((observer: Observer<T[]>) => {
-            const query = `SELECT * FROM ${entity} ORDER BY id ${order} LIMIT ${limit}`;
+            let query = `SELECT * FROM ${entity} ORDER BY id ${order}`;
+            if (limit) {
+                query += ` LIMIT ${limit}`;
+            }
             try {
                 DatabaseService.db.all(query, (err, rows) => {
                     if (err) {

@@ -8,13 +8,15 @@ import { WebcamService } from './webcam.service';
 import { AprsService } from './aprs.service';
 import { VoiceService } from './voice.service';
 import { GpioEnum, GpioService } from './gpio.service';
-import { catchError } from 'rxjs/operators';
+import { catchError, map, switchMap } from 'rxjs/operators';
 import { forkJoin, of } from 'rxjs';
 import { MpptchgService } from './mpptchg.service';
 import { RadioService } from './radio.service';
 import { DatabaseService } from './database.service';
 import { Logs } from '../models/logs';
 import { ProcessService } from './process.service';
+import { CommunicationMpptchdService } from './communication-mpptchd.service';
+import { exec } from 'child_process';
 
 export class DashboardService {
 
@@ -53,7 +55,7 @@ export class DashboardService {
         });
 
         this.app.use('/assets', express.static(__dirname + '/../../assets/dashboard/assets'));
-        this.app.use('/logs', express.static(config.databasePath));
+        this.app.use('/data.db', express.static(config.databasePath));
 
         this.app.get('/', (req, res) => {
             forkJoin([SensorsService.getLast(), WebcamService.getLastPhotos(config.webcam)])
@@ -83,6 +85,16 @@ export class DashboardService {
             });
         });
 
+        this.app.get('/last.json', (req, res) => {
+            forkJoin([SensorsService.getLast(), WebcamService.getLastPhotos(config.webcam)])
+                .subscribe(datas => {
+                    res.json({
+                        sensors: datas[0],
+                        lastPhoto: datas[1].length > 0 ? datas[1][0] : null
+                    });
+                });
+        });
+
         this.app.get('/api/logs', (req, res) => {
             DatabaseService.selectAll(Logs.name, 500).subscribe((logs: Logs[]) => {
                 logs.forEach(log => {
@@ -95,6 +107,20 @@ export class DashboardService {
 
         this.app.post('/api/do-not-shutdown/:value', (req, res) => {
             ProcessService.doNotShutdown = req.params['value'] === '1';
+            res.send(true);
+        });
+
+        this.app.post('/api/program/stop', (req, res) => {
+            ProcessService.doNotShutdown = true;
+            exec('systemctl stop logic');
+            process.exit(0);
+            res.send(true);
+        });
+
+        this.app.post('/api/program/restart', (req, res) => {
+            ProcessService.doNotShutdown = true;
+            exec('systemctl restart logic');
+            process.exit(0);
             res.send(true);
         });
 
@@ -130,7 +156,7 @@ export class DashboardService {
 
             this.app.use('/sensors.csv', express.static(config.sensors.csvPath));
             this.app.use('/sensors.json', (req, res) => {
-                SensorsService.getAllSaved().subscribe(datas => {
+                SensorsService.getAllSaved(500).subscribe(datas => {
                     res.send(datas.map(data => {
                         return {
                             createdAt: data.createdAt,
@@ -138,7 +164,8 @@ export class DashboardService {
                             voltageSolar: data.voltageSolar,
                             currentCharge: data.currentCharge,
                             currentBattery: data.currentBattery,
-                            currentSolar: data.currentSolar
+                            currentSolar: data.currentSolar,
+                            temperature: (data.temperatureBattery + data.temperatureRtc) / 2
                         }
                     }));
                 });
@@ -216,7 +243,14 @@ export class DashboardService {
 
         if (config.voice && config.voice.enable) {
             this.app.post('/api/voice', (req, res) => {
-                VoiceService.sendVoice(config.voice.sentence, false, config.voice).pipe(
+                CommunicationMpptchdService.instance.getStatus().pipe(
+                    map(data => {
+                        return config.voice.sentence
+                            .replace('batteryVoltage', data.values.batteryVoltage / 1000 + '')
+                            .replace('chargeCurrent', data.values.chargeCurrent + '')
+                            ;
+                    }),
+                    switchMap(sentence => VoiceService.sendVoice(sentence, true, config.voice)),
                     catchError(e => {
                         res.json(e);
                         return of(null);

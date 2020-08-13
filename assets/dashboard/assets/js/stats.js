@@ -3,13 +3,13 @@ $(function () {
     const dataJsonWrapper = $('#data-json-wrapper');
 
     $.get('/sensors.json', function (data) {
-        const dataSorted = data.sort((a, b) => a < b ? 1 : -1);
+        const dataSorted = data.sort((a, b) => a.createdAt < b.createdAt ? -1 : 1);
         showData(dataSorted);
 
         const dataGraph = [];
         dataSorted.forEach(d => {
             dataGraph.push([
-                moment(d.createdAt).toDate(), d.voltageBattery / 1000, d.voltageSolar / 1000, d.currentCharge, d.currentBattery, d.currentSolar
+                moment(d.createdAt).toDate(), d.voltageBattery / 1000, d.voltageSolar / 1000, d.currentCharge, d.currentBattery, d.currentSolar, d.temperature
             ]);
         });
 
@@ -17,7 +17,7 @@ $(function () {
             document.getElementById("g"),
             dataGraph,
             {
-                visibility: [true, false, true, false, false],
+                visibility: [true, false, true, false, false, true],
                 legend: 'follow',
                 labelsSeparateLines: ' ',
                 strokeWidth: 2,
@@ -25,7 +25,7 @@ $(function () {
                     strokeWidth: 2,
                     highlightCircleSize: 5
                 },
-                title: 'Données de consommation',
+                title: 'Données',
                 showRangeSelector: true,
                 interactionModel: {
                     'mousedown': function downV3(event, g, context) {
@@ -63,8 +63,8 @@ $(function () {
                     }
                 },
                 rollPeriod: 10,
-                labels: ['Date', 'Voltage batterie', 'Voltage solaire', 'Intensité charge', 'Intensité batterie', 'Intensité solaire'],
-                colors: ['#D00', '#FD0', '#00F', '#933', '#F93'],
+                labels: ['Date', 'Voltage batterie', 'Voltage solaire', 'Intensité charge', 'Intensité batterie', 'Intensité solaire', 'Température'],
+                colors: ['#D00', '#FD0', '#00F', '#933', '#F93', '#52ee28'],
                 drawGrid: true,
                 axes: {
                     y: {
@@ -86,7 +86,7 @@ $(function () {
                         axis: 'y2',
                     },
                 },
-                ylabel: 'Voltage (V)',
+                ylabel: 'Voltage (V) ou Température (C)',
                 y2label: 'Intensité (mA)',
             }
         );
@@ -166,6 +166,9 @@ $(function () {
         });
         $('#currentSolar').change(function (d) {
             g.setVisibility(4, $(this).is(":checked"));
+        });
+        $('#temperature').change(function (d) {
+            g.setVisibility(5, $(this).is(":checked"));
         });
     });
 

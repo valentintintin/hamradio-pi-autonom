@@ -24,7 +24,7 @@ export class VoiceService {
         LogService.log('voice', 'Send message', message)
         return VoiceService.generate(message, config.language).pipe(
             switchMap(path => RadioService.pttOn().pipe(map(_ => path))),
-            switchMap(path => AudioService.play(path, 3)),
+            switchMap(path => AudioService.play(path, 1)),
             switchMap(_ => RadioService.pttOff(!keepRadioOn)),
             tap(_ => {
                 VoiceService.alreadyInUse = false;

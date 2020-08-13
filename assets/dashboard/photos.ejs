@@ -28,7 +28,7 @@
         <section class="align-left">
             <article>
                 <ul>
-                    <% photos.slice(3).forEach(function(photo) { %>
+                    <% photos.slice(3).filter((photo, index) => index % 10 === 0).forEach(function(photo) { %>
                         <li>
                             <a href="/timelapse/<%= photo %>" target="_blank">
                                 <%= photo %>
