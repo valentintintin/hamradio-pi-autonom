@@ -73,7 +73,7 @@ export class MpptchgService {
                     LogService.log('mpptChd', 'Alert asserted !');
                     this.events.emit(EventMpptChg.ALERT);
                 } else {
-                    if (status.nightDetected && config.nightAlert) {
+                    if ((status.nightDetected || status.values.solarVoltage < 3500) && config.nightAlert) {
                         if (!this.nightTriggered || !status.watchdogRunning) {
                             LogService.log('mpptChd', 'Night detected');
                             this.nightTriggered = true;
@@ -119,6 +119,7 @@ export class MpptchgService {
         if (secondsBeforeWakeUp > 65535) {
             throw new Error('Impossible to set more than 65535 seconds before run');
         }
+
         if (secondsBeforeShutdown < 1) {
             secondsBeforeShutdown = 1;
         }
@@ -145,6 +146,10 @@ export class MpptchgService {
         let wakeUpDateOk = new Date(wakeUpDate);
         if (wakeUpDateOk.getTime() < now.getTime() + 10000) {
             wakeUpDateOk.setSeconds(wakeUpDateOk.getSeconds() + 10);
+        }
+
+        if (secondsBeforeShutdown < 1) {
+            secondsBeforeShutdown = 1;
         }
 
         let secondsBeforeWakeUp = Math.round((wakeUpDateOk.getTime() - now.getTime()) / 1000) - secondsBeforeShutdown - 60;

@@ -17,6 +17,7 @@ import { DashboardService } from './services/dashboard.service';
 import { ToneService } from './services/tone.service';
 import { exec } from 'child_process';
 import { MpptchgService } from './services/mpptchg.service';
+import { RsyncService } from './services/rsync.service';
 
 export const assetsFolder: string = process.cwd() + '/assets';
 
@@ -126,7 +127,7 @@ switch (process.argv[process.argv.length - 1]) {
     case 'shutdown':
         const restartDate = new Date();
         restartDate.setMinutes(restartDate.getMinutes() + 2);
-        MpptchgService.shutdownAndWakeUpAtDate(restartDate).subscribe(wakeupDate => {
+        MpptchgService.shutdownAndWakeUpAtDate(restartDate, 30).subscribe(wakeupDate => {
             setInterval(_ => CommunicationMpptchdService.instance.getStatus().subscribe(d => console.log(wakeupDate, d)), 1500);
             setTimeout(_ => {
                 exec('halt');
@@ -157,6 +158,11 @@ switch (process.argv[process.argv.length - 1]) {
         DatabaseService.openDatabase(config.databasePath).subscribe(_ => new DashboardService(config));
         break;
 
+    case 'sftp':
+        ProcessService.debug = false;
+        RsyncService.runSync(config).subscribe();
+        break;
+
     case 'program':
         new ProcessService().run(config);
         break;
@@ -183,6 +189,7 @@ switch (process.argv[process.argv.length - 1]) {
             'mppt-stop-wd-loop': 'Stop the watchdog of the MPPTChg board in loop',
             'shutdown': 'Shutdown the PI in 30 seconds and restart it 2 minutes later',
             'dashboard': 'Run only the dashboard Web interface',
+            'sftp': 'Send test file to remote server',
             'program': 'Run the program',
         });
         break;

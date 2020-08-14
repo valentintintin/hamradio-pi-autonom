@@ -14,6 +14,7 @@ import { DatabaseService } from './database.service';
 import { DashboardService } from './dashboard.service';
 import { exec } from 'child_process';
 import { CommunicationMpptchdService } from './communication-mpptchd.service';
+import { RsyncService } from './rsync.service';
 
 export class ProcessService {
 
@@ -58,8 +59,8 @@ export class ProcessService {
                     this.runApi(config);
                 }
 
-                if (config.sftp && config.sftp.enable) {
-                    this.runSftp(config);
+                if (config.rsync && config.rsync.enable) {
+                    this.runRsync(config);
                 }
 
                 process.on('exit', event => this.exitHandler(config, event));
@@ -209,7 +210,7 @@ export class ProcessService {
     private runWebcam(config: ConfigInterface): void {
         LogService.log('webcam', 'Started');
         timer(1000 * (config.webcam.interval ?? 30), 1000 * (config.webcam.interval ?? 30)).subscribe(_ =>
-            WebcamService.captureAndSend(config.webcam, config.sftp).subscribe()
+            WebcamService.capture(config.webcam).subscribe()
         );
     }
 
@@ -217,11 +218,11 @@ export class ProcessService {
         this.api = new DashboardService(config);
     }
 
-    private runSftp(config: ConfigInterface): void {
-        LogService.log('sftp', 'Started');
-        timer(60000, 1000 * (config.sftp.interval ?? 60)).subscribe(_ => {
-            LogService.send(config.sftp, config.databasePath).subscribe();
-        });
+    private runRsync(config: ConfigInterface): void {
+        LogService.log('rsync', 'Started');
+        timer(1000 * (config.rsync.interval ?? 600), 1000 * (config.rsync.interval ?? 600)).pipe(
+            switchMap(_ => RsyncService.runSync(config).pipe(catchError(e => of(null))))
+        ).subscribe();
     }
 
     private testFunction(config: ConfigInterface): void {

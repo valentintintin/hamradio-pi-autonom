@@ -17,6 +17,7 @@ import { Logs } from '../models/logs';
 import { ProcessService } from './process.service';
 import { CommunicationMpptchdService } from './communication-mpptchd.service';
 import { exec } from 'child_process';
+import { RsyncService } from './rsync.service';
 
 export class DashboardService {
 
@@ -55,7 +56,7 @@ export class DashboardService {
         });
 
         this.app.use('/assets', express.static(__dirname + '/../../assets/dashboard/assets'));
-        this.app.use('/data.db', express.static(config.databasePath));
+        this.app.use('/data.db', express.static(LogService.createCopy(config.databasePath)));
 
         this.app.get('/', (req, res) => {
             forkJoin([SensorsService.getLast(), WebcamService.getLastPhotos(config.webcam)])
@@ -173,9 +174,9 @@ export class DashboardService {
         }
 
         if (config.mpptChd && config.mpptChd.enable) {
-            this.app.post('/api/shutdown/{timestamp}', (req, res) => {
+            this.app.post('/api/shutdown/:timestamp', (req, res) => {
                 const restartDate = new Date(+req.params['timestamp'] * 1000);
-                MpptchgService.shutdownAndWakeUpAtDate(restartDate).pipe(
+                MpptchgService.shutdownAndWakeUpAtDate(restartDate, 30).pipe(
                     catchError(e => {
                         res.json(e);
                         return of(null);
@@ -229,7 +230,7 @@ export class DashboardService {
         if (config.webcam) {
             if (config.webcam.enable) {
                 this.app.post('/api/webcam', (req, res) => {
-                    WebcamService.captureAndSend(config.webcam, config?.sftp).pipe(
+                    WebcamService.capture(config.webcam).pipe(
                         catchError(e => {
                             res.json(e);
                             return of(null);
@@ -256,6 +257,17 @@ export class DashboardService {
                         return of(null);
                     })
                 ).subscribe(_ => res.send(true));
+            });
+        }
+
+        if (config.rsync && config.rsync.enable) {
+            this.app.post('/api/rsync', (req, res) => {
+                RsyncService.runSync(config).pipe(
+                    catchError(e => {
+                        res.json(e);
+                        return of(null);
+                    })
+                ).subscribe(path => res.send(path));
             });
         }
 

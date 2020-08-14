@@ -67,13 +67,12 @@ export const config: ConfigInterface = {
         nightAlert: true,
         nightLimitVolt: 11600
     },
-    sftp: {
+    rsync: {
         enable: true,
-        host: 'valentin.ddns.info',
+        host: '127.0.0.1',
         username: 'valentin',
         interval: 60,
         remotePath: '/',
-        privateKeyPath: '/home/valentin/.ssh/id_rsa',
-        privateKeyPassphrase: '******'
+        privateKeyPath: '/home/valentin/.ssh/id_rsa'
     }
 };

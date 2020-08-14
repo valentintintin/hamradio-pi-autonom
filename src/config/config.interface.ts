@@ -6,7 +6,7 @@ import { SensorsConfigInterface } from './sensors-config.interface';
 import { WebcamConfigInterface } from './webcam-config.interface';
 import { PacketRadioConfigInterface } from './packet-radio-config.interface';
 import { DashboardConfigInterface } from './dashboard-config.interface';
-import { SftpConfigInterface } from './sftp-config.interface';
+import { RsyncConfigInterface } from './rsync-config.interface';
 import { RepeaterRadioConfigInterface } from './repeater-radio-config.interface';
 
 export interface ConfigInterface {
@@ -25,7 +25,7 @@ export interface ConfigInterface {
     voice?: VoiceConfigInterface;
     mpptChd?: MpptChhdConfigInterface;
     dashboard?: DashboardConfigInterface;
-    sftp?: SftpConfigInterface;
+    rsync?: RsyncConfigInterface;
     repeater?: RepeaterRadioConfigInterface
 }
 

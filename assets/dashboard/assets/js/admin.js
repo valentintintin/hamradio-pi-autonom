@@ -69,7 +69,7 @@ $(function () {
     $('#shutdown-pi').click(function () {
         const date = new Date();
         date.setMinutes(date.getMinutes() + 5);
-        shutdownPi(prompt('Timestamp', date.getTime()));
+        shutdownPi(prompt('Timestamp UTC', '' + Math.round(date.getTime() / 1000)));
     });
 
     $('#program-stop').click(function () {
@@ -78,6 +78,10 @@ $(function () {
 
     $('#program-restart').click(function () {
         programRestart();
+    });
+
+    $('#rsync').click(function () {
+        rsync();
     });
 
     function getLogs() {
@@ -160,6 +164,12 @@ $(function () {
 
     function programRestart() {
         $.post('/api/program/restart' + '?apikey=' + apikeyInput.val())
+            .done(showData)
+            .fail(showData);
+    }
+
+    function rsync() {
+        $.post('/api/rsync' + '?apikey=' + apikeyInput.val())
             .done(showData)
             .fail(showData);
     }

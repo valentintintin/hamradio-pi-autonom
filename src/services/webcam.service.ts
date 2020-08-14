@@ -4,9 +4,6 @@ import { Observable, Observer, of } from 'rxjs';
 import { LogService } from './log.service';
 import { WebcamConfigInterface } from '../config/webcam-config.interface';
 import { assetsFolder } from '../index';
-import { catchError, switchMap } from 'rxjs/operators';
-import { SftpService } from './sftp.service';
-import { SftpConfigInterface } from '../config/sftp-config.interface';
 
 export class WebcamService {
 
@@ -84,15 +81,6 @@ export class WebcamService {
                 observer.complete();
             }
         });
-    }
-
-    public static captureAndSend(configWebcam: WebcamConfigInterface, configSftp: SftpConfigInterface): Observable<string> {
-        return WebcamService.capture(configWebcam).pipe(
-            switchMap(photoPath => SftpService.send(configSftp, photoPath).pipe(
-                catchError(_ => of(photoPath)),
-                switchMap(_ => of(photoPath))
-            ))
-        );
     }
 
     public static getLastPhotos(config: WebcamConfigInterface): Observable<string[]> {

@@ -1,10 +1,8 @@
 import { DatabaseService } from './database.service';
 import { Logs } from '../models/logs';
 import { ProcessService } from './process.service';
-import { SftpConfigInterface } from '../config/sftp-config.interface';
-import { Observable, of } from 'rxjs';
-import { SftpService } from './sftp.service';
-import { catchError, map } from 'rxjs/operators';
+
+const fs = require('fs');
 
 export class LogService {
 
@@ -39,10 +37,9 @@ export class LogService {
         }
     }
 
-    public static send(config: SftpConfigInterface, databasePath: string): Observable<void> {
-        return SftpService.send(config, databasePath).pipe(
-            map(_ => null),
-            catchError(e => of(null))
-        );
+    public static createCopy(databasePath: string): string {
+        const tempPath = '/tmp/data.db';
+        fs.copyFileSync(databasePath, tempPath);
+        return tempPath;
     }
 }
