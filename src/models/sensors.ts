@@ -11,7 +11,5 @@ export class Sensors extends Entity {
     public temperatureCpu: number = null;
     public temperatureRtc: number = null;
     public uptime: number = null;
-    public nightDetected: number = null;
-    public alertAsserted: number = null;
     public rawMpptchg: string;
 }

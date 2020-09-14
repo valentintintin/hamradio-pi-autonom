@@ -26,8 +26,6 @@ create table sensors
     temperatureCpu     integer,
     temperatureRtc     integer,
     uptime             integer,
-    nightDetected      INTEGER,
-    alertAsserted      INTEGER,
     rawMpptchg         text
 );
 

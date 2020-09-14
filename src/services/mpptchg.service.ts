@@ -16,7 +16,6 @@ export class MpptchgService {
     private static readonly WD_INIT_SECS = 180; // 2 minutes
     private static readonly WD_INIT_NIGHT_SECS = 255; // 4 minutes 15
     private static readonly WD_UPDATE_SECS = 10; // 10 secondes
-    private static readonly WD_ALERT_SECS = 60; // 1 minute
     private static readonly WD_PWROFF_SECS = 10; // 10 secondes
     private static readonly WD_PWROFF_NIGHT_SECS_DEFAULT = 3600; // 1 heure
 

@@ -12,8 +12,6 @@ const si = require('systeminformation');
 
 export class SensorsService {
 
-    public static lastSensors: Sensors = null;
-
     public static getMpptChgData(): Observable<Sensors> {
         LogService.log('sensors', 'Start getting all MpptChg');
 
@@ -25,8 +23,6 @@ export class SensorsService {
                 sensorsObject.currentBattery = data.values.batteryCurrent;
                 sensorsObject.currentSolar = data.values.solarCurrent;
                 sensorsObject.currentCharge = data.values.chargeCurrent;
-                sensorsObject.alertAsserted = data.alertAsserted ? 1 : 0;
-                sensorsObject.nightDetected = data.nightDetected ? 1 : 0;
                 sensorsObject.temperatureBattery = data.values.internalThermometer / 10;
                 sensorsObject.voltageBattery = data.values.batteryVoltage;
                 sensorsObject.rawMpptchg = JSON.stringify(data);
@@ -84,7 +80,6 @@ export class SensorsService {
             }),
             map(datas => {
                 datas.uptime = SensorsService.getUptime();
-                SensorsService.lastSensors = datas;
                 LogService.log('sensors', 'Get all OK', datas);
                 return datas;
             }),
@@ -98,15 +93,10 @@ export class SensorsService {
     }
 
     public static getLast(): Observable<Sensors> {
-        if (SensorsService.lastSensors) {
-            return of(SensorsService.lastSensors);
-        }
         return DatabaseService.selectLast<Sensors>(Sensors.name).pipe(tap(data => {
             if (data) {
                 (data as any).createdAt = new Date(data.createdAt);
-                if (!SensorsService.lastSensors) {
-                    SensorsService.lastSensors = data;
-                }
+                delete (data as any).rawMpptchg;
             }
         }));
     }
@@ -116,10 +106,8 @@ export class SensorsService {
             if (datas.length > 0) {
                 datas.forEach(data => {
                     (data as any).createdAt = new Date(data.createdAt);
+                    delete (data as any).rawMpptchg;
                 });
-                if (!SensorsService.lastSensors && datas.length > 0) {
-                    SensorsService.lastSensors = datas[0];
-                }
             }
         }));
     }
