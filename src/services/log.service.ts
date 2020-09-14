@@ -1,12 +1,22 @@
 import { DatabaseService } from './database.service';
 import { Logs } from '../models/logs';
 import { ProcessService } from './process.service';
+import { catchError, switchMap, tap } from 'rxjs/operators';
+import { of } from 'rxjs';
 
 const fs = require('fs');
 
 export class LogService {
 
     public static log(action: string, message: string = null, ...data): void {
+        const logs = LogService.consoleLog(action, message, data);
+
+        if (!ProcessService.debug) {
+            DatabaseService.insert(logs).subscribe();
+        }
+    }
+
+    public static consoleLog(action: string, message: string = null, ...data): Logs {
         const logs = new Logs();
 
         logs.service = action;
@@ -32,9 +42,23 @@ export class LogService {
             console.log(log);
         }
 
-        if (!ProcessService.debug) {
-            DatabaseService.insert(logs).subscribe();
-        }
+        return logs;
+    }
+
+    public static removeTooOld(numberDays: number = 7, numberToKeepMax: number = 50000): void {
+        LogService.log('log', 'Remove old');
+        const keepDate = new Date();
+        keepDate.setDate(keepDate.getDate() - numberDays);
+        DatabaseService.execute(`DELETE FROM ${Logs.name} WHERE id NOT IN (SELECT id FROM ${Logs.name} WHERE createdAt >= ${keepDate.getTime()} ORDER BY id DESC LIMIT ${numberToKeepMax})`).pipe(
+            switchMap(_ => DatabaseService.vacuum()),
+            tap(_ => {
+                LogService.log('log', 'Remove old OK');
+            }),
+            catchError(err => {
+                LogService.log('log', 'Remove old KO', err);
+                return of(null);
+            })
+        ).subscribe();
     }
 
     public static createCopy(databasePath: string): string {

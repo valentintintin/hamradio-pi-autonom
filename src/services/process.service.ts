@@ -31,9 +31,8 @@ export class ProcessService {
         LogService.log('program', 'Starting');
 
         try {
-            DatabaseService.openDatabase(config.databasePath).pipe(
-                switchMap(_ => RadioService.pttOff(true))
-            ).subscribe(_ => {
+            DatabaseService.openDatabase(config.databasePath).subscribe(_ => {
+                this.runRemoveOldLog();
                 this.testFunction(config);
 
                 if (config.mpptChd && config.mpptChd.enable) {
@@ -220,9 +219,13 @@ export class ProcessService {
 
     private runRsync(config: ConfigInterface): void {
         LogService.log('rsync', 'Started');
-        timer(1000 * (config.rsync.interval ?? 600), 1000 * (config.rsync.interval ?? 600)).pipe(
+        timer(1000 * (config.rsync.interval ?? 60), 1000 * (config.rsync.interval ?? 600)).pipe(
             switchMap(_ => RsyncService.runSync(config).pipe(catchError(e => of(null))))
         ).subscribe();
+    }
+
+    private runRemoveOldLog(): void {
+        timer(1000 * 60, 1000 * 3600).subscribe(_ => LogService.removeTooOld());
     }
 
     private testFunction(config: ConfigInterface): void {

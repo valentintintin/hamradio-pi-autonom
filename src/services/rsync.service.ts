@@ -41,7 +41,7 @@ export class RsyncService {
                         observer.complete();
                     }
                 }, function (data) {
-                    console.log(data.toString('utf8'));
+                    LogService.consoleLog('rsync', 'data', data.toString('utf8'));
                 }, function (data) {
                     LogService.log('rsync', 'Send KO data', data.toString('utf8'));
                 }

@@ -25,20 +25,15 @@ export class DashboardService {
 
     constructor(config: ConfigInterface) {
         this.app.use(express.json());
+        this.app.set('trust proxy', true);
 
         this.app.use((req, res, next) => {
             if (!req.path.startsWith('/assets')) {
-                LogService.log('dashboard', 'Request start', req.method, req.path);
+                LogService.log('dashboard', 'Request', req.ip, req.method, req.path);
             }
 
             res.header('Access-Control-Allow-Origin', '*');
             res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-
-            res.on('finish', () => {
-                if (!req.path.includes('assets')) {
-                    LogService.log('dashboard', 'Request end', req.method, req.path, res.statusCode);
-                }
-            });
 
             if (req.path.startsWith('/api')) {
                 if (config.dashboard.apikey && req.query.apikey !== config.dashboard.apikey) {

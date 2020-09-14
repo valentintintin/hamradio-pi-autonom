@@ -18,6 +18,7 @@ import { ToneService } from './services/tone.service';
 import { exec } from 'child_process';
 import { MpptchgService } from './services/mpptchg.service';
 import { RsyncService } from './services/rsync.service';
+import { LogService } from './services/log.service';
 
 export const assetsFolder: string = process.cwd() + '/assets';
 
@@ -163,6 +164,10 @@ switch (process.argv[process.argv.length - 1]) {
         RsyncService.runSync(config).subscribe();
         break;
 
+    case 'remove-old-logs':
+        DatabaseService.openDatabase(config.databasePath).subscribe(_ => LogService.removeTooOld());
+        break;
+
     case 'program':
         new ProcessService().run(config);
         break;
@@ -190,6 +195,7 @@ switch (process.argv[process.argv.length - 1]) {
             'shutdown': 'Shutdown the PI in 30 seconds and restart it 2 minutes later',
             'dashboard': 'Run only the dashboard Web interface',
             'sftp': 'Send test file to remote server',
+            'remove-old-logs': 'Remove old logs',
             'program': 'Run the program',
         });
         break;

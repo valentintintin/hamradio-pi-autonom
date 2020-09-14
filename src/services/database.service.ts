@@ -181,6 +181,54 @@ export class DatabaseService {
         });
     }
 
+    public static execute(query: string, ignoreErrors: boolean = true): Observable<void> {
+        return new Observable<void>((observer: Observer<void>) => {
+            try {
+                DatabaseService.db.exec(query, err => {
+                    if (err) {
+                        LogService.log('database', 'Query KO', err, query);
+                        if (!ignoreErrors) {
+                            observer.error(err);
+                        }
+                    }
+                    observer.next(null);
+                    observer.complete();
+                });
+            } catch (e) {
+                LogService.log('database', 'Query KO', e, query);
+                if (!ignoreErrors) {
+                    observer.error(e);
+                }
+                observer.next(null);
+                observer.complete();
+            }
+        });
+    }
+
+    public static vacuum(ignoreErrors: boolean = true): Observable<void> {
+        return new Observable<void>((observer: Observer<void>) => {
+            try {
+                DatabaseService.db.exec('vacuum', err => {
+                    if (err) {
+                        LogService.log('database', 'Vacuum KO', err);
+                        if (!ignoreErrors) {
+                            observer.error(err);
+                        }
+                    }
+                    observer.next(null);
+                    observer.complete();
+                });
+            } catch (e) {
+                LogService.log('database', 'Vacuum KO', e);
+                if (!ignoreErrors) {
+                    observer.error(e);
+                }
+                observer.next(null);
+                observer.complete();
+            }
+        });
+    }
+
     public static readVariable<T>(name: string, fallback: T = null, ignoreErrors: boolean = true): Observable<T> {
         return new Observable<T>((observer: Observer<T>) => {
             const query = `SELECT data FROM variables WHERE name = '${name}'`;

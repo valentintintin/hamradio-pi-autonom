@@ -56,7 +56,7 @@ export class SensorsService {
 
     public static getTemperatureRtc(): number {
         try {
-            const result = GpioService.USE_FAKE ? 20.5 : parseInt(fs.readFileSync('/sys/bus/i2c/devices/i2c-0/0-0068/hwmon/hwmon0/temp1_input', 'utf8'), 10) / 1000;
+            const result = GpioService.USE_FAKE ? 20.5 : parseInt(fs.readFileSync('/sys/bus/i2c/devices/i2c-0/0-0068/hwmon/hwmon1/temp1_input', 'utf8'), 10) / 1000;
             LogService.log('sensors', 'Get temperature RTC', result);
             return result;
         } catch (e) {
