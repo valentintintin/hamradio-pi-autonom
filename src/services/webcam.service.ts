@@ -47,8 +47,21 @@ export class WebcamService {
                             WebcamService.opts.device = cam;
                             WebcamService.webcam = NodeWebcam.create(WebcamService.opts);
 
+                            const date = new Date();
                             // @ts-ignore
-                            WebcamService.webcam.capture(configWebcam.photosPath + '/' + new Date().format('{YYYY}_{MM}_{DD}-{hh}_{mm}_{ss}'), (err, data) => {
+                            let path = configWebcam.photosPath + '/' + date.format('{YYYY}_{MM}_{DD}');
+
+                            try {
+                                if (!fs.existsSync(path)) {
+                                    fs.mkdirSync(path);
+                                }
+                            } catch (e) {
+                                LogService.log('webcam', 'Creation path error', path);
+                                path = configWebcam.photosPath;
+                            }
+
+                            // @ts-ignore
+                            WebcamService.webcam.capture(path + '/' + date.format('{YYYY}_{MM}_{DD}-{hh}_{mm}_{ss}'), (err, data) => {
                                 WebcamService.alreadyInUse = false;
 
                                 if (err) {
@@ -56,7 +69,7 @@ export class WebcamService {
                                 } else if (!fs.existsSync(data)) {
                                     errors.push(new Error('File not found (webcam taken : ' + cam + ')'));
                                 } else {
-                                    LogService.log('webcam', 'Capture OK');
+                                    LogService.log('webcam', 'Capture OK', data);
 
                                     WebcamService.lastPhotoPath = data;
                                     observer.next(data);
@@ -85,13 +98,22 @@ export class WebcamService {
 
     public static getLastPhotos(config: WebcamConfigInterface): Observable<string[]> {
         return new Observable<string[]>((observer: Observer<string[]>) => {
-            fs.readdir(config.photosPath, (err, files) => {
+            fs.readdir(config.photosPath, (err, datesDir) => {
                 if (err) {
                     observer.error(err);
                 }
 
-                if (files) {
-                    const filesSortedDesc = files.sort((a, b) => a < b ? 1 : -1);
+                if (datesDir) {
+                    let allFiles = [];
+                    datesDir.forEach(dateDir => {
+                        try {
+                            const dateFiles = fs.readdirSync(config.photosPath + '/' + dateDir);
+                            allFiles = allFiles.concat(dateFiles.map(f => dateDir + '/' + f));
+                        } catch (e) {
+                        }
+                    });
+
+                    const filesSortedDesc = allFiles.sort((a, b) => a < b ? 1 : -1);
 
                     if (!WebcamService.lastPhotoPath && filesSortedDesc.length > 0) {
                         WebcamService.lastPhotoPath = filesSortedDesc[0];

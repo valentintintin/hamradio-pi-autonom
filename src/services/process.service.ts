@@ -129,7 +129,7 @@ export class ProcessService {
 
     private runAprs(config: ConfigInterface): void {
         LogService.log('aprs', 'Started');
-        timer(1000 * (config.aprs.interval ?? 900), 1000 * (config.aprs.interval ?? 900)).subscribe(_ =>
+        timer(1000 * 120, 1000 * (config.aprs.interval ?? 900)).subscribe(_ =>
             AprsService.sendAprsBeacon(config.aprs, true).pipe(
                 switchMap(_ => AprsService.sendAprsTelemetry(config.aprs, config.sensors, true))
             ).subscribe(_ => {
@@ -201,14 +201,14 @@ export class ProcessService {
 
     private runSensors(config: ConfigInterface): void {
         LogService.log('sensors', 'Started');
-        timer(1000 * (config.sensors.interval ?? 60), 1000 * (config.sensors.interval ?? 60)).subscribe(_ =>
+        timer(1000 * 30, 1000 * (config.sensors.interval ?? 30)).subscribe(_ =>
             SensorsService.getAllCurrentAndSave(config.sensors).subscribe()
         );
     }
 
     private runWebcam(config: ConfigInterface): void {
         LogService.log('webcam', 'Started');
-        timer(1000 * (config.webcam.interval ?? 30), 1000 * (config.webcam.interval ?? 30)).subscribe(_ =>
+        timer(1000 * 30, 1000 * (config.webcam.interval ?? 30)).subscribe(_ =>
             WebcamService.capture(config.webcam).subscribe()
         );
     }
@@ -219,7 +219,7 @@ export class ProcessService {
 
     private runRsync(config: ConfigInterface): void {
         LogService.log('rsync', 'Started');
-        timer(1000 * (config.rsync.interval ?? 60), 1000 * (config.rsync.interval ?? 600)).pipe(
+        timer(1000 * 60, 1000 * (config.rsync.interval ?? 600)).pipe(
             switchMap(_ => RsyncService.runSync(config).pipe(catchError(e => of(null))))
         ).subscribe();
     }

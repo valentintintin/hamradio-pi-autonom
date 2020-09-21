@@ -59,7 +59,7 @@
         <h2>
             Dernière photo
             <% if (lastPhoto) { %>
-                - Prise le <%= lastPhoto %>
+                - Prise le <%= lastPhoto.split('/')[1] %>
             <% } %>
         </h2>
     </header>
@@ -68,7 +68,8 @@
         <% if (lastPhoto) { %>
             <article class="photo">
                 <a href="/timelapse/<%= lastPhoto %>" target="_blank">
-                    <img src="/timelapse/<%= lastPhoto %>" alt="Dernière photo"/>
+                    <img src="/timelapse/<%= lastPhoto %>"
+                         alt="Dernière photo prise le <%= lastPhoto.split('/')[1] %>"/>
                 </a>
             </article>
         <% } else { %>
@@ -85,6 +86,10 @@
     <section>
         <article>
             <ul>
+                <li>
+                    <a href="https://store.arduino.cc/arduino-pro-mini" target="_blank">Un Arduino Pro Mini pour le
+                        watchdog</a>
+                </li>
                 <li>
                     <a href="http://www.orangepi.org/orangepizerolts/" target="_blank">Un Orange Pi Zero LTS</a>
                 </li>
@@ -121,6 +126,9 @@
         </article>
 
         <article>
+            <a href="/assets/images/station-boite.jpg" target="_blank">
+                <img src="/assets/images/station-boite.jpg" alt="Station boîte intérieur" style="width: 200px"/>
+            </a>
             <a href="/assets/images/station-sol.jpg" target="_blank">
                 <img src="/assets/images/station-sol.jpg" alt="Station au sol" style="width: 200px"/>
             </a>

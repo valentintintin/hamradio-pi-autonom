@@ -21,7 +21,11 @@ export class LogService {
 
         logs.service = action;
         logs.log = message;
-        if (data && data.length) {
+
+        data = data[0];
+        data = data.length > 1 ? data : data[0];
+
+        if (data) {
             try {
                 logs.data = JSON.stringify(data);
             } catch (e) {
@@ -36,7 +40,7 @@ export class LogService {
             ' --> ' + message
         ;
 
-        if (data && data.length) {
+        if (data) {
             console.log(log, data);
         } else {
             console.log(log);

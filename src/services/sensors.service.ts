@@ -97,6 +97,7 @@ export class SensorsService {
             if (data) {
                 (data as any).createdAt = new Date(data.createdAt);
                 delete (data as any).rawMpptchg;
+                delete (data as any).id;
             }
         }));
     }

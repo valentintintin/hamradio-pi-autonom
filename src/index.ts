@@ -159,7 +159,7 @@ switch (process.argv[process.argv.length - 1]) {
         DatabaseService.openDatabase(config.databasePath).subscribe(_ => new DashboardService(config));
         break;
 
-    case 'sftp':
+    case 'rsync':
         ProcessService.debug = false;
         RsyncService.runSync(config).subscribe();
         break;
@@ -194,7 +194,7 @@ switch (process.argv[process.argv.length - 1]) {
             'mppt-stop-wd-loop': 'Stop the watchdog of the MPPTChg board in loop',
             'shutdown': 'Shutdown the PI in 30 seconds and restart it 2 minutes later',
             'dashboard': 'Run only the dashboard Web interface',
-            'sftp': 'Send test file to remote server',
+            'rsync': 'Send test file to remote server',
             'remove-old-logs': 'Remove old logs',
             'program': 'Run the program',
         });

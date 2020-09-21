@@ -11,8 +11,8 @@
                 <article class="photo align-center">
                     <a href="/timelapse/<%= photo %>" target="_blank">
                         <div class="align-center" style="width: 320px">
-                            <img src="/timelapse/<%= photo %>" alt="Prise le <%= photo %>>"/>
-                            <span><%= photo %></span>
+                            <img src="/timelapse/<%= photo %>" alt="Prise le <%= photo.split('/')[1] %>"/>
+                            <span><%= photo.split('/')[1] %></span>
                         </div>
                     </a>
                 </article>
@@ -31,7 +31,7 @@
                     <% photos.filter((photo, index) => index % 10 === 0).slice(3).forEach(function(photo) { %>
                         <li>
                             <a href="/timelapse/<%= photo %>" target="_blank">
-                                <%= photo %>
+                                <%= photo.split('/')[1] %>
                             </a>
                         </li>
                     <% }); %>
