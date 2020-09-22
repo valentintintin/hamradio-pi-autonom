@@ -1,4 +1,5 @@
 import SunCalc = require('suncalc');
+import fs = require('fs');
 import { Observable, of, timer } from 'rxjs';
 import { catchError, map, retry, switchMap, tap } from 'rxjs/operators';
 import { LogService } from './log.service';
@@ -77,7 +78,10 @@ export class MpptchgService {
                 } else {
                     if (status.nightDetected && config.nightAlert) {
                         if (!this.nightTriggered || !status.watchdogRunning) {
-                            LogService.log('mpptChd', 'Night detected');
+                            LogService.log('mpptChd', 'Night detected', {
+                                batteryVoltage: status.values.batteryVoltage,
+                                solarVoltage: status.values.solarVoltage
+                            });
                             this.nightTriggered = true;
                             this.events.emit(EventMpptChg.NIGHT_DETECTED);
 
@@ -88,15 +92,24 @@ export class MpptchgService {
                                 nextWakeUp.setSeconds(nextWakeUp.getSeconds() + (config.nightSleepTimeSeconds ?? this.WD_PWROFF_NIGHT_SECS_DEFAULT));
                                 if (nextWakeUp.getTime() > sunDate.dawn.getTime()) {
                                     if (sunDate.isTomorrow) {
-                                        LogService.log('mpptChd', 'Morning is too soon, no sleep');
+                                        LogService.log('mpptChd', 'Morning is too soon, no sleep', {
+                                            nextWakeUp,
+                                            dawn: sunDate.dawn
+                                        });
                                         return of(null);
                                     }
-                                    LogService.log('mpptChd', 'Sleep to dawn');
+                                    LogService.log('mpptChd', 'Sleep to dawn', {
+                                        nextWakeUp,
+                                        dawn: sunDate.dawn
+                                    });
                                     nextWakeUp = sunDate.dawn;
                                 }
                             } else {
-                                LogService.log('mpptChd', 'Not enough battery so sleep to golden hour');
-                                nextWakeUp = sunDate.goldenHour;
+                                LogService.log('mpptChd', 'Not enough battery so sleep to sunrise', {
+                                    nextWakeUp,
+                                    sunrise: sunDate.sunrise
+                                });
+                                nextWakeUp = sunDate.sunrise;
                             }
                             return MpptchgService.shutdownAndWakeUpAtDate(nextWakeUp, config.nightRunSleepTimeSeconds ?? this.WD_INIT_NIGHT_SECS).pipe(
                                 catchError(_ => of(null))
@@ -143,6 +156,8 @@ export class MpptchgService {
             secondsBeforeWakeUp,
             secondsBeforeShutdown
         };
+
+        fs.writeFileSync('/tmp/watchdog.log', JSON.stringify(dataLog))
 
         return CommunicationMpptchdService.instance.enableWatchdog(secondsBeforeWakeUp, secondsBeforeShutdown).pipe(
             map(_ => {

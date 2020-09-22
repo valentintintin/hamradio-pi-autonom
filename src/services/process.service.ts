@@ -25,58 +25,57 @@ export class ProcessService {
     private mpptchgSubscription: Subscription;
     private api: DashboardService;
     private dtmfDecoderShouldStop: boolean;
-    private stopDirectly: boolean;
+    private stopHandlerPassed: boolean;
 
     public run(config: ConfigInterface): void {
         LogService.log('program', 'Starting');
 
-        try {
-            DatabaseService.openDatabase(config.databasePath).subscribe(_ => {
-                this.runRemoveOldLog();
-                this.testFunction(config);
+        DatabaseService.openDatabase(config.databasePath).subscribe(_ => {
+            this.runRemoveOldLog();
+            this.testFunction(config);
 
-                if (config.mpptChd && config.mpptChd.enable) {
-                    this.runMpptChd(config);
+            if (config.mpptChd && config.mpptChd.enable) {
+                this.runMpptChd(config);
+            }
+
+            if (config.aprs && config.aprs.enable) {
+                this.runAprs(config);
+                if (!!config.aprs.waitDtmfInterval) {
+                    this.runDtmfDecoder(config);
                 }
+            }
 
-                if (config.aprs && config.aprs.enable) {
-                    this.runAprs(config);
-                    if (!!config.aprs.waitDtmfInterval) {
-                        this.runDtmfDecoder(config);
-                    }
-                }
+            if (config.sensors && config.sensors.enable) {
+                this.runSensors(config);
+            }
 
-                if (config.sensors && config.sensors.enable) {
-                    this.runSensors(config);
-                }
+            if (config.webcam && config.webcam.enable) {
+                this.runWebcam(config);
+            }
 
-                if (config.webcam && config.webcam.enable) {
-                    this.runWebcam(config);
-                }
+            if (config.dashboard && config.dashboard.enable) {
+                this.runApi(config);
+            }
 
-                if (config.dashboard && config.dashboard.enable) {
-                    this.runApi(config);
-                }
+            if (config.rsync && config.rsync.enable) {
+                this.runRsync(config);
+            }
 
-                if (config.rsync && config.rsync.enable) {
-                    this.runRsync(config);
-                }
-
-                process.on('exit', event => this.exitHandler(config, event));
-                process.on('SIGINT', event => this.exitHandler(config, event));
-                process.on('SIGTERM', event => this.exitHandler(config, event));
-                process.on('SIGQUIT', event => this.exitHandler(config, event));
-
-                LogService.log('program', 'Started');
+            for (const signal of (['SIGTERM', 'SIGHUP', 'SIGINT', 'SIGQUIT', 'SIGSEGV'] as NodeJS.Signals[])) {
+                // SIGKILL, SIGSTOP not working on this node version
+                process.on(signal, event => this.exitHandler(config, event));
+            }
+            process.on('uncaughtException', e => {
+                LogService.log('program', 'exception', e);
+                this.exitHandler(config, 'SIGHUP');
             });
-        } catch (e) {
-            LogService.log('program', 'exception', e);
-            this.exitHandler(config, 'SIGALRM');
-        }
+
+            LogService.log('program', 'Started');
+        });
     }
 
     private exitHandler(config: ConfigInterface, event) {
-        if (!this.stopDirectly) {
+        if (!this.stopHandlerPassed) {
             let stop = of(null);
 
             LogService.log('program', 'Stopping', event);
@@ -99,6 +98,12 @@ export class ProcessService {
                 }
             }
 
+            if (config.rsync && config.rsync.enable) {
+                stop = stop.pipe(
+                    switchMap(_ => RsyncService.runSync(config).pipe(catchError(e => of(null))))
+                )
+            }
+
             stop.pipe(
                 catchError(err => {
                     LogService.log('program', 'Stopped KO', err);
@@ -106,16 +111,16 @@ export class ProcessService {
                 })
             ).subscribe(_ => {
                 LogService.log('program', 'Stopped', event);
-                this.stopDirectly = true;
+                this.stopHandlerPassed = true;
                 if (ProcessService.debug || ProcessService.doNotShutdown) {
-                    process.exit(0);
+                    process.exit(!isNaN(event) ? event : 'SIGTERM');
                 } else {
                     exec('halt');
                 }
             });
         } else {
             if (ProcessService.debug || ProcessService.doNotShutdown) {
-                process.exit(0);
+                process.exit(!isNaN(event) ? event : 'SIGTERM');
             } else {
                 exec('halt');
             }

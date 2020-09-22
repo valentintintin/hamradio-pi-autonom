@@ -62,7 +62,8 @@ export class RsyncService {
         return RsyncService.sendMultiple(config.rsync, [
             LogService.createCopy(config.databasePath),
             config.sensors?.csvPath,
-            config.webcam?.photosPath
+            config.webcam?.photosPath,
+            '/tmp/watchdog.log'
         ]);
     }
 

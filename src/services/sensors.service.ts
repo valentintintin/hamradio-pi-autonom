@@ -102,8 +102,8 @@ export class SensorsService {
         }));
     }
 
-    public static getAllSaved(limit: number = 0): Observable<Sensors[]> {
-        return DatabaseService.selectAll<Sensors>(Sensors.name, limit).pipe(tap(datas => {
+    public static getAllSaved(limit: number = 0, skip: number = 0): Observable<Sensors[]> {
+        return DatabaseService.selectAll<Sensors>(Sensors.name, limit, skip).pipe(tap(datas => {
             if (datas.length > 0) {
                 datas.forEach(data => {
                     (data as any).createdAt = new Date(data.createdAt);

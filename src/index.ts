@@ -155,6 +155,25 @@ switch (process.argv[process.argv.length - 1]) {
         });
         break;
 
+    case 'mppt-start-wd-loop':
+        CommunicationMpptchdService.instance.send(CommandMpptChd.PWROFFV, 11000).subscribe(_ => {
+            setInterval(_ => {
+                CommunicationMpptchdService.instance.enableWatchdog(10, 180).pipe(
+                    switchMap(_ => CommunicationMpptchdService.instance.getStatus())
+                ).subscribe(d => {
+                    if (d.alertAsserted) {
+                        setTimeout(_ => {
+                            exec('halt');
+                        }, 30000);
+                        console.log('Alert !!', d);
+                    } else {
+                        console.log(d.values.batteryVoltage);
+                    }
+                });
+            }, 1500);
+        });
+        break;
+
     case 'dashboard':
         DatabaseService.openDatabase(config.databasePath).subscribe(_ => new DashboardService(config));
         break;
@@ -192,6 +211,7 @@ switch (process.argv[process.argv.length - 1]) {
             'mppt-status': 'Get the status of the MPPTChg board',
             'mppt-stop-wd': 'Stop the watchdog of the MPPTChg board',
             'mppt-stop-wd-loop': 'Stop the watchdog of the MPPTChg board in loop',
+            'mppt-start-wd-loop': 'Start the watchdog of the MPPTChg board in loop',
             'shutdown': 'Shutdown the PI in 30 seconds and restart it 2 minutes later',
             'dashboard': 'Run only the dashboard Web interface',
             'rsync': 'Send test file to remote server',

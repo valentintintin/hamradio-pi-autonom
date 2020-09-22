@@ -109,14 +109,12 @@ export class DashboardService {
         this.app.post('/api/program/stop', (req, res) => {
             ProcessService.doNotShutdown = true;
             exec('systemctl stop logic');
-            process.exit(0);
             res.send(true);
         });
 
         this.app.post('/api/program/restart', (req, res) => {
             ProcessService.doNotShutdown = true;
             exec('systemctl restart logic');
-            process.exit(0);
             res.send(true);
         });
 
@@ -152,7 +150,7 @@ export class DashboardService {
 
             this.app.use('/sensors.csv', express.static(config.sensors.csvPath));
             this.app.use('/sensors.json', (req, res) => {
-                SensorsService.getAllSaved(500).subscribe(datas => {
+                SensorsService.getAllSaved(500, 5).subscribe(datas => {
                     res.send(datas.map(data => {
                         return {
                             createdAt: data.createdAt,

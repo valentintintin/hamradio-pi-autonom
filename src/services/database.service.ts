@@ -69,9 +69,13 @@ export class DatabaseService {
         });
     }
 
-    public static selectAll<T>(entity: string, limit: number = 100, order: string = 'DESC', ignoreErrors: boolean = true): Observable<T[]> {
+    public static selectAll<T>(entity: string, limit: number = 100, skip: number = 0, order: string = 'DESC', ignoreErrors: boolean = true): Observable<T[]> {
         return new Observable<T[]>((observer: Observer<T[]>) => {
-            let query = `SELECT * FROM ${entity} ORDER BY id ${order}`;
+            let query = `SELECT * FROM ${entity}`;
+            if (skip) {
+                query += ` WHERE id % ${skip} = 0`
+            }
+            query += ` ORDER BY id ${order}`;
             if (limit) {
                 query += ` LIMIT ${limit}`;
             }

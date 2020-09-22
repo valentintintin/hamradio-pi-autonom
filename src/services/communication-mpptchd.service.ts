@@ -1,6 +1,6 @@
 import { Observable, Observer } from 'rxjs';
 import { LogService } from './log.service';
-import { map, switchMap } from 'rxjs/operators';
+import { delay, map, retryWhen, switchMap, take } from 'rxjs/operators';
 import i2c = require('i2c-bus');
 
 export enum CommandMpptChd {
@@ -366,7 +366,9 @@ export class CommunicationMpptchdService {
 
             observer.next();
             observer.complete();
-        });
+        }).pipe(
+            retryWhen(errors => errors.pipe(delay(250), take(3)))
+        );
     }
 
     public receive(command: CommandMpptChd): Observable<number> {
@@ -423,7 +425,9 @@ export class CommunicationMpptchdService {
 
             observer.next(received);
             observer.complete();
-        });
+        }).pipe(
+            retryWhen(errors => errors.pipe(delay(250), take(3)))
+        );
     }
 
     private static getData(mask: number, value1: number, value2: number = null, error: number = 0): number {

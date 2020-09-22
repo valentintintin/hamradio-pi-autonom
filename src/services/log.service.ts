@@ -3,8 +3,7 @@ import { Logs } from '../models/logs';
 import { ProcessService } from './process.service';
 import { catchError, switchMap, tap } from 'rxjs/operators';
 import { of } from 'rxjs';
-
-const fs = require('fs');
+import fs = require('fs');
 
 export class LogService {
 
