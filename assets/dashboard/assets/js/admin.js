@@ -4,8 +4,6 @@ $(function () {
     const dataBrut = $('#data-json');
     const dataJsonWrapper = $('#data-json-wrapper');
 
-    getLogs();
-
     $('#see-logs').click(function () {
         getLogs();
     });

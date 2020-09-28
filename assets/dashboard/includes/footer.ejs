@@ -2,17 +2,10 @@
     <a href="mailto:valentin.s.10@gmail.com">valentin.s.10@gmail.com</a>
 </footer>
 </main>
-
-<% if (locals.scripts) {
-scripts.forEach(function (script) { %>
-    <script type="text/javascript" src="/assets/<%= script %>.js"></script>
-<% });
-} %>
 <script type="text/javascript">
     document.addEventListener("DOMContentLoaded", function () {
         document.getElementById('nav-<%= page %>').classList.add('selected');
     });
 </script>
 
-</body>
-</html>
+<%- include('footer-base.ejs', {page: 'index'}); %>

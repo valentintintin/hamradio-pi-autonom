@@ -42,11 +42,11 @@ export class RsyncService {
                             if (err) {
                                 LogService.log('rsync', 'Send KO', cmd + ' ' + err);
                                 observer.error(err);
-                            } else {
-                                LogService.log('rsync', 'Send OK', cmd);
-                                observer.next(toSend);
-                                observer.complete();
+                                return;
                             }
+                            LogService.log('rsync', 'Send OK', cmd);
+                            observer.next(toSend);
+                            observer.complete();
                         }, function (data) {
                             LogService.consoleLog('rsync', 'data', data.toString('utf8'));
                         }, function (data) {

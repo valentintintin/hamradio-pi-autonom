@@ -1,7 +1,7 @@
 import SunCalc = require('suncalc');
 import fs = require('fs');
 import { Observable, of, timer } from 'rxjs';
-import { catchError, map, retry, switchMap, tap } from 'rxjs/operators';
+import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import { LogService } from './log.service';
 import { CommandMpptChd, CommunicationMpptchdService } from './communication-mpptchd.service';
 import { ConfigInterface } from '../config/config.interface';
@@ -10,19 +10,23 @@ import { MpptChhdConfigInterface } from '../config/mppt-chhd-config.interface';
 
 export class MpptchgService {
 
-    public static readonly POWER_OFF_VOLT = 11500;
-    public static readonly POWER_ON_VOLT = 12500;
-    public static readonly NIGHT_LIMIT_VOLT = 11700;
+    private static readonly POWER_OFF_VOLT = 11500;
+    private static readonly POWER_ON_VOLT = 12500;
+    private static readonly NIGHT_LIMIT_VOLT = 11600;
+    private static readonly PAUSE_BEFORE_POWER_OFF_REACHED_VOLT = 11600;
 
     private static readonly WD_INIT_SECS = 180; // 2 minutes
     private static readonly WD_INIT_NIGHT_SECS = 255; // 4 minutes 15
-    private static readonly WD_UPDATE_SECS = 10; // 10 secondes
-    private static readonly WD_PWROFF_SECS = 10; // 10 secondes
-    private static readonly WD_PWROFF_NIGHT_SECS_DEFAULT = 3600; // 1 heure
+    private static readonly WD_UPDATE_SECS = 10; // 10 seconds
+    private static readonly WD_PWROFF_SECS = 10; // 10 seconds
+    private static readonly WD_PWROFF_NIGHT_SECS_DEFAULT = 3600; // 1 hour
+    private static readonly WD_PAUSE_BEFORE_POWEROFF_REACHED_SEC = 1800; // 30 minutes
+    private static readonly WD_ALERT_SEC = 60;
 
-    private static nightTriggered;
+    private static nightTriggered: boolean;
 
     public static events = new events.EventEmitter();
+    public static externalShutdownTriggered: Date;
 
     private static getSunCalcTime(lat: number, lng: number): SunCalcResultInterface {
         const date = new Date();
@@ -56,7 +60,6 @@ export class MpptchgService {
         return mpptChd.send(CommandMpptChd.PWRONV, powerOnVolt).pipe(
             switchMap(_ => mpptChd.send(CommandMpptChd.PWROFFV, powerOffVolt)),
             tap(_ => LogService.log('mpptChd', 'Power values set', powerOffVolt, powerOnVolt)),
-            retry(2),
             catchError(_ => {
                 LogService.log('mpptChd', 'Impossible to set all power values', powerOffVolt, powerOnVolt);
                 return of(null);
@@ -71,52 +74,69 @@ export class MpptchgService {
         return CommunicationMpptchdService.instance.getStatus().pipe(
             switchMap(status => {
                 LogService.log('mpptChd', 'Loop check', status);
+                const now = new Date();
 
                 if (status.alertAsserted && config.batteryLowAlert) {
                     LogService.log('mpptChd', 'Alert asserted !');
                     this.events.emit(EventMpptChg.ALERT);
-                } else {
+                } else if (!MpptchgService.externalShutdownTriggered || MpptchgService.externalShutdownTriggered.getTime() < now.getTime()) {
+                    MpptchgService.externalShutdownTriggered = null;
+
+                    const nextWakeUpLowBattery = new Date();
+                    const batteryVoltage = status.values ? status.values.batteryVoltage : Number.MAX_SAFE_INTEGER;
+                    const isLowVoltage = batteryVoltage < (config.pauseBeforePowerOffReachedVolt ?? MpptchgService.PAUSE_BEFORE_POWER_OFF_REACHED_VOLT);
+
                     if (status.nightDetected && config.nightAlert) {
                         if (!this.nightTriggered || !status.watchdogRunning) {
-                            LogService.log('mpptChd', 'Night detected', {
-                                batteryVoltage: status.values.batteryVoltage,
-                                solarVoltage: status.values.solarVoltage
-                            });
+                            let nextWakeUpNight = new Date();
+
+                            LogService.log('mpptChd', 'Night detected');
                             this.nightTriggered = true;
                             this.events.emit(EventMpptChg.NIGHT_DETECTED);
 
                             const sunDate = this.getSunCalcTime(lat, lng);
-                            let nextWakeUp = new Date();
 
-                            if (status.values && status.values.batteryVoltage >= (config.nightLimitVolt ?? this.NIGHT_LIMIT_VOLT)) {
-                                nextWakeUp.setSeconds(nextWakeUp.getSeconds() + (config.nightSleepTimeSeconds ?? this.WD_PWROFF_NIGHT_SECS_DEFAULT));
-                                if (nextWakeUp.getTime() > sunDate.dawn.getTime()) {
+                            LogService.log('mpptChd', 'Night status', {
+                                now: now,
+                                dawn: sunDate.dawn,
+                                sunrise: sunDate.sunrise,
+                                isTomorrow: sunDate.isTomorrow,
+                                batteryVoltage
+                            });
+
+                            if (!isLowVoltage && batteryVoltage >= (config.nightLimitVolt ?? this.NIGHT_LIMIT_VOLT)) {
+                                nextWakeUpNight.setSeconds(nextWakeUpNight.getSeconds() + (config.nightSleepTimeSeconds ?? this.WD_PWROFF_NIGHT_SECS_DEFAULT));
+                                if (nextWakeUpNight.getTime() > sunDate.dawn.getTime()) {
                                     if (sunDate.isTomorrow) {
-                                        LogService.log('mpptChd', 'Morning is too soon, no sleep', {
-                                            nextWakeUp,
-                                            dawn: sunDate.dawn
-                                        });
+                                        LogService.log('mpptChd', 'Morning is too soon, no sleep', sunDate.dawn);
                                         return of(null);
                                     }
-                                    LogService.log('mpptChd', 'Sleep to dawn', {
-                                        nextWakeUp,
-                                        dawn: sunDate.dawn
-                                    });
-                                    nextWakeUp = sunDate.dawn;
+                                    LogService.log('mpptChd', 'Sleep to dawn', sunDate.dawn);
+                                    nextWakeUpNight = sunDate.dawn;
                                 }
                             } else {
-                                LogService.log('mpptChd', 'Not enough battery so sleep to sunrise', {
-                                    nextWakeUp,
-                                    sunrise: sunDate.sunrise
-                                });
-                                nextWakeUp = sunDate.sunrise;
+                                LogService.log('mpptChd', 'Not enough battery so sleep to sunrise', sunDate.sunrise);
+                                nextWakeUpNight = sunDate.sunrise;
                             }
-                            return MpptchgService.shutdownAndWakeUpAtDate(nextWakeUp, config.nightRunSleepTimeSeconds ?? this.WD_INIT_NIGHT_SECS).pipe(
+
+                            return MpptchgService.shutdownAndWakeUpAtDate(nextWakeUpNight, config.nightRunSleepTimeSeconds ?? this.WD_INIT_NIGHT_SECS).pipe(
                                 catchError(_ => of(null))
                             );
                         } else {
-                            LogService.log('mpptChd', 'Night still here');
+                            LogService.log('mpptChd', 'Night still here', status.values?.watchdogCounter);
                         }
+                    } else if (isLowVoltage) {
+                        nextWakeUpLowBattery.setSeconds(nextWakeUpLowBattery.getSeconds() + (config.pauseBeforePowerOffReachedSeconds ?? MpptchgService.WD_PAUSE_BEFORE_POWEROFF_REACHED_SEC));
+
+                        LogService.log('mpptChd', 'Low battery voltage detected', {
+                            batteryVoltage: status.values.batteryVoltage,
+                            solarVoltage: status.values.solarVoltage,
+                            nextWakeUpLowBattery
+                        });
+
+                        return MpptchgService.shutdownAndWakeUpAtDate(nextWakeUpLowBattery, this.WD_INIT_NIGHT_SECS).pipe(
+                            catchError(_ => of(null))
+                        );
                     } else if (config.watchdog) {
                         this.nightTriggered = false;
 
@@ -127,6 +147,8 @@ export class MpptchgService {
                         this.nightTriggered = false;
                     }
                     LogService.log('mpptChd', 'Nothing to do');
+                } else {
+                    LogService.log('mpptChd', 'Nothing to do, waiting for user shutdown', MpptchgService.externalShutdownTriggered);
                 }
                 return of(null);
             })
@@ -137,24 +159,24 @@ export class MpptchgService {
         if (secondsBeforeWakeUp < 5) {
             secondsBeforeWakeUp = 5; // enough time for Pi to empty capacitor
         } else if (secondsBeforeWakeUp > 65535) {
-            LogService.log('mpptChg', 'Watchdog secondsBeforeWakeUp too important', secondsBeforeWakeUp);
+            LogService.log('mpptChg', 'Watchdog secondsBeforeWakeUp too much', secondsBeforeWakeUp);
             secondsBeforeWakeUp = 65535;
         }
 
-        if (secondsBeforeShutdown < 1) {
-            secondsBeforeShutdown = 1;
+        if (secondsBeforeShutdown < 5) {
+            secondsBeforeShutdown = 5;
         } else if (secondsBeforeShutdown > 255) {
-            LogService.log('mpptChg', 'Watchdog secondsBeforeShutdown too important', secondsBeforeShutdown);
+            LogService.log('mpptChg', 'Watchdog secondsBeforeShutdown too much', secondsBeforeShutdown);
             secondsBeforeWakeUp = 255;
         }
 
         const now = new Date();
         const dataLog = {
             now: now,
-            sleepAt: new Date(now.getTime() + secondsBeforeShutdown * 1000),
-            wakeupAt: new Date(now.getTime() + secondsBeforeWakeUp * 1000),
-            secondsBeforeWakeUp,
-            secondsBeforeShutdown
+            sleepAt: new Date(now.getTime() + (secondsBeforeShutdown + MpptchgService.WD_ALERT_SEC) * 1000),
+            wakeupAt: new Date(now.getTime() + (secondsBeforeWakeUp + secondsBeforeShutdown + MpptchgService.WD_ALERT_SEC) * 1000),
+            secondsBeforeShutdown: secondsBeforeShutdown + MpptchgService.WD_ALERT_SEC,
+            secondsBeforeWakeUp
         };
 
         fs.writeFileSync('/tmp/watchdog.log', JSON.stringify(dataLog))
@@ -164,7 +186,6 @@ export class MpptchgService {
                 LogService.log('mpptChd', 'Watchdog enabled', dataLog);
                 return null;
             }),
-            retry(2),
             catchError(err => {
                 LogService.log('mpptChd', 'Watchdog impossible to enabled !', dataLog);
                 return err;
@@ -172,18 +193,12 @@ export class MpptchgService {
         );
     }
 
-    public static shutdownAndWakeUpAtDate(wakeUpDate: Date, secondsBeforeShutdown: number = 1): Observable<Date> {
-        const now = new Date();
-
-        let wakeUpDateOk = new Date(wakeUpDate);
-        if (wakeUpDateOk.getTime() < now.getTime() + 10000) { // 10s more than now to be safe
-            wakeUpDateOk.setSeconds(wakeUpDateOk.getSeconds() + 10);
-        }
-
-        let secondsBeforeWakeUp = Math.round((wakeUpDateOk.getTime() - now.getTime()) / 1000) - secondsBeforeShutdown - 60;
-
-        return this.enableWatchdog(secondsBeforeWakeUp, secondsBeforeShutdown).pipe(
-            map(_ => wakeUpDateOk)
+    public static shutdownAndWakeUpAtDate(wakeUpDate: Date, secondsBeforeShutdown: number = 0): Observable<Date> {
+        return this.enableWatchdog(
+            Math.round((wakeUpDate.getTime() - new Date().getTime()) / 1000) - secondsBeforeShutdown - MpptchgService.WD_ALERT_SEC,
+            secondsBeforeShutdown
+        ).pipe(
+            map(_ => wakeUpDate)
         );
     }
 }

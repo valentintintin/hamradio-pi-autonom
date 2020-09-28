@@ -34,30 +34,30 @@ export class ProcessService {
             this.runRemoveOldLog();
             this.testFunction(config);
 
-            if (config.mpptChd && config.mpptChd.enable) {
+            if (config.mpptChd?.enable) {
                 this.runMpptChd(config);
             }
 
-            if (config.aprs && config.aprs.enable) {
+            if (config.aprs?.enable) {
                 this.runAprs(config);
                 if (!!config.aprs.waitDtmfInterval) {
                     this.runDtmfDecoder(config);
                 }
             }
 
-            if (config.sensors && config.sensors.enable) {
+            if (config.sensors?.enable) {
                 this.runSensors(config);
             }
 
-            if (config.webcam && config.webcam.enable) {
+            if (config.webcam?.enable) {
                 this.runWebcam(config);
             }
 
-            if (config.dashboard && config.dashboard.enable) {
+            if (config.dashboard?.enable) {
                 this.runApi(config);
             }
 
-            if (config.rsync && config.rsync.enable) {
+            if (config.rsync?.enable) {
                 this.runRsync(config);
             }
 
@@ -67,7 +67,7 @@ export class ProcessService {
             }
             process.on('uncaughtException', e => {
                 LogService.log('program', 'exception', e);
-                this.exitHandler(config, 'SIGHUP');
+                // this.exitHandler(config, 'SIGHUP');
             });
 
             LogService.log('program', 'Started');
@@ -98,7 +98,7 @@ export class ProcessService {
                 }
             }
 
-            if (config.rsync && config.rsync.enable) {
+            if (config.rsync?.enable) {
                 stop = stop.pipe(
                     switchMap(_ => RsyncService.runSync(config).pipe(catchError(e => of(null))))
                 )
@@ -167,7 +167,7 @@ export class ProcessService {
 
             if (result.type === MultimonModeEnum.TONE) {
                 dtmfCode = '';
-                if (config.voice && config.voice.enable) {
+                if (config.voice?.enable) {
                     this.dtmfDecoderShouldStop = false;
                     CommunicationMpptchdService.instance.getStatus().pipe(
                         map(data => {
@@ -186,7 +186,7 @@ export class ProcessService {
                     dtmfCode = '';
                 } else if (result.data === '*') {
                     this.dtmfDecoderShouldStop = false;
-                    if (config.sstv && config.sstv.enable && dtmfCode === config.sstv.dtmfCode) {
+                    if (config.sstv?.enable && dtmfCode === config.sstv?.dtmfCode) {
                         SstvService.sendImage(config.sstv, true).subscribe(_ => this.dtmfDecoderShouldStop = true);
                     } else if (dtmfCode === config.packetRadio.dtmfCode) {
                         RadioService.keepOn = !RadioService.keepOn;

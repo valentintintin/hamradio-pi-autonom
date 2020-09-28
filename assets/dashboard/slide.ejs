@@ -1,0 +1,68 @@
+<%- include('includes/header-base.ejs', {styles: ['css/slide']}); %>
+
+<meta http-equiv="refresh" content="35;URL=/slide">
+
+<header class="bg-primary">
+    <span>Station autonome</span>
+
+    <% if (sensors) { %>
+        <span><%= new Date(sensors.createdAt).toLocaleString() %></span>
+    <% } else { %>
+        <strong>Aucune donnée</strong>
+    <% } %>
+
+    <span>F4HVV</span>
+</header>
+
+<div id="slideBody">
+    <main>
+        <% if (lastPhoto) { %>
+            <article class="photo">
+                <a href="/timelapse/<%= lastPhoto %>" target="_blank">
+                    <img src="/timelapse/<%= lastPhoto %>"
+                         alt="Dernière photo prise le <%= lastPhoto.split('/')[1] %>"/>
+                </a>
+            </article>
+        <% } else { %>
+            <strong>Aucune photo</strong>
+        <% } %>
+    </main>
+
+    <aside>
+        <% if (sensors) { %>
+            <article class="card card-number bg-green card-small">
+                <span class="title">Boîte</span>
+                <strong class="value"><%= (sensors.temperatureRtc + sensors.temperatureBattery) / 2 %>°C</strong>
+            </article>
+
+            <article class="card card-number bg-green card-small">
+                <span class="title">CPU</span>
+                <strong class="value"><%= Math.round(sensors.temperatureCpu) %>°C</strong>
+            </article>
+
+            <article class="card card-number bg-orange card-small">
+                <span class="title">Uptime</span>
+                <strong class="value"><%= Math.round(sensors.uptime / 60) %>min</strong>
+            </article>
+
+            <article class="card card-number bg-orange card-small">
+                <span class="title">Charge</span>
+                <strong class="value"><%= sensors.currentCharge %>mA</strong>
+            </article>
+
+            <article class="card card-number bg-blue card-small">
+                <span class="title">Batterie</span>
+                <strong class="value"><%= sensors.voltageBattery / 1000 %>V</strong>
+            </article>
+
+            <article class="card card-number bg-blue card-small">
+                <span class="title">Solaire</span>
+                <strong class="value"><%= sensors.voltageSolar / 1000 %>V</strong>
+            </article>
+        <% } else { %>
+            <strong>Aucune donnée pour le moment</strong>
+        <% } %>
+    </aside>
+</div>
+
+<%- include('includes/footer-base.ejs', {page: 'index'}); %>

@@ -49,7 +49,7 @@ ul {
     margin: 0;
 }
 
-aside {
+aside#nav {
     max-width: 300px;
     min-width: 200px;
     box-shadow: var(--shadown);
@@ -102,7 +102,6 @@ nav .button {
 .card-number {
     align-items: center;
     flex-direction: column;
-    height: 80px;
 }
 
 .card-number .title {
@@ -112,6 +111,16 @@ nav .button {
 
 .card-number .value {
     font-size: 30px;
+}
+
+.card-small {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 5px;
+}
+
+.card-small .title {
+    margin-bottom: 0;
 }
 
 .align-left {
