@@ -27,31 +27,33 @@ export class SstvService {
 
         SstvService.alreadyInUse = true;
 
-        return new Observable<void>((observer: Observer<void>) => {
-            const filePath = WebcamService.lastPhotoPath ?? assetsFolder + '/test.jpg';
+        return WebcamService.getLastPhoto().pipe(
+            switchMap(lastPhoto => new Observable<void>((observer: Observer<void>) => {
+                    const filePath = lastPhoto ?? assetsFolder + '/test.jpg';
 
-            LogService.log('sstv', 'Get image', filePath);
+                    LogService.log('sstv', 'Get image', filePath);
 
-            if (!fs.existsSync(filePath)) {
-                observer.error(new Error('File does not exist'));
-                return;
-            }
+                    if (!fs.existsSync(filePath)) {
+                        observer.error(new Error('File does not exist'));
+                        return;
+                    }
 
-            // @ts-ignore
-            Jimp.read(filePath)
-                .then(image => {
                     // @ts-ignore
-                    Jimp.loadFont(Jimp.FONT_SANS_16_BLACK).then(font => {
-                        image.resize(320, 240)
-                            .print(font, 0, 0, config.comment.toUpperCase())
-                            .print(font, 0, image.getHeight() - 16, config.comment.toUpperCase())
-                            .write(SstvService.tmpImage);
-                        observer.next();
-                        observer.complete();
-                    }).catch(err => observer.error(err));
+                    Jimp.read(filePath)
+                        .then(image => {
+                            // @ts-ignore
+                            Jimp.loadFont(Jimp.FONT_SANS_16_BLACK).then(font => {
+                                image.resize(320, 240)
+                                    .print(font, 0, 0, config.comment.toUpperCase())
+                                    .print(font, 0, image.getHeight() - 16, config.comment.toUpperCase())
+                                    .write(SstvService.tmpImage);
+                                observer.next();
+                                observer.complete();
+                            }).catch(err => observer.error(err));
+                        })
+                        .catch(err => observer.error(err));
                 })
-                .catch(err => observer.error(err));
-        }).pipe(
+            ),
             delay(100),
             switchMap(_ => {
                 return new Observable<void>((observer: Observer<void>) => {

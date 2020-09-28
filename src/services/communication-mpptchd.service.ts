@@ -1,6 +1,6 @@
-import { Observable, Observer } from 'rxjs';
+import { Observable, Observer, throwError, timer } from 'rxjs';
 import { LogService } from './log.service';
-import { delay, map, retryWhen, switchMap, take } from 'rxjs/operators';
+import { map, mergeMap, retryWhen, switchMap } from 'rxjs/operators';
 import i2c = require('i2c-bus');
 
 export enum CommandMpptChd {
@@ -42,11 +42,11 @@ export enum StatusMpptChd {
     EXTERNAL_TEMPERATURE_SENSOR_MISSING = 0x1000,
     BAD_BATTERY_STATUS = 0x2000,
     POWER_WATCHDOG_TRIGGERED = 0x4000,
-    INTERNAL_WATCHDOG_TRIGGERED_ = 0x8000
+    INTERNAL_WATCHDOG_TRIGGERED = 0x8000
 }
 
 export interface MpptChdStatusInterface {
-    raw: number[];
+    raw: number;
     chargerState: MpptChdStatusChargerStateInterface, // 2:0
     nightDetected: boolean; // 3
     chargerTemperatureLimit: boolean; // 4
@@ -118,7 +118,7 @@ export class CommunicationMpptchdService {
     private static readonly COMMANDS: Command[] = [
         new Command('ID', false, true, false, CommandMpptChd.ID, 0x1000),
         new Command('STATUS', false, true, false, CommandMpptChd.STATUS, CommunicationMpptchdService.getStatusData({
-            raw: [0, 0],
+            raw: 0,
             chargerState: {
                 night: false,
                 idle: false,
@@ -189,33 +189,32 @@ export class CommunicationMpptchdService {
     public getStatus(): Observable<MpptChdStatusInterface> {
         // @ts-ignore
         return this.receive(CommandMpptChd.STATUS).pipe(
-            switchMap(status => this.receive(CommandMpptChd.STATUS).pipe(
-                map(status2 => {
+            map(status => {
                     return {
-                        raw: [status, status2],
+                        raw: status,
                         chargerState: {
-                            night: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_NIGHT, status, status2),
-                            idle: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_IDLE, status, status2),
-                            vsrcv: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_VSCR, status, status2),
-                            scan: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_SCAN, status, status2),
-                            bulk: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_BULK, status, status2),
-                            absorption: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_ABSORPTION, status, status2),
-                            float: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_FLOAT, status, status2),
+                            night: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_NIGHT, status),
+                            idle: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_IDLE, status),
+                            vsrcv: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_VSCR, status),
+                            scan: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_SCAN, status),
+                            bulk: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_BULK, status),
+                            absorption: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_ABSORPTION, status),
+                            float: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_STATE_FLOAT, status),
                         },
-                        nightDetected: !!CommunicationMpptchdService.getData(StatusMpptChd.NIGHT_DETECTED, status, status2),
-                        chargerTemperatureLimit: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_TEMERATURE_LIMIT, status, status2),
-                        powerEnabledJumper: !!CommunicationMpptchdService.getData(StatusMpptChd.POWER_ENABLE_JUMPER, status, status2),
-                        alertAsserted: !!CommunicationMpptchdService.getData(StatusMpptChd.ALERT_ASSERTED, status, status2),
-                        powerEnabled: !!CommunicationMpptchdService.getData(StatusMpptChd.POWER_ENABLED, status, status2),
-                        watchdogRunning: !!CommunicationMpptchdService.getData(StatusMpptChd.WATCHDOG_RUNNING, status, status2),
-                        externalTemperatureSensorMissing: !!CommunicationMpptchdService.getData(StatusMpptChd.EXTERNAL_TEMPERATURE_SENSOR_MISSING, status, status2),
-                        badBatteryStatus: !!CommunicationMpptchdService.getData(StatusMpptChd.BAD_BATTERY_STATUS, status, status2),
-                        powerWatchdogTriggered: !!CommunicationMpptchdService.getData(StatusMpptChd.POWER_WATCHDOG_TRIGGERED, status, status2),
-                        internalWatchdogTriggered: !!CommunicationMpptchdService.getData(StatusMpptChd.INTERNAL_WATCHDOG_TRIGGERED_, status, status2),
+                        nightDetected: !!CommunicationMpptchdService.getData(StatusMpptChd.NIGHT_DETECTED, status),
+                        chargerTemperatureLimit: !!CommunicationMpptchdService.getData(StatusMpptChd.CHARGER_TEMERATURE_LIMIT, status),
+                        powerEnabledJumper: !!CommunicationMpptchdService.getData(StatusMpptChd.POWER_ENABLE_JUMPER, status),
+                        alertAsserted: !!CommunicationMpptchdService.getData(StatusMpptChd.ALERT_ASSERTED, status),
+                        powerEnabled: !!CommunicationMpptchdService.getData(StatusMpptChd.POWER_ENABLED, status),
+                        watchdogRunning: !!CommunicationMpptchdService.getData(StatusMpptChd.WATCHDOG_RUNNING, status),
+                        externalTemperatureSensorMissing: !!CommunicationMpptchdService.getData(StatusMpptChd.EXTERNAL_TEMPERATURE_SENSOR_MISSING, status),
+                        badBatteryStatus: !!CommunicationMpptchdService.getData(StatusMpptChd.BAD_BATTERY_STATUS, status),
+                        powerWatchdogTriggered: !!CommunicationMpptchdService.getData(StatusMpptChd.POWER_WATCHDOG_TRIGGERED, status),
+                        internalWatchdogTriggered: !!CommunicationMpptchdService.getData(StatusMpptChd.INTERNAL_WATCHDOG_TRIGGERED, status),
                         values: {}
                     } as MpptChdStatusInterface;
-                })
-            )),
+                }
+            ),
             switchMap((status: MpptChdStatusInterface) => {
                 return CommunicationMpptchdService.instance.receive(CommandMpptChd.VB).pipe(map(value => {
                     status.values.batteryVoltage = value;
@@ -332,10 +331,12 @@ export class CommunicationMpptchdService {
             if (!commandObject) {
                 LogService.log('i2c-' + 'mpptChg', 'Send command KO. Command does not exist', commandObject.name, data);
                 observer.error(new Error('Command does not exist'));
+                return;
             }
             if (!commandObject.isWritable) {
                 LogService.log('i2c-' + 'mpptChg', 'Send command KO. Command is not writable', commandObject.name, data);
                 observer.error(new Error('Command is not writable'));
+                return;
             }
 
             if (CommunicationMpptchdService.DEBUG) {
@@ -356,18 +357,23 @@ export class CommunicationMpptchdService {
                 } catch (e) {
                     LogService.log('i2c-' + 'mpptChg', 'Send command KO', commandObject.name, data, e);
                     observer.error(e);
+                    return;
                 }
             }
 
             if (receive === -1) {
                 LogService.log('i2c-' + 'mpptChg', 'Send command KO', commandObject.name, data);
                 observer.error(new Error('Error during i2c write'));
+                return;
             }
 
             observer.next();
             observer.complete();
         }).pipe(
-            retryWhen(errors => errors.pipe(delay(250), take(3)))
+            retryWhen(errors => errors.pipe(mergeMap((err, i) => i > 3
+                ? throwError(err)
+                : timer(250)
+            ))),
         );
     }
 
@@ -377,6 +383,7 @@ export class CommunicationMpptchdService {
             if (!commandObject) {
                 LogService.log('i2c-' + 'mpptChg', 'Receive KO. Command does not exist', command);
                 observer.error(new Error('Command does not exist'));
+                return;
             }
 
             if (CommunicationMpptchdService.DEBUG) {
@@ -397,12 +404,14 @@ export class CommunicationMpptchdService {
                 } catch (e) {
                     LogService.log('i2c-' + 'mpptChg', 'Send command KO', commandObject.name, e);
                     observer.error(e);
+                    return;
                 }
             }
 
             if (received === -1) {
-                LogService.log('i2c-' + 'mpptChg', 'Receive KO', commandObject.name);
-                observer.error(new Error('Receive KO'));
+                LogService.log('i2c-' + 'mpptChg', 'Receive result KO', commandObject.name);
+                observer.error(new Error('Receive result KO'));
+                return;
             } else if (commandObject.isSigned) {
                 // 2's complement to create negative int
                 if (commandObject.isWord) {
@@ -426,15 +435,15 @@ export class CommunicationMpptchdService {
             observer.next(received);
             observer.complete();
         }).pipe(
-            retryWhen(errors => errors.pipe(delay(250), take(3)))
+            retryWhen(errors => errors.pipe(mergeMap((err, i) => i > 3
+                ? throwError(err)
+                : timer(250)
+            )))
         );
     }
 
-    private static getData(mask: number, value1: number, value2: number = null, error: number = 0): number {
-        if (value2 !== null) {
-            return (value1 & mask) === (value2 & mask) ? value1 & mask : error;
-        }
-        return value1 & mask;
+    private static getData(mask: number, value: number): number {
+        return value & mask;
     }
 
     private static getStatusData(config: MpptChdStatusInterface): number {
@@ -454,7 +463,7 @@ export class CommunicationMpptchdService {
         value += config.externalTemperatureSensorMissing ? StatusMpptChd.EXTERNAL_TEMPERATURE_SENSOR_MISSING : 0;
         value += config.badBatteryStatus ? StatusMpptChd.BAD_BATTERY_STATUS : 0;
         value += config.powerWatchdogTriggered ? StatusMpptChd.POWER_WATCHDOG_TRIGGERED : 0;
-        value += config.internalWatchdogTriggered ? StatusMpptChd.INTERNAL_WATCHDOG_TRIGGERED_ : 0;
+        value += config.internalWatchdogTriggered ? StatusMpptChd.INTERNAL_WATCHDOG_TRIGGERED : 0;
         return value;
     }
 }

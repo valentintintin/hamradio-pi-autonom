@@ -1,0 +1,41 @@
+body {
+    background: #2f2d2d;
+}
+
+body > * {
+    margin: 0;
+    padding: 0;
+}
+
+header {
+    margin: 0;
+    padding: 10px;
+    width: 100%;
+
+    display: flex;
+    justify-content: space-between;
+
+    font-size: 1.5em;
+    font-weight: bold;
+}
+
+#slideBody {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+}
+
+main {
+    align-self: center;
+}
+
+aside {
+    flex: 0;
+    align-self: center;
+}
+
+img {
+    max-width: 640px;
+    max-height: 480px;
+}

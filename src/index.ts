@@ -127,7 +127,7 @@ switch (process.argv[process.argv.length - 1]) {
 
     case 'shutdown':
         const restartDate = new Date();
-        restartDate.setMinutes(restartDate.getMinutes() + 2);
+        restartDate.setMinutes(restartDate.getMinutes() + 5);
         MpptchgService.shutdownAndWakeUpAtDate(restartDate, 30).subscribe(wakeupDate => {
             setInterval(_ => CommunicationMpptchdService.instance.getStatus().subscribe(d => console.log(wakeupDate, d)), 1500);
             setTimeout(_ => {

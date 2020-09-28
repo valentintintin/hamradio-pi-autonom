@@ -54,11 +54,21 @@ export class DashboardService {
         this.app.use('/data.db', express.static(LogService.createCopy(config.databasePath)));
 
         this.app.get('/', (req, res) => {
-            forkJoin([SensorsService.getLast(), WebcamService.getLastPhotos(config.webcam)])
+            forkJoin([SensorsService.getLast(), WebcamService.getLastPhoto(config.webcam)])
                 .subscribe(datas => {
                     res.render(__dirname + '/../../assets/dashboard/index.ejs', {
                         sensors: datas[0],
-                        lastPhoto: datas[1].length > 0 ? datas[1][0] : null
+                        lastPhoto: datas[1]
+                    });
+                });
+        });
+
+        this.app.get('/slide', (req, res) => {
+            forkJoin([SensorsService.getLast(), WebcamService.getLastPhoto(config.webcam)])
+                .subscribe(datas => {
+                    res.render(__dirname + '/../../assets/dashboard/slide.ejs', {
+                        sensors: datas[0],
+                        lastPhoto: datas[1]
                     });
                 });
         });
@@ -139,7 +149,7 @@ export class DashboardService {
             res.send(config);
         });
 
-        if (config.sensors && config.sensors.enable) {
+        if (config.sensors?.enable) {
             this.app.get('/api/sensors', (req, res) => {
                 SensorsService.getAllCurrent().subscribe(datas => {
                     (datas as any).createdAt = new Date(datas.createdAt);
@@ -166,7 +176,7 @@ export class DashboardService {
             });
         }
 
-        if (config.mpptChd && config.mpptChd.enable) {
+        if (config.mpptChd?.enable) {
             this.app.post('/api/shutdown/:timestamp', (req, res) => {
                 const restartDate = new Date(+req.params['timestamp'] * 1000);
                 MpptchgService.shutdownAndWakeUpAtDate(restartDate, 30).pipe(
@@ -174,7 +184,10 @@ export class DashboardService {
                         res.json(e);
                         return of(null);
                     })
-                ).subscribe(wakeupDate => res.send(wakeupDate));
+                ).subscribe(wakeupDate => {
+                    MpptchgService.externalShutdownTriggered = wakeupDate;
+                    res.send(wakeupDate);
+                });
             });
 
             this.app.post('/api/watchdog/stop', (req, res) => {
@@ -198,7 +211,7 @@ export class DashboardService {
             }
         }
 
-        if (config.repeater && config.repeater.enable) {
+        if (config.repeater?.enable) {
             this.app.post('/api/repeater', (req, res) => {
                 RadioService.listenAndRepeat(config.repeater.seconds).pipe(
                     catchError(e => {
@@ -209,7 +222,7 @@ export class DashboardService {
             });
         }
 
-        if (config.sstv && config.sstv.enable) {
+        if (config.sstv?.enable) {
             this.app.post('/api/sstv', (req, res) => {
                 SstvService.sendImage(config.sstv).pipe(
                     catchError(e => {
@@ -235,7 +248,7 @@ export class DashboardService {
             this.app.use('/timelapse', express.static(config.webcam.photosPath));
         }
 
-        if (config.voice && config.voice.enable) {
+        if (config.voice?.enable) {
             this.app.post('/api/voice', (req, res) => {
                 CommunicationMpptchdService.instance.getStatus().pipe(
                     map(data => {
@@ -253,7 +266,7 @@ export class DashboardService {
             });
         }
 
-        if (config.rsync && config.rsync.enable) {
+        if (config.rsync?.enable) {
             this.app.post('/api/rsync', (req, res) => {
                 RsyncService.runSync(config).pipe(
                     catchError(e => {
@@ -264,7 +277,7 @@ export class DashboardService {
             });
         }
 
-        if (config.aprs && config.aprs.enable) {
+        if (config.aprs?.enable) {
             this.app.post('/api/aprs/beacon', (req, res) => {
                 AprsService.sendAprsBeacon(config.aprs).pipe(
                     catchError(e => {

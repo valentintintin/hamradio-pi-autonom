@@ -4,11 +4,12 @@ import { Observable, Observer, of } from 'rxjs';
 import { LogService } from './log.service';
 import { WebcamConfigInterface } from '../config/webcam-config.interface';
 import { assetsFolder } from '../index';
+import { map } from 'rxjs/operators';
 
 export class WebcamService {
 
     public static USE_FAKE = false;
-    public static lastPhotoPath: string;
+    private static lastPhotoPath: string;
 
     private static readonly opts = {
         width: 640,
@@ -61,7 +62,7 @@ export class WebcamService {
                             }
 
                             // @ts-ignore
-                            WebcamService.webcam.capture(path + '/' + date.format('{YYYY}_{MM}_{DD}-{hh}_{mm}_{ss}'), (err, data) => {
+                            WebcamService.webcam.capture(path + '/' + date.format('{YYYY}_{MM}_{DD}-{hh}_{mm}_{ss}'), (err, data: string) => {
                                 WebcamService.alreadyInUse = false;
 
                                 if (err) {
@@ -71,7 +72,6 @@ export class WebcamService {
                                 } else {
                                     LogService.log('webcam', 'Capture OK', data);
 
-                                    WebcamService.lastPhotoPath = data;
                                     observer.next(data);
                                     observer.complete();
                                     ended = true;
@@ -84,6 +84,7 @@ export class WebcamService {
                 if (errors.length) {
                     LogService.log('webcam', 'Capture error', errors);
                     observer.error(errors);
+                    return;
                 }
             } else {
                 WebcamService.alreadyInUse = false;
@@ -96,11 +97,16 @@ export class WebcamService {
         });
     }
 
+    public static getLastPhoto(config: WebcamConfigInterface = null): Observable<string> {
+        return WebcamService.getLastPhotos(config).pipe(map(_ => WebcamService.lastPhotoPath));
+    }
+
     public static getLastPhotos(config: WebcamConfigInterface): Observable<string[]> {
         return new Observable<string[]>((observer: Observer<string[]>) => {
             fs.readdir(config.photosPath, (err, datesDir) => {
                 if (err) {
                     observer.error(err);
+                    return;
                 }
 
                 if (datesDir) {

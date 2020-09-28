@@ -22,6 +22,7 @@ export class DatabaseService {
                     if (err) {
                         LogService.log('database', 'Open KO', err);
                         observer.error(err);
+                        return;
                     }
                     observer.next(DatabaseService.db);
                     observer.complete();
@@ -44,6 +45,7 @@ export class DatabaseService {
                             if (err) {
                                 LogService.log('database', 'Create KO', err);
                                 observer.error(err);
+                                return;
                             }
                             observer.next(DatabaseService.db);
                             observer.complete();
@@ -62,6 +64,7 @@ export class DatabaseService {
                 if (err) {
                     LogService.log('database', 'Close KO', err);
                     observer.error(err);
+                    return;
                 }
                 observer.next(null);
                 observer.complete();
@@ -85,6 +88,7 @@ export class DatabaseService {
                         LogService.log('database', 'Select KO', err, query);
                         if (!ignoreErrors) {
                             observer.error(err);
+                            return;
                         }
                     }
                     observer.next(rows);
@@ -94,6 +98,7 @@ export class DatabaseService {
                 LogService.log('database', 'Select KO', e, query);
                 if (!ignoreErrors) {
                     observer.error(e);
+                    return;
                 }
                 observer.next([]);
                 observer.complete();
@@ -110,6 +115,7 @@ export class DatabaseService {
                         LogService.log('database', 'Select KO', err, query);
                         if (!ignoreErrors) {
                             observer.error(err);
+                            return;
                         }
                     }
                     observer.next(row);
@@ -119,6 +125,7 @@ export class DatabaseService {
                 LogService.log('database', 'Select KO', e, query);
                 if (!ignoreErrors) {
                     observer.error(e);
+                    return;
                 }
                 observer.next(null);
                 observer.complete();
@@ -138,6 +145,7 @@ export class DatabaseService {
                         }
                         if (!ignoreErrors) {
                             observer.error(err);
+                            return;
                         }
                     }
                     observer.next(data);
@@ -149,6 +157,7 @@ export class DatabaseService {
                 }
                 if (!ignoreErrors) {
                     observer.error(e);
+                    return;
                 }
                 observer.next(data);
                 observer.complete();
@@ -167,6 +176,7 @@ export class DatabaseService {
                         }
                         if (!ignoreErrors) {
                             observer.error(err);
+                            return;
                         }
                     }
                     observer.next(data);
@@ -178,6 +188,7 @@ export class DatabaseService {
                 }
                 if (!ignoreErrors) {
                     observer.error(e);
+                    return;
                 }
                 observer.next(data);
                 observer.complete();
@@ -193,6 +204,7 @@ export class DatabaseService {
                         LogService.log('database', 'Query KO', err, query);
                         if (!ignoreErrors) {
                             observer.error(err);
+                            return;
                         }
                     }
                     observer.next(null);
@@ -202,6 +214,7 @@ export class DatabaseService {
                 LogService.log('database', 'Query KO', e, query);
                 if (!ignoreErrors) {
                     observer.error(e);
+                    return;
                 }
                 observer.next(null);
                 observer.complete();
@@ -217,6 +230,7 @@ export class DatabaseService {
                         LogService.log('database', 'Vacuum KO', err);
                         if (!ignoreErrors) {
                             observer.error(err);
+                            return;
                         }
                     }
                     observer.next(null);
@@ -226,6 +240,7 @@ export class DatabaseService {
                 LogService.log('database', 'Vacuum KO', e);
                 if (!ignoreErrors) {
                     observer.error(e);
+                    return;
                 }
                 observer.next(null);
                 observer.complete();
@@ -242,6 +257,7 @@ export class DatabaseService {
                         LogService.log('database', 'Select KO', err, query);
                         if (!ignoreErrors) {
                             observer.error(err);
+                            return;
                         }
                         observer.next(fallback);
                         observer.complete();
@@ -253,6 +269,7 @@ export class DatabaseService {
                 LogService.log('database', 'Select KO', e, query);
                 if (!ignoreErrors) {
                     observer.error(e);
+                    return;
                 }
                 observer.next(fallback);
                 observer.complete();
