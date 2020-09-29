@@ -15,7 +15,7 @@ export class WebcamService {
         width: 640,
         height: 480,
         quality: 100,
-        // skip: 100,
+        skip: 100,
         // delay: 10,
         saveShots: true,
         output: 'jpeg',
