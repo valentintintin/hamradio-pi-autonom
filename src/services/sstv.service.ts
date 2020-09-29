@@ -29,7 +29,7 @@ export class SstvService {
 
         return WebcamService.getLastPhoto().pipe(
             switchMap(lastPhoto => new Observable<void>((observer: Observer<void>) => {
-                    const filePath = lastPhoto ?? assetsFolder + '/test.jpg';
+                    const filePath = lastPhoto?.path ?? assetsFolder + '/test.jpg';
 
                     LogService.log('sstv', 'Get image', filePath);
 
