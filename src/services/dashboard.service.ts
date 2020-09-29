@@ -55,7 +55,7 @@ export class DashboardService {
         this.app.use('/data.db', express.static(LogService.createCopy(config.databasePath)));
 
         this.app.get('/', (req, res) => {
-            forkJoin([SensorsService.getLast(), WebcamService.getLastPhoto(config.webcam)])
+            forkJoin([SensorsService.getLast(), WebcamService.getLastPhoto()])
                 .subscribe(datas => {
                     res.render(__dirname + '/../../assets/dashboard/index.ejs', {
                         sensors: datas[0],
@@ -65,7 +65,7 @@ export class DashboardService {
         });
 
         this.app.get('/slide', (req, res) => {
-            forkJoin([SensorsService.getLast(), WebcamService.getLastPhoto(config.webcam)])
+            forkJoin([SensorsService.getLast(), WebcamService.getLastPhoto()])
                 .subscribe(datas => {
                     res.render(__dirname + '/../../assets/dashboard/slide.ejs', {
                         sensors: datas[0],
@@ -93,7 +93,7 @@ export class DashboardService {
         });
 
         this.app.get('/last.json', (req, res) => {
-            forkJoin([SensorsService.getLast(), WebcamService.getLastPhoto(config.webcam)])
+            forkJoin([SensorsService.getLast(), WebcamService.getLastPhoto()])
                 .subscribe(datas => {
                     if (datas[1]?.date) {
                         (datas[1].date as any) = new Date(datas[1]?.date);

@@ -100,22 +100,11 @@ export class WebcamService {
         });
     }
 
-    public static getLastPhoto(config: WebcamConfigInterface = null): Observable<LastPhotoInterface> {
+    public static getLastPhoto(): Observable<LastPhotoInterface> {
         return DatabaseService.readVariable(EnumVariable.LAST_PHOTO).pipe(
             switchMap((d: string) => {
-                if (!d) {
-                    return WebcamService.getLastPhotos(config).pipe(
-                        first(),
-                        map(a => a.length > 0 ? a[0] : ''),
-                        map(photo => {
-                            return {
-                                path: photo,
-                                date: new Date().getTime()
-                            } as LastPhotoInterface;
-                        })
-                    );
-                }
-                return of((JSON.parse(d) as LastPhotoInterface));
+                const lastPhoto: LastPhotoInterface = JSON.parse(d);
+                return of(lastPhoto);
             })
         );
     }
