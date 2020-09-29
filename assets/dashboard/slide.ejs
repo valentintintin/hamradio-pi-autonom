@@ -18,9 +18,9 @@
     <main>
         <% if (lastPhoto) { %>
             <article class="photo">
-                <a href="/timelapse/<%= lastPhoto %>" target="_blank">
-                    <img src="/timelapse/<%= lastPhoto %>"
-                         alt="Dernière photo prise le <%= lastPhoto.split('/')[1] %>"/>
+                <a href="<%= lastPhoto.path %>" target="_blank">
+                    <img src="<%= lastPhoto.path %>" alt="Dernière photo prise"
+                         title="Dernière photo prise le <%= new Date(lastPhoto.date).toLocaleString() %>"/>
                 </a>
             </article>
         <% } else { %>

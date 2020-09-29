@@ -7,5 +7,6 @@ export class Variables extends Entity {
 }
 
 export enum EnumVariable {
-    SEQ_TELEMETRY = 'seq_telemetry'
+    SEQ_TELEMETRY = 'seq_telemetry',
+    LAST_PHOTO = 'last_photo'
 }

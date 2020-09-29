@@ -3,19 +3,19 @@ import fs = require('fs');
 import { Observable, Observer, of } from 'rxjs';
 import { LogService } from './log.service';
 import { WebcamConfigInterface } from '../config/webcam-config.interface';
-import { assetsFolder } from '../index';
-import { map } from 'rxjs/operators';
+import { first, map, switchMap } from 'rxjs/operators';
+import { DatabaseService } from './database.service';
+import { EnumVariable } from '../models/variables';
 
 export class WebcamService {
 
     public static USE_FAKE = false;
-    private static lastPhotoPath: string;
 
     private static readonly opts = {
         width: 640,
         height: 480,
         quality: 100,
-        skip: 100,
+        // skip: 100,
         // delay: 10,
         saveShots: true,
         output: 'jpeg',
@@ -39,66 +39,85 @@ export class WebcamService {
 
         return new Observable<string>((observer: Observer<string>) => {
             if (!WebcamService.USE_FAKE) {
-                const errors = [];
+                const now = new Date();
+                // @ts-ignore
+                const dirName = now.format('{YYYY}_{MM}_{DD}');
+                // @ts-ignore
+                const fileName = now.format('{YYYY}_{MM}_{DD}-{hh}_{mm}_{ss}');
+                let path = '';
+
+                try {
+                    path = configWebcam.photosPath + '/' + dirName;
+                    if (!fs.existsSync(path)) {
+                        fs.mkdirSync(path);
+                    }
+
+                    path += '/' + fileName;
+                } catch (e) {
+                    LogService.log('webcam', 'Creation path error', path);
+                    path = configWebcam.photosPath + '/' + fileName;
+                }
 
                 WebcamService.webcam.list(list => {
-                    let ended = false;
                     list.reverse().forEach(cam => {
-                        if (!ended) {
-                            WebcamService.opts.device = cam;
-                            WebcamService.webcam = NodeWebcam.create(WebcamService.opts);
+                        WebcamService.opts.device = cam;
+                        WebcamService.webcam = NodeWebcam.create(WebcamService.opts);
 
-                            const date = new Date();
-                            // @ts-ignore
-                            let path = configWebcam.photosPath + '/' + date.format('{YYYY}_{MM}_{DD}');
+                        WebcamService.webcam.capture(path, (err, data: string) => {
+                            WebcamService.alreadyInUse = false;
 
-                            try {
-                                if (!fs.existsSync(path)) {
-                                    fs.mkdirSync(path);
+                            if (err) {
+                                LogService.log('webcam', 'Capture KO', err);
+                                observer.error(err);
+                            } else {
+                                LogService.log('webcam', 'Capture OK', data);
+
+                                const log: LastPhotoInterface = {
+                                    date: new Date().getTime(),
+                                    path: '/timelapse/' + dirName + '/' + fileName + '.jpg'
                                 }
-                            } catch (e) {
-                                LogService.log('webcam', 'Creation path error', path);
-                                path = configWebcam.photosPath;
+                                DatabaseService.updateVariable(EnumVariable.LAST_PHOTO, JSON.stringify(log)).subscribe();
+
+                                observer.next(data);
+                                observer.complete();
                             }
-
-                            // @ts-ignore
-                            WebcamService.webcam.capture(path + '/' + date.format('{YYYY}_{MM}_{DD}-{hh}_{mm}_{ss}'), (err, data: string) => {
-                                WebcamService.alreadyInUse = false;
-
-                                if (err) {
-                                    errors.push(err);
-                                } else if (!fs.existsSync(data)) {
-                                    errors.push(new Error('File not found (webcam taken : ' + cam + ')'));
-                                } else {
-                                    LogService.log('webcam', 'Capture OK', data);
-
-                                    observer.next(data);
-                                    observer.complete();
-                                    ended = true;
-                                }
-                            });
-                        }
+                        });
                     });
                 });
-
-                if (errors.length) {
-                    LogService.log('webcam', 'Capture error', errors);
-                    observer.error(errors);
-                    return;
-                }
             } else {
                 WebcamService.alreadyInUse = false;
                 LogService.log('webcam', 'Capture fake OK');
 
-                WebcamService.lastPhotoPath = assetsFolder + '/test.jpg';
-                observer.next(WebcamService.lastPhotoPath);
+                const log: LastPhotoInterface = {
+                    date: new Date().getTime(),
+                    path: '/assets/test.jpg'
+                };
+
+                DatabaseService.updateVariable(EnumVariable.LAST_PHOTO, JSON.stringify(log)).subscribe();
+                observer.next(log.path);
                 observer.complete();
             }
         });
     }
 
-    public static getLastPhoto(config: WebcamConfigInterface = null): Observable<string> {
-        return WebcamService.getLastPhotos(config).pipe(map(_ => WebcamService.lastPhotoPath));
+    public static getLastPhoto(config: WebcamConfigInterface = null): Observable<LastPhotoInterface> {
+        return DatabaseService.readVariable(EnumVariable.LAST_PHOTO).pipe(
+            switchMap((d: string) => {
+                if (!d) {
+                    return WebcamService.getLastPhotos(config).pipe(
+                        first(),
+                        map(a => a.length > 0 ? a[0] : ''),
+                        map(photo => {
+                            return {
+                                path: photo,
+                                date: new Date().getTime()
+                            } as LastPhotoInterface;
+                        })
+                    );
+                }
+                return of((JSON.parse(d) as LastPhotoInterface));
+            })
+        );
     }
 
     public static getLastPhotos(config: WebcamConfigInterface): Observable<string[]> {
@@ -119,13 +138,7 @@ export class WebcamService {
                         }
                     });
 
-                    const filesSortedDesc = allFiles.sort((a, b) => a < b ? 1 : -1);
-
-                    if (!WebcamService.lastPhotoPath && filesSortedDesc.length > 0) {
-                        WebcamService.lastPhotoPath = filesSortedDesc[0];
-                    }
-
-                    observer.next(filesSortedDesc);
+                    observer.next(allFiles.sort((a, b) => a < b ? 1 : -1));
                 } else {
                     observer.next(null);
                 }
@@ -133,4 +146,9 @@ export class WebcamService {
             });
         });
     }
+}
+
+export interface LastPhotoInterface {
+    path: string;
+    date: number;
 }

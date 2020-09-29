@@ -5,6 +5,7 @@
 
 #define BLINK_MS 200
 #define TRIGGER_WATCHDOG_SECS 80 // 1 minutes 20
+#define LOW_BATTERY_VOLTAGE 11400
 #define WD_INIT_SECS 1
 #define WD_PWROFF_SECS 1
 #define I2C_ADDRESS 0x11
@@ -17,6 +18,7 @@ byte countSeconds = 0;
 bool watchdogEnabled = false, alertAsserted = false, nightDetected = false, powerEnabled = false;
 byte watchdogCount = 0;
 uint16_t chgStatus = 0, watchdogPowerOff = 0;
+uint16_t batteryVoltage = 0;
 
 mpptChg chg;
 RTClib RTC;
@@ -58,6 +60,7 @@ void action() {
     chg.getStatusValue(SYS_STATUS, &chgStatus) 
     && chg.getWatchdogTimeout(&watchdogCount) 
     && chg.getWatchdogPoweroff(&watchdogPowerOff)
+    && chg.getIndexedValue(VAL_VB, &batteryVoltage)
   ) {
     watchdogEnabled = (chgStatus & MPPT_CHG_STATUS_WD_RUN_MASK) != 0;
     powerEnabled = (chgStatus & MPPT_CHG_STATUS_PWR_EN_MASK) != 0;
@@ -66,6 +69,8 @@ void action() {
     
     Serial.print(F(" Status : "));
     Serial.print(chgStatus, HEX);
+    Serial.print(F(" Battery voltage : "));
+    Serial.print(batteryVoltage);
     Serial.print(F(" Watchdog enabled : "));
     Serial.print(watchdogEnabled);
     Serial.print(F(" Watchdog count : "));
@@ -81,7 +86,7 @@ void action() {
     Serial.print(F(" Count seconds : "));
     Serial.print(countSeconds);
 
-    if (!alertAsserted && !nightDetected && powerEnabled && !watchdogEnabled) {
+    if (!alertAsserted && !nightDetected && powerEnabled && !watchdogEnabled && batteryVoltage > LOW_BATTERY_VOLTAGE) {
       if (countSeconds >= TRIGGER_WATCHDOG_SECS) {
         watchdogEnabled = true;
         if (chg.setWatchdogPoweroff(WD_PWROFF_SECS) && chg.setWatchdogTimeout(WD_INIT_SECS) && chg.setWatchdogEnable(&watchdogEnabled)) {

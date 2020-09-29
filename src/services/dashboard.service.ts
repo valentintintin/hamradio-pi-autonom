@@ -18,6 +18,7 @@ import { ProcessService } from './process.service';
 import { CommunicationMpptchdService } from './communication-mpptchd.service';
 import { exec } from 'child_process';
 import { RsyncService } from './rsync.service';
+import { assetsFolder } from '../index';
 
 export class DashboardService {
 
@@ -92,11 +93,15 @@ export class DashboardService {
         });
 
         this.app.get('/last.json', (req, res) => {
-            forkJoin([SensorsService.getLast(), WebcamService.getLastPhotos(config.webcam)])
+            forkJoin([SensorsService.getLast(), WebcamService.getLastPhoto(config.webcam)])
                 .subscribe(datas => {
+                    if (datas[1]?.date) {
+                        (datas[1].date as any) = new Date(datas[1]?.date);
+                    }
+
                     res.json({
                         sensors: datas[0],
-                        lastPhoto: datas[1].length > 0 ? datas[1][0] : null
+                        lastPhoto: datas[1]
                     });
                 });
         });
@@ -241,11 +246,15 @@ export class DashboardService {
                             res.json(e);
                             return of(null);
                         })
-                    ).subscribe(filePath => res.sendFile(filePath));
+                    ).subscribe(filePath => res.json(filePath));
                 });
             }
 
             this.app.use('/timelapse', express.static(config.webcam.photosPath));
+
+            if (config.webcam.fake) {
+                this.app.use('/assets/test.jpg', express.static(assetsFolder + '/test.jpg'));
+            }
         }
 
         if (config.voice?.enable) {

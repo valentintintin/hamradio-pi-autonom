@@ -262,7 +262,7 @@ export class DatabaseService {
                         observer.next(fallback);
                         observer.complete();
                     }
-                    observer.next(row.data);
+                    observer.next(row?.data);
                     observer.complete();
                 });
             } catch (e) {

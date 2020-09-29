@@ -34,8 +34,10 @@ create table variables
     id        integer
         primary key autoincrement,
     updatedAt datetime    not null,
-    name       varchar(32) not null,
-    data       text        not null
+    name      varchar(32) not null,
+    data      text        not null
 );
 insert into variables(updatedAt, name, data)
-values (1587229268000, 'seq_telemetry', 0)
+values (1587229268000, 'seq_telemetry', 0);
+insert into variables(updatedAt, name, data)
+values (1587229268000, 'last_photo', '{}');

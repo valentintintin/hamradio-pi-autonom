@@ -24,6 +24,7 @@ export class MpptchgService {
     private static readonly WD_ALERT_SEC = 60;
 
     private static nightTriggered: boolean;
+    private static lowVoltageTriggered: boolean;
 
     public static events = new events.EventEmitter();
     public static externalShutdownTriggered: Date;
@@ -87,7 +88,7 @@ export class MpptchgService {
                     const isLowVoltage = batteryVoltage < (config.pauseBeforePowerOffReachedVolt ?? MpptchgService.PAUSE_BEFORE_POWER_OFF_REACHED_VOLT);
 
                     if (status.nightDetected && config.nightAlert) {
-                        if (!this.nightTriggered || !status.watchdogRunning) {
+                        if (!this.nightTriggered) {
                             let nextWakeUpNight = new Date();
 
                             LogService.log('mpptChd', 'Night detected');
@@ -126,25 +127,33 @@ export class MpptchgService {
                             LogService.log('mpptChd', 'Night still here', status.values?.watchdogCounter);
                         }
                     } else if (isLowVoltage) {
-                        nextWakeUpLowBattery.setSeconds(nextWakeUpLowBattery.getSeconds() + (config.pauseBeforePowerOffReachedSeconds ?? MpptchgService.WD_PAUSE_BEFORE_POWEROFF_REACHED_SEC));
+                        if (!this.lowVoltageTriggered) {
+                            this.lowVoltageTriggered = true;
 
-                        LogService.log('mpptChd', 'Low battery voltage detected', {
-                            batteryVoltage: status.values.batteryVoltage,
-                            solarVoltage: status.values.solarVoltage,
-                            nextWakeUpLowBattery
-                        });
+                            nextWakeUpLowBattery.setSeconds(nextWakeUpLowBattery.getSeconds() + (config.pauseBeforePowerOffReachedSeconds ?? MpptchgService.WD_PAUSE_BEFORE_POWEROFF_REACHED_SEC));
 
-                        return MpptchgService.shutdownAndWakeUpAtDate(nextWakeUpLowBattery, this.WD_INIT_NIGHT_SECS).pipe(
-                            catchError(_ => of(null))
-                        );
+                            LogService.log('mpptChd', 'Low battery voltage detected', {
+                                batteryVoltage: status.values.batteryVoltage,
+                                solarVoltage: status.values.solarVoltage,
+                                nextWakeUpLowBattery
+                            });
+
+                            return MpptchgService.shutdownAndWakeUpAtDate(nextWakeUpLowBattery, this.WD_INIT_NIGHT_SECS).pipe(
+                                catchError(_ => of(null))
+                            );
+                        } else {
+                            LogService.log('mpptChd', 'Still low voltage battery', status.values?.watchdogCounter);
+                        }
                     } else if (config.watchdog) {
                         this.nightTriggered = false;
+                        this.lowVoltageTriggered = false;
 
                         return MpptchgService.startWatchdog().pipe(
                             catchError(_ => of(null))
                         );
                     } else {
                         this.nightTriggered = false;
+                        this.lowVoltageTriggered = false;
                     }
                     LogService.log('mpptChd', 'Nothing to do');
                 } else {
