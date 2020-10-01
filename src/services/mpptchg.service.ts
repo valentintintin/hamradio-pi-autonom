@@ -29,17 +29,12 @@ export class MpptchgService {
     public static events = new events.EventEmitter();
     public static externalShutdownTriggered: Date;
 
-    private static getSunCalcTime(lat: number, lng: number): SunCalcResultInterface {
+    private static getSunCalcTime(lat: number, lng: number, tomorrow: boolean): SunCalcResultInterface {
         const date = new Date();
-        let sunDate: SunCalcResultInterface = SunCalc.getTimes(date, lat, lng);
-        sunDate.isTomorrow = false;
-
-        if (sunDate.dawn.getTime() < date.getTime()) {
+        if (tomorrow) {
             date.setDate(date.getDate() + 1);
-            sunDate = SunCalc.getTimes(date, lat, lng);
-            sunDate.isTomorrow = true;
         }
-        return sunDate;
+        return SunCalc.getTimes(date, lat, lng);
     }
 
     public static stopWatchdog(): Observable<void> {
@@ -95,25 +90,20 @@ export class MpptchgService {
                             this.nightTriggered = true;
                             this.events.emit(EventMpptChg.NIGHT_DETECTED);
 
-                            const sunDate = this.getSunCalcTime(lat, lng);
+                            const sunDate = this.getSunCalcTime(lat, lng, true);
 
                             LogService.log('mpptChd', 'Night status', {
                                 now: now,
                                 dawn: sunDate.dawn,
                                 sunrise: sunDate.sunrise,
-                                isTomorrow: sunDate.isTomorrow,
                                 batteryVoltage
                             });
 
                             if (!isLowVoltage && batteryVoltage >= (config.nightLimitVolt ?? this.NIGHT_LIMIT_VOLT)) {
                                 nextWakeUpNight.setSeconds(nextWakeUpNight.getSeconds() + (config.nightSleepTimeSeconds ?? this.WD_PWROFF_NIGHT_SECS_DEFAULT));
                                 if (nextWakeUpNight.getTime() > sunDate.dawn.getTime()) {
-                                    if (sunDate.isTomorrow) {
-                                        LogService.log('mpptChd', 'Morning is too soon, no sleep', sunDate.dawn);
-                                        return of(null);
-                                    }
-                                    LogService.log('mpptChd', 'Sleep to dawn', sunDate.dawn);
-                                    nextWakeUpNight = sunDate.dawn;
+                                    LogService.log('mpptChd', 'Morning is too soon, no sleep', sunDate.dawn);
+                                    return of(null);
                                 }
                             } else {
                                 LogService.log('mpptChd', 'Not enough battery so sleep to sunrise', sunDate.sunrise);
@@ -214,7 +204,6 @@ export class MpptchgService {
 
 // https://en.wikipedia.org/wiki/Twilight
 interface SunCalcResultInterface {
-    isTomorrow: boolean;    // date of computation is for tomorrow
     sunrise: Date;          // sunrise (top edge of the sun appears on the horizon)
     sunriseEnd: Date;       // sunrise ends (bottom edge of the sun touches the horizon)
     goldenHourEnd: Date;    // morning golden hour (soft light, best time for photography) ends
