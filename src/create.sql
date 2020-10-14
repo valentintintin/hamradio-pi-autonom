@@ -23,7 +23,6 @@ create table sensors
     currentSolar        integer,
     currentCharge       integer,
     temperatureBattery  integer,
-    temperatureCpu      integer,
     temperatureRtc      integer,
     uptime              integer,
     light               integer,
