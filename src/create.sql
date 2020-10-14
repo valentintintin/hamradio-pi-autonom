@@ -14,19 +14,24 @@ create table logs
 
 create table sensors
 (
-    id                 integer
+    id                  integer
         primary key autoincrement,
-    createdAt          datetime not null,
-    voltageBattery     integer,
-    voltageSolar       integer,
-    currentBattery     integer,
-    currentSolar       integer,
-    currentCharge      integer,
-    temperatureBattery integer,
-    temperatureCpu     integer,
-    temperatureRtc     integer,
-    uptime             integer,
-    rawMpptchg         text
+    createdAt           datetime not null,
+    voltageBattery      integer,
+    voltageSolar        integer,
+    currentBattery      integer,
+    currentSolar        integer,
+    currentCharge       integer,
+    temperatureBattery  integer,
+    temperatureCpu      integer,
+    temperatureRtc      integer,
+    uptime              integer,
+    light               integer,
+    pressure            integer,
+    temperaturePressure integer,
+    temperature         integer,
+    humidity            integer,
+    rawMpptchg          text
 );
 
 create table variables

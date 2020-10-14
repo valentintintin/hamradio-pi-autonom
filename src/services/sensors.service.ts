@@ -6,6 +6,7 @@ import { SensorsConfigInterface } from '../config/sensors-config.interface';
 import { DatabaseService } from './database.service';
 import { Sensors } from '../models/sensors';
 import { GpioService } from './gpio.service';
+import { SerialService } from './serial.service';
 import fs = require('fs');
 
 const si = require('systeminformation');
@@ -80,6 +81,42 @@ export class SensorsService {
             }),
             map(datas => {
                 datas.uptime = SensorsService.getUptime();
+                return datas;
+            }),
+            map(datas => {
+                const stringSerial = SerialService.instance.data;
+                if (stringSerial) {
+                    LogService.log('sensors', 'Get from Serial', stringSerial);
+
+                    const datasSplitted = stringSerial.split('[');
+                    datasSplitted.forEach(split => {
+                        const indexCrochet = split.indexOf(']');
+                        const dataSplit = +split.substring(indexCrochet + 1);
+                        const dataName = split.substring(0, split.indexOf(']'));
+                        switch (dataName) {
+                            case 'LIGHT':
+                                datas.light = dataSplit;
+                                break;
+                            case 'PRESSURE_TEMP':
+                                datas.temperaturePressure = dataSplit;
+                                break;
+                            case 'PRESSURE':
+                                datas.pressure = dataSplit;
+                                break;
+                            case 'TEMP':
+                                datas.temperature = dataSplit;
+                                break;
+                            case 'HUMIDITY':
+                                datas.humidity = dataSplit;
+                                break;
+                            default:
+                                LogService.log('sensors', 'Data name unkown', {
+                                    string: split,
+                                    dataName
+                                });
+                        }
+                    });
+                }
                 LogService.log('sensors', 'Get all OK', datas);
                 return datas;
             }),

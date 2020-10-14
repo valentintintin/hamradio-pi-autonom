@@ -11,5 +11,10 @@ export class Sensors extends Entity {
     public temperatureCpu: number = null;
     public temperatureRtc: number = null;
     public uptime: number = null;
+    public light: number = null;
+    public pressure: number = null;
+    public temperaturePressure: number = null;
+    public temperature: number = null;
+    public humidity: number = null;
     public rawMpptchg: string;
 }
