@@ -23,6 +23,7 @@
     "nodejs-arecord-multimon": "git+https://github.com/valentintintin/nodejs-arecord-multimon.git",
     "rsync": "^0.6.1",
     "rxjs": "^6.6.3",
+    "serialport": "^9.0.1",
     "sqlite3": "^5.0.0",
     "suncalc": "^1.8.0",
     "systeminformation": "^4.27.3",

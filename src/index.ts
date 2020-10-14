@@ -19,6 +19,7 @@ import { exec } from 'child_process';
 import { MpptchgService } from './services/mpptchg.service';
 import { RsyncService } from './services/rsync.service';
 import { LogService } from './services/log.service';
+import { SerialService } from './services/serial.service';
 
 export const assetsFolder: string = process.cwd() + '/assets';
 
@@ -37,6 +38,10 @@ if (config.mpptChd) {
 
 if (config.webcam) {
     WebcamService.USE_FAKE = !!config.webcam.fake;
+}
+
+if (config.sensors) {
+    SerialService.USE_FAKE = !!config.fakeGpio;
 }
 
 switch (process.argv[process.argv.length - 1]) {
