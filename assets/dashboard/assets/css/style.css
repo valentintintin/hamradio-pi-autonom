@@ -24,6 +24,14 @@
     background: orange;
 }
 
+.bg-purple {
+    background: lightcoral;
+}
+
+.bg-brown {
+    background: rosybrown;
+}
+
 h1, h2, h3 {
     margin: 0;
     color: var(--fg-primary);

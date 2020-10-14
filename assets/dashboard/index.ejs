@@ -15,26 +15,25 @@
     <% if (sensors) { %>
         <section>
             <article class="card card-number bg-green">
-                <span class="title">Température boîte</span>
-                <strong class="value"><%= (sensors.temperatureRtc + sensors.temperatureBattery) / 2 %>°C</strong>
+                <span class="title">Température</span>
+                <strong class="value"><%= sensors.temperature %>°C</strong>
             </article>
 
-            <article class="card card-number bg-green">
-                <span class="title">Température CPU</span>
-                <strong class="value"><%= Math.round(sensors.temperatureCpu) %>°C</strong>
+            <article class="card card-number bg-blue">
+                <span class="title">Humidité</span>
+                <strong class="value"><%= Math.round(sensors.humidity) %>%</strong>
             </article>
 
             <article class="card card-number bg-orange">
-                <span class="title">Uptime</span>
-                <strong class="value"><%= Math.floor(sensors.uptime / 3600) %>
-                    h<%= Math.floor(((sensors.uptime / 3600) - Math.floor(sensors.uptime / 3600)) * 60) %>min</strong>
+                <span class="title">Lumière</span>
+                <strong class="value"><%= sensors.light %>Lux</strong>
             </article>
         </section>
 
         <section>
-            <article class="card card-number bg-blue">
-                <span class="title">Voltage batterie</span>
-                <strong class="value"><%= sensors.voltageBattery / 1000 %>V</strong>
+            <article class="card card-number bg-green">
+                <span class="title">Pression</span>
+                <strong class="value"><%= Math.round(sensors.pressure / 100) %>hPa</strong>
             </article>
 
             <article class="card card-number bg-blue">
@@ -45,6 +44,26 @@
             <article class="card card-number bg-orange">
                 <span class="title">Intensité de charge</span>
                 <strong class="value"><%= sensors.currentCharge %>mA</strong>
+            </article>
+        </section>
+
+        <section>
+            <article class="card card-number bg-green">
+                <span class="title">Température boîte</span>
+                <strong class="value"><%= (sensors.temperatureRtc + sensors.temperatureBattery) / 2 %>°C</strong>
+            </article>
+
+            <article class="card card-number bg-blue">
+                <span class="title">Voltage batterie</span>
+                <strong class="value"><%= sensors.voltageBattery / 1000 %>V</strong>
+            </article>
+
+            <article class="card card-number bg-orange">
+                <span class="title">Uptime</span>
+                <strong class="value">
+                    <%= Math.floor(sensors.uptime / 3600) %>
+                    h<%= Math.floor(((sensors.uptime / 3600) - Math.floor(sensors.uptime / 3600)) * 60).toString().padStart(2, '0') %>
+                    min</strong>
             </article>
         </section>
     <% } else { %>
