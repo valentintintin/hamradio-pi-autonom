@@ -1,6 +1,6 @@
-import { Observable, Observer, of } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { LogService } from './log.service';
-import { catchError, map, switchMap, tap } from 'rxjs/operators';
+import { catchError, map, tap } from 'rxjs/operators';
 import { CommunicationMpptchdService } from './communication-mpptchd.service';
 import { SensorsConfigInterface } from '../config/sensors-config.interface';
 import { DatabaseService } from './database.service';
@@ -36,21 +36,6 @@ export class SensorsService {
         )
     }
 
-    public static getTemperatureCpu(): Observable<number> {
-        return new Observable<number>((observer: Observer<number>) => {
-            LogService.log('sensors', 'Start getting temperature CPU');
-
-            si.cpuTemperature().then(data => {
-                LogService.log('sensors', 'Get temperature CPU', data.main);
-                observer.next(data.main);
-                observer.complete();
-            }).catch(err => {
-                LogService.log('sensors', 'Get temperature CPU KO', err);
-                return of(-1);
-            });
-        });
-    }
-
     public static getTemperatureRtc(): number {
         try {
             const result = GpioService.USE_FAKE ? 20.5 : parseInt(fs.readFileSync('/sys/bus/i2c/devices/i2c-0/0-0068/hwmon/hwmon1/temp1_input', 'utf8'), 10) / 1000;
@@ -71,10 +56,6 @@ export class SensorsService {
         LogService.log('sensors', 'Get all');
 
         return SensorsService.getMpptChgData().pipe(
-            switchMap(datas => SensorsService.getTemperatureCpu().pipe(map(data => {
-                datas.temperatureCpu = data;
-                return datas;
-            }))),
             map(datas => {
                 datas.temperatureRtc = SensorsService.getTemperatureRtc();
                 return datas;

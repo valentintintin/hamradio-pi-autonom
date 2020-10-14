@@ -8,7 +8,6 @@ export class Sensors extends Entity {
     public currentSolar: number = null;
     public currentCharge: number = null;
     public temperatureBattery: number = null;
-    public temperatureCpu: number = null;
     public temperatureRtc: number = null;
     public uptime: number = null;
     public light: number = null;
