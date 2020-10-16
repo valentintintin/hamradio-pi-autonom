@@ -3,7 +3,7 @@ import fs = require('fs');
 import { Observable, Observer, of } from 'rxjs';
 import { LogService } from './log.service';
 import { WebcamConfigInterface } from '../config/webcam-config.interface';
-import { first, map, switchMap } from 'rxjs/operators';
+import { switchMap } from 'rxjs/operators';
 import { DatabaseService } from './database.service';
 import { EnumVariable } from '../models/variables';
 
@@ -58,28 +58,36 @@ export class WebcamService {
                     path = configWebcam.photosPath + '/' + fileName;
                 }
 
+                let nb = 0;
                 WebcamService.webcam.list(list => {
-                    list.reverse().forEach(cam => {
+                    list.forEach((cam, index) => {
                         WebcamService.opts.device = cam;
                         WebcamService.webcam = NodeWebcam.create(WebcamService.opts);
 
-                        WebcamService.webcam.capture(path, (err, data: string) => {
-                            WebcamService.alreadyInUse = false;
+                        let pathWebcam = path;
+                        pathWebcam += '_' + index;
 
+                        WebcamService.webcam.capture(pathWebcam, (err, data: string) => {
                             if (err) {
-                                LogService.log('webcam', 'Capture KO', err);
+                                LogService.log('webcam', 'Capture KO', data, err);
                                 observer.error(err);
-                            } else {
+                            } else if (nb === 1) {
+                                WebcamService.alreadyInUse = false;
+
                                 LogService.log('webcam', 'Capture OK', data);
 
                                 const log: LastPhotoInterface = {
                                     date: new Date().getTime(),
-                                    path: '/timelapse/' + dirName + '/' + fileName + '.jpg'
+                                    path: '/timelapse/' + dirName + '/' + fileName
                                 }
                                 DatabaseService.updateVariable(EnumVariable.LAST_PHOTO, JSON.stringify(log)).subscribe();
 
                                 observer.next(data);
                                 observer.complete();
+                            } else {
+                                LogService.log('webcam', 'Capture OK', data);
+                                observer.next(data);
+                                nb++;
                             }
                         });
                     });

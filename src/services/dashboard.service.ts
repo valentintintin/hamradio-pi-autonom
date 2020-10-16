@@ -174,7 +174,10 @@ export class DashboardService {
                             currentCharge: data.currentCharge,
                             currentBattery: data.currentBattery,
                             currentSolar: data.currentSolar,
-                            temperature: (data.temperatureBattery + data.temperatureRtc) / 2
+                            temperature: data.temperature,
+                            humidity: data.humidity,
+                            pressure: data.pressure,
+                            light: data.light
                         }
                     }));
                 });

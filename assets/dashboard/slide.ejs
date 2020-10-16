@@ -18,10 +18,17 @@
     <main>
         <% if (lastPhoto) { %>
             <article class="photo">
-                <a href="<%= lastPhoto.path %>" target="_blank">
-                    <img src="<%= lastPhoto.path %>" alt="Dernière photo prise"
+                <a href="<%= lastPhoto.path %>_4.jpg" target="_blank">
+                    <img src="<%= lastPhoto.path %>_4.jpg" alt="Dernière photo prise"
                          title="Dernière photo prise le <%= new Date(lastPhoto.date).toLocaleString() %>"
-                         onerror="const old = this.src; this.src = ''; this.src = old;" />
+                         onerror="const old = this.src; this.src = ''; this.src = old;"/>
+                </a>
+            </article>
+            <article class="photo">
+                <a href="<%= lastPhoto.path %>_2.jpg" target="_blank">
+                    <img src="<%= lastPhoto.path %>_2.jpg" alt="Dernière photo prise"
+                         title="Dernière photo prise le <%= new Date(lastPhoto.date).toLocaleString() %>"
+                         onerror="const old = this.src; this.src = ''; this.src = old;"/>
                 </a>
             </article>
         <% } else { %>

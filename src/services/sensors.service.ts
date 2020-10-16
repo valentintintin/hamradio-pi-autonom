@@ -121,14 +121,17 @@ export class SensorsService {
     }
 
     public static getAllSaved(limit: number = 0, skip: number = 0): Observable<Sensors[]> {
-        return DatabaseService.selectAll<Sensors>(Sensors.name, limit, skip).pipe(tap(datas => {
-            if (datas.length > 0) {
-                datas.forEach(data => {
-                    (data as any).createdAt = new Date(data.createdAt);
-                    delete (data as any).rawMpptchg;
-                });
-            }
-        }));
+        return DatabaseService.selectAll<Sensors>(Sensors.name, limit, skip).pipe(
+            map(datas => datas.filter(data => data.createdAt >= 1577833200000)),
+            tap(datas => {
+                if (datas.length > 0) {
+                    datas.forEach(data => {
+                        (data as any).createdAt = new Date(data.createdAt);
+                        delete (data as any).rawMpptchg;
+                    });
+                }
+            })
+        );
     }
 
     private static save(datas: Sensors, path: string): void {

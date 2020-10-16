@@ -9,7 +9,7 @@ $(function () {
         const dataGraph = [];
         dataSorted.forEach(d => {
             dataGraph.push([
-                moment(d.createdAt).toDate(), d.voltageBattery / 1000, d.voltageSolar / 1000, d.currentCharge, d.currentBattery, d.currentSolar, d.temperature
+                moment(d.createdAt).toDate(), d.voltageBattery / 1000, d.voltageSolar / 1000, d.currentCharge, d.currentBattery, d.currentSolar, d.temperature, d.humidity, d.pressure / 100, d.light
             ]);
         });
 
@@ -17,7 +17,7 @@ $(function () {
             document.getElementById("g"),
             dataGraph,
             {
-                visibility: [true, false, true, false, false, true],
+                visibility: [true, false, true, false, false, true, false, false, false],
                 legend: 'follow',
                 labelsSeparateLines: ' ',
                 strokeWidth: 2,
@@ -63,8 +63,8 @@ $(function () {
                     }
                 },
                 rollPeriod: 10,
-                labels: ['Date', 'Voltage batterie', 'Voltage solaire', 'Intensité charge', 'Intensité batterie', 'Intensité solaire', 'Température'],
-                colors: ['#D00', '#FD0', '#00F', '#933', '#F93', '#52ee28'],
+                labels: ['Date', 'Voltage batterie', 'Voltage solaire', 'Intensité charge', 'Intensité batterie', 'Intensité solaire', 'Température', 'Humidité', 'Pression', 'Lumière'],
+                colors: ['#D00', '#FD0', '#00F', '#933', '#F93', '#52ee28', '#43d9cc', '#a928ee', '#cd5504'],
                 drawGrid: true,
                 axes: {
                     y: {
@@ -85,9 +85,15 @@ $(function () {
                     'Intensité solaire': {
                         axis: 'y2',
                     },
+                    'Pression': {
+                        axis: 'y2',
+                    },
+                    'Lumière': {
+                        axis: 'y2',
+                    },
                 },
                 ylabel: 'Voltage (V) ou Température (C)',
-                y2label: 'Intensité (mA)',
+                y2label: 'Intensité (mA) ou Lux ou %',
             }
         );
 
@@ -169,6 +175,15 @@ $(function () {
         });
         $('#temperature').change(function (d) {
             g.setVisibility(5, $(this).is(":checked"));
+        });
+        $('#humidity').change(function (d) {
+            g.setVisibility(6, $(this).is(":checked"));
+        });
+        $('#pressure').change(function (d) {
+            g.setVisibility(7, $(this).is(":checked"));
+        });
+        $('#light').change(function (d) {
+            g.setVisibility(8, $(this).is(":checked"));
         });
     });
 
