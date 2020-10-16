@@ -60,21 +60,31 @@ export class WebcamService {
 
                 let nb = 0;
                 WebcamService.webcam.list(list => {
-                    list.forEach((cam, index) => {
-                        WebcamService.opts.device = cam;
+                    list.forEach((cam: string, index: number) => {
+                        if (cam.endsWith('2')) {
+                            WebcamService.opts.skip = 0;
+                        } else if (cam.endsWith('4')) {
+                            WebcamService.opts.skip = 100;
+                        } else {
+                            return;
+                        }
+
+                        (WebcamService.opts as any).device = cam;
                         WebcamService.webcam = NodeWebcam.create(WebcamService.opts);
 
                         let pathWebcam = path;
                         pathWebcam += '_' + index;
 
                         WebcamService.webcam.capture(pathWebcam, (err, data: string) => {
+                            nb++;
                             if (err) {
                                 LogService.log('webcam', 'Capture KO', data, err);
                                 observer.error(err);
-                            } else if (nb === 1) {
+                            } else if (nb === 2) {
                                 WebcamService.alreadyInUse = false;
 
                                 LogService.log('webcam', 'Capture OK', data);
+                                LogService.consoleLog('webcam', 'Last finished');
 
                                 const log: LastPhotoInterface = {
                                     date: new Date().getTime(),
@@ -87,7 +97,6 @@ export class WebcamService {
                             } else {
                                 LogService.log('webcam', 'Capture OK', data);
                                 observer.next(data);
-                                nb++;
                             }
                         });
                     });

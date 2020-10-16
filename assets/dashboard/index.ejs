@@ -26,14 +26,14 @@
 
             <article class="card card-number bg-orange">
                 <span class="title">Lumière</span>
-                <strong class="value"><%= sensors.light %>Lux</strong>
+                <strong class="value"><%= Math.round(sensors.light) %>Lux</strong>
             </article>
         </section>
 
         <section>
             <article class="card card-number bg-green">
                 <span class="title">Pression</span>
-                <strong class="value"><%= Math.round(sensors.pressure / 100) %>hPa</strong>
+                <strong class="value"><%= Math.round(sensors.pressure / 100) + 50 %>hPa</strong>
             </article>
 
             <article class="card card-number bg-blue">
@@ -61,9 +61,12 @@
             <article class="card card-number bg-orange">
                 <span class="title">Uptime</span>
                 <strong class="value">
-                    <%= Math.floor(sensors.uptime / 3600) %>
-                    h<%= Math.floor(((sensors.uptime / 3600) - Math.floor(sensors.uptime / 3600)) * 60).toString().padStart(2, '0') %>
-                    min
+                    <%
+                        var uptimeStr =
+                                Math.floor(sensors.uptime / 3600).toString() + 'h'
+                                + Math.floor(((sensors.uptime / 3600) - Math.floor(sensors.uptime / 3600)) * 60).toString().padStart(2, '0') + 'min';
+                    %>
+                    <%= uptimeStr %>
                 </strong>
             </article>
         </section>
@@ -150,6 +153,9 @@
                 <li>
                     <a href="https://www.passion-radio.fr/mobile/hp7000c-540.html" target="_blank">Une Antenne mobile
                         V/UHF Sirio HP 7000C</a>
+                </li>
+                <li>
+                    Un arduino Uno pour les capteurs météos (température, humidité, pression, lumière)
                 </li>
             </ul>
         </article>
