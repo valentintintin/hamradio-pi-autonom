@@ -22,13 +22,15 @@ export class LogService {
         logs.log = message;
 
         data = data[0];
-        data = data.length > 1 ? data : data[0];
-
         if (data) {
-            try {
-                logs.data = JSON.stringify(data);
-            } catch (e) {
-                logs.data = e.message;
+            data = data.length > 1 ? data : data[0];
+
+            if (data) {
+                try {
+                    logs.data = JSON.stringify(data);
+                } catch (e) {
+                    logs.data = e.message;
+                }
             }
         }
 

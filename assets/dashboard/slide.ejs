@@ -50,12 +50,12 @@
 
             <article class="card card-number bg-green card-small">
                 <span class="title">Pression</span>
-                <strong class="value"><%= Math.round(sensors.pressure / 100) %>hPa</strong>
+                <strong class="value"><%= Math.round(sensors.pressure / 100) + 50 %>hPa</strong>
             </article>
 
             <article class="card card-number bg-orange card-small">
                 <span class="title">Lumière</span>
-                <strong class="value"><%= sensors.light %>Lux</strong>
+                <strong class="value"><%= Math.round(sensors.light) %>Lux</strong>
             </article>
 
             <article class="card card-number bg-orange card-small">
@@ -76,9 +76,12 @@
             <article class="card card-number bg-blue card-small">
                 <span class="title">Uptime</span>
                 <strong class="value">
-                    <%= Math.floor(sensors.uptime / 3600) %>
-                    h<%= Math.floor(((sensors.uptime / 3600) - Math.floor(sensors.uptime / 3600)) * 60).toString().padStart(2, '0') %>
-                    min
+                    <%
+                        var uptimeStr =
+                                Math.floor(sensors.uptime / 3600).toString() + 'h'
+                                + Math.floor(((sensors.uptime / 3600) - Math.floor(sensors.uptime / 3600)) * 60).toString().padStart(2, '0') + 'min';
+                    %>
+                    <%= uptimeStr %>
                 </strong>
             </article>
         <% } else { %>

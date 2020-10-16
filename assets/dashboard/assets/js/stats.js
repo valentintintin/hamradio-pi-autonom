@@ -9,7 +9,7 @@ $(function () {
         const dataGraph = [];
         dataSorted.forEach(d => {
             dataGraph.push([
-                moment(d.createdAt).toDate(), d.voltageBattery / 1000, d.voltageSolar / 1000, d.currentCharge, d.currentBattery, d.currentSolar, d.temperature, d.humidity, d.pressure / 100, d.light
+                moment(d.createdAt).toDate(), d.voltageBattery / 1000, d.voltageSolar / 1000, d.currentCharge, d.currentBattery, d.currentSolar, d.temperature, d.humidity, (d.pressure / 100) + 50, d.light
             ]);
         });
 

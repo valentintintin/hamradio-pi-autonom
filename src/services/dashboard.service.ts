@@ -8,7 +8,7 @@ import { WebcamService } from './webcam.service';
 import { AprsService } from './aprs.service';
 import { VoiceService } from './voice.service';
 import { GpioEnum, GpioService } from './gpio.service';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { catchError, last, map, switchMap } from 'rxjs/operators';
 import { forkJoin, of } from 'rxjs';
 import { MpptchgService } from './mpptchg.service';
 import { RadioService } from './radio.service';
@@ -248,7 +248,8 @@ export class DashboardService {
                         catchError(e => {
                             res.json(e);
                             return of(null);
-                        })
+                        }),
+                        last()
                     ).subscribe(filePath => res.json(filePath));
                 });
             }
