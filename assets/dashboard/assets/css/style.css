@@ -157,8 +157,13 @@ header {
 
 section {
     display: flex;
+    align-items: center;
     flex-wrap: wrap;
     justify-content: space-around;
+}
+
+.photo {
+    max-width: 480px;
 }
 
 article {

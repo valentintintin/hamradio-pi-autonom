@@ -26,6 +26,8 @@ header {
 }
 
 main {
+    display: flex;
+    align-items: center;
     align-self: center;
 }
 
@@ -37,4 +39,8 @@ aside {
 img {
     max-width: 640px;
     max-height: 480px;
+}
+
+.photo {
+    max-width: 100%;
 }
