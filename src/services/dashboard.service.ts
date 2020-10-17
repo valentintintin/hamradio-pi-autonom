@@ -163,7 +163,6 @@ export class DashboardService {
                 });
             });
 
-            this.app.use('/sensors.csv', express.static(config.sensors.csvPath));
             this.app.use('/sensors.json', (req, res) => {
                 SensorsService.getAllSaved(500, 5).subscribe(datas => {
                     res.send(datas.map(data => {
