@@ -207,7 +207,7 @@ export class ProcessService {
     private runSensors(config: ConfigInterface): void {
         LogService.log('sensors', 'Started');
         timer(1000 * 30, 1000 * (config.sensors.interval ?? 30)).subscribe(_ =>
-            SensorsService.getAllCurrentAndSave(config.sensors).subscribe()
+            SensorsService.getAllCurrentAndSave().subscribe()
         );
     }
 

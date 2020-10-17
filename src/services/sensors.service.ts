@@ -2,7 +2,6 @@ import { Observable, of } from 'rxjs';
 import { LogService } from './log.service';
 import { catchError, map, tap } from 'rxjs/operators';
 import { CommunicationMpptchdService } from './communication-mpptchd.service';
-import { SensorsConfigInterface } from '../config/sensors-config.interface';
 import { DatabaseService } from './database.service';
 import { Sensors } from '../models/sensors';
 import { GpioService } from './gpio.service';
@@ -104,9 +103,9 @@ export class SensorsService {
         );
     }
 
-    public static getAllCurrentAndSave(config: SensorsConfigInterface): Observable<Sensors> {
+    public static getAllCurrentAndSave(): Observable<Sensors> {
         return this.getAllCurrent().pipe(
-            tap(data => this.save(data, config.csvPath))
+            tap(data => this.save(data))
         )
     }
 
@@ -134,17 +133,7 @@ export class SensorsService {
         );
     }
 
-    private static save(datas: Sensors, path: string): void {
-        DatabaseService.insert(datas).subscribe(_ => {
-            delete datas.rawMpptchg;
-
-            if (!fs.existsSync(path)) {
-                fs.writeFileSync(path, 'date,' + Object.keys(datas).join(',') + '\n');
-                LogService.log('sensors', 'CSV created', path);
-            }
-
-            fs.appendFileSync(path, new Date().toString() + ',' + Object.values(datas).join(',') + '\n');
-            LogService.log('sensors', 'CSV saved');
-        });
+    private static save(datas: Sensors): void {
+        DatabaseService.insert(datas).subscribe();
     }
 }
