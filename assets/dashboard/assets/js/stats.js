@@ -3,8 +3,9 @@ $(function () {
     const dataJsonWrapper = $('#data-json-wrapper');
 
     $.get('/sensors.json', function (data) {
+        showData(data);
+
         const dataSorted = data.sort((a, b) => a.createdAt < b.createdAt ? -1 : 1);
-        showData(dataSorted);
 
         const dataGraph = [];
         dataSorted.forEach(d => {
