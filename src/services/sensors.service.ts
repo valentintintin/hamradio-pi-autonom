@@ -71,29 +71,31 @@ export class SensorsService {
                     const datasSplitted = stringSerial.split('[');
                     datasSplitted.forEach(split => {
                         const indexCrochet = split.indexOf(']');
-                        const dataSplit = +split.substring(indexCrochet + 1);
-                        const dataName = split.substring(0, split.indexOf(']'));
-                        switch (dataName) {
-                            case 'LIGHT':
-                                datas.light = dataSplit;
-                                break;
-                            case 'PRESSURE_TEMP':
-                                datas.temperaturePressure = dataSplit;
-                                break;
-                            case 'PRESSURE':
-                                datas.pressure = dataSplit;
-                                break;
-                            case 'TEMP':
-                                datas.temperature = dataSplit;
-                                break;
-                            case 'HUMIDITY':
-                                datas.humidity = dataSplit;
-                                break;
-                            default:
-                                LogService.log('sensors', 'Data name unkown', {
-                                    string: split,
-                                    dataName
-                                });
+                        const dataSplit = +split.substring(indexCrochet + 1).trim();
+                        const dataName = split.substring(0, split.indexOf(']')).trim();
+                        if (dataName.length > 0) {
+                            switch (dataName) {
+                                case 'LIGHT':
+                                    datas.light = dataSplit;
+                                    break;
+                                case 'PRESSURE_TEMP':
+                                    datas.temperaturePressure = dataSplit;
+                                    break;
+                                case 'PRESSURE':
+                                    datas.pressure = dataSplit;
+                                    break;
+                                case 'TEMP':
+                                    datas.temperature = dataSplit;
+                                    break;
+                                case 'HUMIDITY':
+                                    datas.humidity = dataSplit;
+                                    break;
+                                default:
+                                    LogService.log('sensors', 'Data name unkown', {
+                                        string: split,
+                                        dataName
+                                    });
+                            }
                         }
                     });
                 }
