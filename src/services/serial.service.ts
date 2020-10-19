@@ -22,7 +22,7 @@ export class SerialService {
 
     constructor() {
         const parser = new Readline()
-        parser.on('data', line => this._data$.next(line));
+        parser.on('data', line => this._data$.next(line.trim()));
 
         if (!SerialService.USE_FAKE) {
             this.port = new SerialPort('/dev/ttyUSB0', { baudRate: 115200, }, error => {
