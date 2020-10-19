@@ -29,10 +29,12 @@ main {
     display: flex;
     align-items: center;
     align-self: center;
+    width: 78%;
+    max-width: calc(640px + 480px + 20px);
 }
 
 aside {
-    flex: 0;
+    width: 22%;
     align-self: center;
 }
 

@@ -40,7 +40,7 @@
         <% if (sensors) { %>
             <article class="card card-number bg-green card-small">
                 <span class="title">Température</span>
-                <strong class="value"><%= sensors.temperature %>°C</strong>
+                <strong class="value"><%= +sensors.temperature %>°C</strong>
             </article>
 
             <article class="card card-number bg-green card-small">
@@ -50,7 +50,8 @@
 
             <article class="card card-number bg-green card-small">
                 <span class="title">Pression</span>
-                <strong class="value"><%= Math.round(sensors.pressure / 100) + 50 %>hPa</strong>
+                <strong class="value"><%= sensors.pressure > 0 ? Math.round(sensors.pressure / 100) + 50 : 0 %>
+                    hPa</strong>
             </article>
 
             <article class="card card-number bg-orange card-small">
