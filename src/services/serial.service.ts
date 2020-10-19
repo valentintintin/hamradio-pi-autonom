@@ -10,7 +10,7 @@ export class SerialService {
 
     private static _instance: SerialService;
 
-    private _data$ = new BehaviorSubject<string>('[LIGHT]0[PRESSURE_TEMP]1.23[PRESSURE]2[TEMP]3.45[HUMIDITY]4.56');
+    private _data$ = new BehaviorSubject<string>('');
     private port;
 
     public static get instance(): SerialService {

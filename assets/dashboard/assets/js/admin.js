@@ -2,7 +2,11 @@ $(function () {
 
     const apikeyInput = $('#apikey');
     const dataBrut = $('#data-json');
+    const logBrut = $('#log-json');
     const dataJsonWrapper = $('#data-json-wrapper');
+    const logJsonWrapper = $('#log-json-wrapper');
+
+    setInterval(() => getLogs(), 1000 * 15);
 
     $('#see-logs').click(function () {
         getLogs();
@@ -84,8 +88,8 @@ $(function () {
 
     function getLogs() {
         $.get('/api/logs?apikey=' + apikeyInput.val())
-            .done(showData)
-            .fail(showData);
+            .done(showDataLog)
+            .fail(showDataLog);
     }
 
     function getSensors() {
@@ -185,5 +189,11 @@ $(function () {
         console.log(data);
         dataBrut.html(JSON.stringify(data, null, 4));
         dataJsonWrapper.attr('open', '');
+    }
+
+    function showDataLog(data) {
+        console.log(data);
+        logBrut.html(JSON.stringify(data, null, 4));
+        logJsonWrapper.attr('open', '');
     }
 });

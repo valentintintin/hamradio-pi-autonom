@@ -15,8 +15,7 @@ export class WebcamService {
         width: 640,
         height: 480,
         quality: 100,
-        skip: 100,
-        // delay: 10,
+        skip: 0,
         saveShots: true,
         output: 'jpeg',
         callbackReturn: 'location',
@@ -62,9 +61,9 @@ export class WebcamService {
                 WebcamService.webcam.list(list => {
                     list.forEach((cam: string, index: number) => {
                         if (cam.endsWith('2')) {
-                            WebcamService.opts.skip = 0;
+                            WebcamService.opts.skip = 2;
                         } else if (cam.endsWith('4')) {
-                            WebcamService.opts.skip = 100;
+                            WebcamService.opts.skip = 150;
                         } else {
                             return;
                         }

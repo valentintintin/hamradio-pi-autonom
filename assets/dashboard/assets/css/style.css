@@ -131,10 +131,6 @@ nav .button {
     margin-bottom: 0;
 }
 
-.align-left {
-    justify-content: left;
-}
-
 .align-center {
     display: flex;
     flex-direction: column;
@@ -189,4 +185,8 @@ pre {
 
 img {
     width: 100%;
+}
+
+.w-45-p {
+    width: 45%;
 }
