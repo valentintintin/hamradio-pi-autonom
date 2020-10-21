@@ -29,12 +29,33 @@ export class MpptchgService {
     public static events = new events.EventEmitter();
     public static externalShutdownTriggered: Date;
 
-    private static getSunCalcTime(lat: number, lng: number, tomorrow: boolean): SunCalcResultInterface {
+    private static date1NotPastOtherwiseDate2(date1: Date, date2: Date, dateRef: Date = null): Date {
+        return date1.getTime() < (dateRef ?? new Date()).getTime() ? date2 : date1;
+    }
+
+    public static getSunCalcTime(lat: number, lng: number): SunCalcResultInterface {
         const date = new Date();
-        if (tomorrow) {
-            date.setDate(date.getDate() + 1);
-        }
-        return SunCalc.getTimes(date, lat, lng);
+
+        const calcToday: SunCalcResultInterface = SunCalc.getTimes(date, lat, lng);
+        date.setDate(date.getDate() + 1);
+        const calcTomorrow: SunCalcResultInterface = SunCalc.getTimes(date, lat, lng);
+
+        return {
+            solarNoon: MpptchgService.date1NotPastOtherwiseDate2(calcToday.solarNoon, calcTomorrow.solarNoon),
+            nadir: MpptchgService.date1NotPastOtherwiseDate2(calcToday.nadir, calcTomorrow.nadir),
+            sunrise: MpptchgService.date1NotPastOtherwiseDate2(calcToday.sunrise, calcTomorrow.sunrise),
+            sunset: MpptchgService.date1NotPastOtherwiseDate2(calcToday.sunset, calcTomorrow.sunset),
+            sunriseEnd: MpptchgService.date1NotPastOtherwiseDate2(calcToday.sunriseEnd, calcTomorrow.sunriseEnd),
+            sunsetStart: MpptchgService.date1NotPastOtherwiseDate2(calcToday.sunsetStart, calcTomorrow.sunsetStart),
+            dawn: MpptchgService.date1NotPastOtherwiseDate2(calcToday.dawn, calcTomorrow.dawn),
+            dusk: MpptchgService.date1NotPastOtherwiseDate2(calcToday.dusk, calcTomorrow.dusk),
+            nauticalDawn: MpptchgService.date1NotPastOtherwiseDate2(calcToday.nauticalDawn, calcTomorrow.nauticalDawn),
+            nauticalDusk: MpptchgService.date1NotPastOtherwiseDate2(calcToday.nauticalDusk, calcTomorrow.nauticalDusk),
+            nightEnd: MpptchgService.date1NotPastOtherwiseDate2(calcToday.nightEnd, calcTomorrow.nightEnd),
+            night: MpptchgService.date1NotPastOtherwiseDate2(calcToday.night, calcTomorrow.night),
+            goldenHourEnd: MpptchgService.date1NotPastOtherwiseDate2(calcToday.goldenHourEnd, calcTomorrow.goldenHourEnd),
+            goldenHour: MpptchgService.date1NotPastOtherwiseDate2(calcToday.goldenHour, calcTomorrow.goldenHour),
+        };
     }
 
     public static stopWatchdog(): Observable<void> {
@@ -86,24 +107,27 @@ export class MpptchgService {
                         if (!this.nightTriggered) {
                             let nextWakeUpNight = new Date();
 
-                            LogService.log('mpptChd', 'Night detected');
+                            LogService.log('mpptChd', 'Night detected', status.values.solarVoltage);
                             this.nightTriggered = true;
                             this.events.emit(EventMpptChg.NIGHT_DETECTED);
 
-                            const sunDate = this.getSunCalcTime(lat, lng, true);
+                            const sunDate = this.getSunCalcTime(lat, lng);
 
                             LogService.log('mpptChd', 'Night status', {
                                 now: now,
                                 dawn: sunDate.dawn,
                                 sunrise: sunDate.sunrise,
-                                batteryVoltage
+                                batteryVoltage,
+                                isLowVoltage
                             });
 
                             if (!isLowVoltage && batteryVoltage >= (config.nightLimitVolt ?? this.NIGHT_LIMIT_VOLT)) {
                                 nextWakeUpNight.setSeconds(nextWakeUpNight.getSeconds() + (config.nightSleepTimeSeconds ?? this.WD_PWROFF_NIGHT_SECS_DEFAULT));
-                                if (nextWakeUpNight.getTime() > sunDate.dawn.getTime()) {
+                                if (nextWakeUpNight.getTime() >= sunDate.dawn.getTime()) {
                                     LogService.log('mpptChd', 'Morning is too soon, no sleep', sunDate.dawn);
                                     return of(null);
+                                } else {
+                                    LogService.log('mpptChd', 'Morning not yet so sleep', nextWakeUpNight);
                                 }
                             } else {
                                 LogService.log('mpptChd', 'Not enough battery so sleep to sunrise', sunDate.sunrise);

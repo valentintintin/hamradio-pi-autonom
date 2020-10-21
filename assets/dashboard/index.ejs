@@ -26,14 +26,14 @@
 
             <article class="card card-number bg-orange">
                 <span class="title">Lumière</span>
-                <strong class="value"><%= Math.round(sensors.light) %>Lux</strong>
+                <strong class="value"><%= Math.round(sensors.light / 100) %> kLux</strong>
             </article>
         </section>
 
         <section>
             <article class="card card-number bg-green">
                 <span class="title">Pression</span>
-                <strong class="value"><%= sensors.pressure > 0 ? Math.round(sensors.pressure / 100) + 50 : 0 %>
+                <strong class="value"><%= sensors.pressure > 0 ? Math.round(sensors.pressure / 100) + 51 : 0 %>
                     hPa</strong>
             </article>
 

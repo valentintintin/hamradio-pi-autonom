@@ -10,7 +10,7 @@ $(function () {
         const dataGraph = [];
         dataSorted.forEach(d => {
             dataGraph.push([
-                moment(d.createdAt).toDate(), d.voltageBattery / 1000, d.voltageSolar / 1000, d.currentCharge, d.currentBattery, d.currentSolar, d.temperature, d.humidity, (d.pressure / 100) + 50, d.light
+                moment(d.createdAt).toDate(), d.voltageBattery / 1000, d.voltageSolar / 1000, d.currentCharge, d.currentBattery, d.currentSolar, d.temperature, d.humidity, (d.pressure / 100) + 51, d.light / 100
             ]);
         });
 
@@ -88,13 +88,10 @@ $(function () {
                     },
                     'Pression': {
                         axis: 'y2',
-                    },
-                    'Lumière': {
-                        axis: 'y2',
-                    },
+                    }
                 },
-                ylabel: 'Voltage (V) ou Température (C)',
-                y2label: 'Intensité (mA) ou Lux ou %',
+                ylabel: 'Voltage (V), Température (C), Lumière (KiloLux), Humidité (%)',
+                y2label: 'Intensité (mA), Pression (hPa)',
             }
         );
 
