@@ -131,6 +131,10 @@ nav .button {
     margin-bottom: 0;
 }
 
+.align-left {
+    justify-content: left;
+}
+
 .align-center {
     display: flex;
     flex-direction: column;
