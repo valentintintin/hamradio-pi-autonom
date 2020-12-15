@@ -77,6 +77,7 @@ export class WebcamService {
                         WebcamService.webcam.capture(pathWebcam, (err, data: string) => {
                             nb++;
                             if (err) {
+                                WebcamService.alreadyInUse = false;
                                 LogService.log('webcam', 'Capture KO', data, err);
                                 observer.error(err);
                             } else if (nb === 2) {
