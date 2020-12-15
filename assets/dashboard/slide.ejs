@@ -6,7 +6,7 @@
     <span>Station autonome</span>
 
     <% if (sensors) { %>
-        <span><%= new Date(Math.max(sensors.createdAt, lastPhoto.date)).toLocaleString() %></span>
+        <span><%= new Date(Math.max(sensors.createdAt, lastPhoto.date)).toLocaleString('fr-FR', {hour12: false}) %></span>
     <% } else { %>
         <strong>Aucune donnée</strong>
     <% } %>
@@ -20,14 +20,14 @@
             <article class="photo">
                 <a href="<%= lastPhoto.path %>_4.jpg" target="_blank">
                     <img src="<%= lastPhoto.path %>_4.jpg" alt="Dernière photo prise"
-                         title="Dernière photo prise le <%= new Date(lastPhoto.date).toLocaleString() %>"
+                         title="Dernière photo prise le <%= new Date(lastPhoto.date).toLocaleString('fr-FR', {hour12: false}) %>"
                          onerror="const old = this.src; this.src = ''; this.src = old;"/>
                 </a>
             </article>
             <article class="photo">
                 <a href="<%= lastPhoto.path %>_2.jpg" target="_blank">
                     <img src="<%= lastPhoto.path %>_2.jpg" alt="Dernière photo prise"
-                         title="Dernière photo prise le <%= new Date(lastPhoto.date).toLocaleString() %>"
+                         title="Dernière photo prise le <%= new Date(lastPhoto.date).toLocaleString('fr-FR', {hour12: false}) %>"
                          onerror="const old = this.src; this.src = ''; this.src = old;"/>
                 </a>
             </article>

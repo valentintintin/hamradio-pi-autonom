@@ -40,7 +40,7 @@ export class MpptchgService {
         date.setDate(date.getDate() + 1);
         const calcTomorrow: SunCalcResultInterface = SunCalc.getTimes(date, lat, lng);
 
-        return {
+        const calc = {
             solarNoon: MpptchgService.date1NotPastOtherwiseDate2(calcToday.solarNoon, calcTomorrow.solarNoon),
             nadir: MpptchgService.date1NotPastOtherwiseDate2(calcToday.nadir, calcTomorrow.nadir),
             sunrise: MpptchgService.date1NotPastOtherwiseDate2(calcToday.sunrise, calcTomorrow.sunrise),
@@ -56,9 +56,21 @@ export class MpptchgService {
             goldenHourEnd: MpptchgService.date1NotPastOtherwiseDate2(calcToday.goldenHourEnd, calcTomorrow.goldenHourEnd),
             goldenHour: MpptchgService.date1NotPastOtherwiseDate2(calcToday.goldenHour, calcTomorrow.goldenHour),
         };
+
+        if (calc.sunset > calc.dusk) {
+            calc.sunset = calcToday.sunset;
+        }
+
+        if (calc.dawn > calc.sunrise) {
+            calc.dawn = calcToday.dawn;
+        }
+
+        return calc;
     }
 
     public static stopWatchdog(): Observable<void> {
+        this.lowVoltageTriggered = false;
+        this.nightTriggered = false;
         return CommunicationMpptchdService.instance.disableWatchdog();
     }
 
@@ -99,7 +111,6 @@ export class MpptchgService {
                 } else if (!MpptchgService.externalShutdownTriggered || MpptchgService.externalShutdownTriggered.getTime() < now.getTime()) {
                     MpptchgService.externalShutdownTriggered = null;
 
-                    const nextWakeUpLowBattery = new Date();
                     const batteryVoltage = status.values ? status.values.batteryVoltage : Number.MAX_SAFE_INTEGER;
                     const isLowVoltage = batteryVoltage < (config.pauseBeforePowerOffReachedVolt ?? MpptchgService.PAUSE_BEFORE_POWER_OFF_REACHED_VOLT);
 
@@ -116,22 +127,34 @@ export class MpptchgService {
                             LogService.log('mpptChd', 'Night status', {
                                 now: now,
                                 dawn: sunDate.dawn,
-                                sunrise: sunDate.sunrise,
                                 batteryVoltage,
                                 isLowVoltage
                             });
 
-                            if (!isLowVoltage && batteryVoltage >= (config.nightLimitVolt ?? this.NIGHT_LIMIT_VOLT)) {
-                                nextWakeUpNight.setSeconds(nextWakeUpNight.getSeconds() + (config.nightSleepTimeSeconds ?? this.WD_PWROFF_NIGHT_SECS_DEFAULT));
+                            if (batteryVoltage >= (config.nightLimitVolt ?? this.NIGHT_LIMIT_VOLT)) {
+                                let nightSleepTime = config.nightSleepTimeSeconds ?? this.WD_PWROFF_NIGHT_SECS_DEFAULT;
+                                nextWakeUpNight.setSeconds(nextWakeUpNight.getSeconds() + nightSleepTime);
+
                                 if (nextWakeUpNight.getTime() >= sunDate.dawn.getTime()) {
                                     LogService.log('mpptChd', 'Morning is too soon, no sleep', sunDate.dawn);
                                     return of(null);
                                 } else {
-                                    LogService.log('mpptChd', 'Morning not yet so sleep', nextWakeUpNight);
+                                    if (isLowVoltage) {
+                                        nextWakeUpNight.setSeconds(nextWakeUpNight.getSeconds() + nightSleepTime);
+
+                                        if (nextWakeUpNight.getTime() >= sunDate.dawn.getTime()) {
+                                            LogService.log('mpptChd', 'Battery low but morning is too soon, sleep to dawn', sunDate.dawn);
+                                            nextWakeUpNight = sunDate.dawn;
+                                        } else {
+                                            LogService.log('mpptChd', 'Morning not yet so sleep one time more because of low battery', nextWakeUpNight);
+                                        }
+                                    } else {
+                                        LogService.log('mpptChd', 'Morning not yet so sleep', nextWakeUpNight);
+                                    }
                                 }
                             } else {
-                                LogService.log('mpptChd', 'Not enough battery so sleep to sunrise', sunDate.sunrise);
-                                nextWakeUpNight = sunDate.sunrise;
+                                LogService.log('mpptChd', 'Not enough battery so sleep to dawn', sunDate.dawn);
+                                nextWakeUpNight = sunDate.dawn;
                             }
 
                             return MpptchgService.shutdownAndWakeUpAtDate(nextWakeUpNight, config.nightRunSleepTimeSeconds ?? this.WD_INIT_NIGHT_SECS).pipe(
@@ -144,12 +167,41 @@ export class MpptchgService {
                         if (!this.lowVoltageTriggered) {
                             this.lowVoltageTriggered = true;
 
+                            const nightDate = this.getSunCalcTime(lat, lng);
+
+                            const nextWakeUpLowBattery = new Date();
                             nextWakeUpLowBattery.setSeconds(nextWakeUpLowBattery.getSeconds() + (config.pauseBeforePowerOffReachedSeconds ?? MpptchgService.WD_PAUSE_BEFORE_POWEROFF_REACHED_SEC));
+
+                            if (this.isDateInGoldenHours(new Date(), nightDate) ||
+                                this.isDateInGoldenHours(nextWakeUpLowBattery, nightDate)) {
+                                LogService.log('mpptChd', 'Low battery voltage detected but is cool period', {
+                                    batteryVoltage: status.values.batteryVoltage,
+                                    solarVoltage: status.values.solarVoltage,
+                                    nextWakeUpLowBattery,
+                                    now: now,
+                                    dawn: nightDate.dawn,
+                                    sunrise: nightDate.sunrise,
+                                    sunset: nightDate.sunset,
+                                    dusk: nightDate.dusk,
+                                });
+
+                                this.nightTriggered = false;
+                                this.lowVoltageTriggered = false;
+
+                                return MpptchgService.startWatchdog().pipe(
+                                    catchError(_ => of(null))
+                                );
+                            }
 
                             LogService.log('mpptChd', 'Low battery voltage detected', {
                                 batteryVoltage: status.values.batteryVoltage,
                                 solarVoltage: status.values.solarVoltage,
-                                nextWakeUpLowBattery
+                                nextWakeUpLowBattery,
+                                now: now,
+                                dawn: nightDate.dawn,
+                                sunrise: nightDate.sunrise,
+                                sunset: nightDate.sunset,
+                                dusk: nightDate.dusk,
                             });
 
                             return MpptchgService.shutdownAndWakeUpAtDate(nextWakeUpLowBattery, this.WD_INIT_NIGHT_SECS).pipe(
@@ -176,6 +228,16 @@ export class MpptchgService {
                 return of(null);
             })
         );
+    }
+
+    private static isDateInGoldenHours(date: Date, sunCalc: SunCalcResultInterface): boolean {
+        return (
+            date.getTime() >= sunCalc.sunset.getTime() && // night coming
+            date.getTime() <= sunCalc.dusk.getTime()
+        ) || (
+            date.getTime() >= sunCalc.dawn.getTime() && // morning coming
+            date.getTime() <= sunCalc.sunrise.getTime()
+        )
     }
 
     private static enableWatchdog(secondsBeforeWakeUp: number, secondsBeforeShutdown: number): Observable<void> {

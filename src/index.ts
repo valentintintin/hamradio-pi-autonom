@@ -192,6 +192,10 @@ switch (process.argv[process.argv.length - 1]) {
         DatabaseService.openDatabase(config.databasePath).subscribe(_ => LogService.removeTooOld());
         break;
 
+    case 'sun-calc':
+        console.log(new Date(), MpptchgService.getSunCalcTime(config.lat, config.lng));
+        break;
+
     case 'program':
         new ProcessService().run(config);
         break;
@@ -199,6 +203,7 @@ switch (process.argv[process.argv.length - 1]) {
     default:
         console.log('Liste des commandes :');
         console.table({
+            'sun-cal': 'Show sun calculation dates',
             'dtmf': 'Listen to DTMF code or 1750 Hz tone',
             'tones': 'Send 1750, OK and error',
             'repeat': 'Listen 10s the frequency and replay it over the air',
