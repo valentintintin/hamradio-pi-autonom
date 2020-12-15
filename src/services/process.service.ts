@@ -100,7 +100,7 @@ export class ProcessService {
 
             if (config.rsync?.enable && !ProcessService.debug && !ProcessService.doNotShutdown) {
                 stop = stop.pipe(
-                    switchMap(_ => RsyncService.runSync(config).pipe(catchError(e => of(null))))
+                    switchMap(_ => RsyncService.runSyncLog(config).pipe(catchError(e => of(null))))
                 )
             }
 

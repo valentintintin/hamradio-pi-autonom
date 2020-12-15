@@ -66,6 +66,13 @@ export class RsyncService {
         ]);
     }
 
+    public static runSyncLog(config: ConfigInterface): Observable<string[]> {
+        return RsyncService.sendMultiple(config.rsync, [
+            '/tmp/watchdog.log',
+            LogService.createCopy(config.databasePath),
+        ]);
+    }
+
     private static isRunning(): Observable<boolean> {
         return new Observable<boolean>(observer => {
             exec('pgrep rsync', (err, stdout, stderr) => {
