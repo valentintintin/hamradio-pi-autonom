@@ -1,0 +1,33 @@
+#ifndef CUBECELL_MONITORING_CONFIG_H
+#define CUBECELL_MONITORING_CONFIG_H
+
+#define RF_FREQUENCY 433775000 // Hz
+#define LORA_BANDWIDTH 0 // [0: 125 kHz,
+//  1: 250 kHz,
+//  2: 500 kHz,
+//  3: Reserved]
+#define LORA_SPREADING_FACTOR 12 // [SF7..SF12]
+#define LORA_CODINGRATE 1 // [1: 4/5,
+//  2: 4/6,
+//  3: 4/7,
+//  4: 4/8]
+#define LORA_PREAMBLE_LENGTH 8 // Same for Tx and Rx
+#define LORA_SYMBOL_TIMEOUT 0 // Symbols
+#define LORA_FIX_LENGTH_PAYLOAD_ON false
+#define LORA_IQ_INVERSION_ON false
+#define TX_OUTPUT_POWER 0
+
+#define TRX_BUFFER 256
+#define USER_BUTTON P3_3
+#define INTERVAL_REFRESH_MPPTCHG 10000
+#define TIME_SCREEN_ON 30000
+
+#define APRS_CALLSIGN "F4HVV-15"
+#define APRS_DESTINATION "F4HVV-7"
+#define APRS_SYMBOL 'I'
+#define APRS_SYMBOL_TABLE '/'
+#define APRS_LATITUDE 45.382552
+#define APRS_LONGITUDE 5.554130
+#define APRS_COMMENT "f4hvv.valentin-saugnier.fr"
+
+#endif //CUBECELL_MONITORING_CONFIG_H
