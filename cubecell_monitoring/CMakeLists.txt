@@ -30,4 +30,4 @@ add_custom_target(
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-add_executable(Z_DUMMY_TARGET ${SRC_LIST} lib/Aprs/Aprs.cpp src/MpptMonitor.cpp src/Communication.cpp include/Communication.h include/MpptMonitor.h include/System.h src/System.cpp include/Config.h)
+add_executable(Z_DUMMY_TARGET ${SRC_LIST})

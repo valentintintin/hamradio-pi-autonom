@@ -23,7 +23,7 @@ SimpleDHT22 dht22(2);
 void setup()
 {
   Serial.begin(115200);
-  Serial.println("Started");
+  Serial.println("Starting");
 
   myBarometer.init();
   light.begin();
@@ -33,6 +33,8 @@ void setup()
   unsigned char time = 2;
   light.setTiming(gain, time, ms);
   light.setPowerUp();
+  
+  Serial.println("Started");
 }
 
 void loop()
@@ -66,6 +68,7 @@ void loop()
 
   delay(100);
   // LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_OFF, USART0_OFF, TWI_OFF); // Normal version
-  LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_OFF, BOD_OFF, USART0_OFF, TWI_OFF); // Modified @valentin version to gain 2 mA (BOD_OFF)
+  //LowPower.idle(SLEEP_8S, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_OFF, BOD_OFF, USART0_OFF, TWI_OFF); // Modified @valentin version to gain 2 mA (BOD_OFF)
   //delay(8000);
+  delay(900);
 }

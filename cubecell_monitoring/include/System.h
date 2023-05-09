@@ -4,25 +4,55 @@
 #include <cstdint>
 #include <CubeCell_NeoPixel.h>
 #include <HT_SH1107Wire.h>
+#include <DS3231.h>
+
+#include "Communication.h"
 #include "Timer.h"
 #include "Config.h"
+#include "Command.h"
+#include "MpptMonitor.h"
+#include "WeatherSensors.h"
+#include "Gpio.h"
 
 class System {
 public:
-    bool begin();
+    explicit System(SH1107Wire *display, CubeCell_NeoPixel *pixels);
+
+    bool begin(RadioEvents_t *radioEvents);
     void update();
+    void userButton();
+    void wakeUp();
+    void sleep();
 
     void turnOnRGB(uint32_t color);
     void turnOffRGB();
 
     void turnScreenOn();
-    void displayText(const char* title, const char* content, uint16_t pause = 2500);
+    void turnScreenOff();
+    void displayText(const char* title, const char* content, uint16_t pause = TIME_SCREEN) const;
 
-    SH1107Wire display = SH1107Wire(0x3c, 500000, SDA, SCL, GEOMETRY_128_64, GPIO10);
+    Communication *communication;
+    SH1107Wire *display;
+    Command command;
+    MpptMonitor mpptMonitor;
+    WeatherSensors weatherSensors;
+    Gpio gpio;
+
+    bool forceSendTelemetry = false;
 private:
-    CubeCell_NeoPixel pixels = CubeCell_NeoPixel(1, RGB, NEO_GRB + NEO_KHZ800);
-    Timer timerScreen = Timer(TIME_SCREEN_ON);
-};
+    char bufferText[256]{};
+    bool screenOn = false;
 
+    Timer timerPosition = Timer(INTERVAL_POSITION, true);
+    Timer timerTelemetry = Timer(INTERVAL_REFRESH_APRS, false);
+    Timer timerTime = Timer(INTERVAL_TIME, true);
+
+    CubeCell_NeoPixel *pixels;
+    DS3231 RTC;
+
+    void timeUpdate();
+
+    static void nowToString(char *result);
+};
 
 #endif //CUBECELL_MONITORING_SYSTEM_H

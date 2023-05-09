@@ -180,13 +180,14 @@ public:
     bool getConfigurationValue(mpptChg_cfg_t index, uint16_t* val);
     bool setConfigurationValue(mpptChg_cfg_t index, uint16_t val);
     bool getWatchdogEnable(bool* val);
-    bool setWatchdogEnable(bool* val);
+    bool setWatchdogEnable(bool val);
     bool setWatchdogTimeout(uint8_t val);
     bool getWatchdogTimeout(uint8_t* val);
     bool setWatchdogPoweroff(uint16_t val);
     bool getWatchdogPoweroff(uint16_t* val);
     bool isAlert(bool* val);
     bool isNight(bool* val);
+    bool isPowerEnabled(bool* val);
 
     static const char* getStatusAsString(uint16_t s);
     static uint16_t computePowerMw(uint16_t mV, uint16_t mA);

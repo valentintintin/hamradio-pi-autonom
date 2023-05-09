@@ -65,12 +65,14 @@ bool mpptChg::begin()
         pinMode(nightPin, INPUT);
     }
 
+    uint16_t val;
+
 #ifdef ARDUINO
     Wire.begin();
-    return(true);
+    return _Read16(0, &val) && val > 0;
 #else
     linuxI2cFd = wiringPiI2CSetup(MPPT_CHG_I2C_ADDR);
-	return(linuxI2cFd != -1);
+	return(linuxI2cFd != -1) && _Read16(0, &val) && val > 0;
 #endif
 }
 
@@ -220,7 +222,7 @@ bool mpptChg::getWatchdogEnable(bool* val)
 }
 
 
-bool mpptChg::setWatchdogEnable(bool* val)
+bool mpptChg::setWatchdogEnable(bool val)
 {
     uint16_t t = (val) ? MPPT_CHG_WD_ENABLE : 0;
 
@@ -285,6 +287,19 @@ bool mpptChg::isNight(bool* val)
         success = _Read16(MPPT_CHG_STATUS, &t);
         *val = ((t & MPPT_CHG_STATUS_NIGHT_MASK) != 0);
     }
+
+    return(success);
+}
+
+
+bool mpptChg::isPowerEnabled(bool* val)
+{
+    bool success;
+    uint16_t t;
+
+    // Read the STATUS register
+    success = _Read16(MPPT_CHG_STATUS, &t);
+    *val = ((t & MPPT_CHG_STATUS_PWR_EN_MASK) != 0);
 
     return(success);
 }

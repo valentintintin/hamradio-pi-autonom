@@ -3,6 +3,49 @@
 #include "System.h"
 
 Communication::Communication(System *system) : system(system) {
+    system->communication = this;
+
+    strcpy_P(aprsPacketTx.source, PSTR(APRS_CALLSIGN));
+    strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH));
+    strcpy_P(aprsPacketTx.destination, PSTR(APRS_DESTINATION));
+
+    strcpy_P(aprsPacketTx.telemetries.projectName, PSTR("Data"));
+
+    // Voltage battery between 0 and 15000mV
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[0].name, PSTR("Battery"));
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[0].unit, PSTR("V"));
+
+    // Current charge between -2000mA and 2000mA
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[1].name, PSTR("ICharg"));
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[1].unit, PSTR("mA"));
+
+    // Temperature in degrees
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[2].name, PSTR("Temp"));
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[2].unit, PSTR("°C"));
+
+    // Humidity in percentage
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[3].name, PSTR("Humdt"));
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[3].unit, PSTR("%"));
+
+    // Watchdog poweroff in seconds
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[4].name, PSTR("Slep"));
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[4].unit, PSTR("min"));
+
+    strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[0].name, PSTR("Night"));
+    strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[1].name, PSTR("Alrt"));
+    strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[2].name, PSTR("WDog"));
+    strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[3].name, PSTR("Wifi"));
+    strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[4].name, PSTR("USB"));
+}
+
+bool Communication::begin(RadioEvents_t *radioEvents) {
+    if (Radio.Init(radioEvents)) {
+        Log.errorln(F("[RADIO] Init error"));
+        system->displayText(PSTR("LoRa error"), PSTR("Init failed"));
+
+        return false;
+    }
+
     Radio.SetChannel(RF_FREQUENCY);
 
     Radio.SetRxConfig(MODEM_LORA, LORA_BANDWIDTH, LORA_SPREADING_FACTOR,
@@ -15,83 +58,125 @@ Communication::Communication(System *system) : system(system) {
                       LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
                       true, false, 0, LORA_IQ_INVERSION_ON, 3000);
 
-    strcpy_P(aprsPacketTx.source, PSTR(APRS_CALLSIGN));
-    strcpy_P(aprsPacketTx.destination, PSTR(APRS_DESTINATION));
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[0].name, PSTR("Vb"));
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[1].name, PSTR("Ib"));
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[2].name, PSTR("Vs"));
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[3].name, PSTR("Is"));
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[0].unit, PSTR("V"));
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[1].unit, PSTR("mA"));
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[2].unit, PSTR("V"));
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[3].unit, PSTR("mA"));
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[4].unit, PSTR("h"));
-}
-
-bool Communication::begin(RadioEvents_t *radioEvents) {
-    if (Radio.Init(radioEvents)) {
-        Log.errorln(F("Radio error"));
-
-        return false;
-    }
-
     Radio.Rx(0);
 
     return true;
 }
 
-void Communication::update() {
-    Radio.IrqProcess();;
+void Communication::update(bool sendTelemetry, bool sendPosition) {
+    Radio.IrqProcess();
+
+    if (sendTelemetry) {
+        this->sendTelemetry();
+    }
+
+    if (sendPosition) {
+        this->sendPosition(PSTR(APRS_COMMENT));
+    }
 }
 
 void Communication::send() {
-    Log.infoln(F("Send Lora"));
+    delay(100);
+    Radio.IrqProcess();
+
+    Log.traceln(F("[LORA_TX] Radio status : %d"), Radio.GetStatus());
 
     system->turnOnRGB(COLOR_SEND);
 
-    uint8_t size = Aprs::encode(&aprsPacketTx, stringBuffer);
+    while (USE_RF && Radio.GetStatus() == RF_TX_RUNNING) {
+        Log.warningln(F("[LORA_TX] Locked. Radio Status : %d"), Radio.GetStatus());
+        delay(1000);
+        Radio.IrqProcess();
+    }
+
+    Log.traceln(F("[LORA_TX] Radio ready"));
+
+    system->turnOnRGB(COLOR_SEND);
+
+    uint8_t size = Aprs::encode(&aprsPacketTx, bufferText);
 
     if (!size) {
-        Log.errorln(F("Error during APRS string encode"));
-        system->displayText("LoRa send error", "APRS encode error", 5000);
+        Log.errorln(F("[APRS] Error during string encode"));
+        system->displayText("LoRa send error", "APRS encode error");
     } else {
         buffer[0] = '<';
         buffer[1]= 0xFF;
         buffer[2] = 0x01;
 
         for (uint8_t i = 0; i < size; i++) {
-            buffer[i + 3] = stringBuffer[i];
-            Log.traceln(F("Lora TX payload[%d]=%X %c"), i, buffer[i], buffer[i]);
+            buffer[i + 3] = bufferText[i];
+            Log.verboseln(F("[LORA_TX] Payload[%d]=%X %c"), i, buffer[i], buffer[i]);
         }
 
-        Radio.Send(buffer, size + 3);
-        Log.infoln(F("Lora TX started : %s"), stringBuffer);
+        if (USE_RF) {
+            Radio.Send(buffer, size + 3);
+            Radio.IrqProcess();
+        }
 
-        system->displayText("LoRa send", stringBuffer, 5000);
+        Log.infoln(F("[LORA_TX] Start send : %s"), bufferText);
+        Log2.infoln(F("[LORA_TX] %s"), bufferText);
+
+        system->displayText("LoRa send", bufferText);
+
+        if (!USE_RF) {
+            sent();
+        }
     }
 }
 
-void Communication::sendMessage(const char* message) {
-    strcpy(aprsPacketTx.message.destination, APRS_DESTINATION);
+void Communication::sendMessage(const char* destination, const char* message, const char* ackToConfirm) {
+    strcpy(aprsPacketTx.message.destination, destination);
     strcpy(aprsPacketTx.message.message, message);
 
     aprsPacketTx.message.ackToAsk[0] = '\0';
+    aprsPacketTx.message.ackToConfirm[0] = '\0';
+    aprsPacketTx.message.ackToReject[0] = '\0';
+
+    if (strlen(ackToConfirm) > 0) {
+        strcpy(aprsPacketTx.message.ackToConfirm, ackToConfirm);
+    }
+
+    if (strlen(aprsPacketTx.message.ackToConfirm) == 0) {
+        sprintf_P(aprsPacketTx.message.ackToAsk, PSTR("%d"), ackToAsk++);
+    }
+
     aprsPacketTx.type = Message;
 
     send();
 }
 
-void Communication::sendTelemetry(const char* comment, uint8_t uptime, uint8_t vs, uint8_t is, uint8_t vb, uint8_t ib, bool isNight) {
-    strcpy(aprsPacketTx.comment, comment);
+void Communication::sendTelemetry() {
+    sprintf_P(aprsPacketTx.comment, PSTR("Chg:%s Up:%lds"), mpptChg::getStatusAsString(system->mpptMonitor.getStatus()), millis() / 1000);
+    aprsPacketTx.telemetries.telemetrySequenceNumber = telemetrySequenceNumber++;
+    aprsPacketTx.telemetries.telemetriesAnalog[0].value = system->mpptMonitor.getVoltageBattery();
+    aprsPacketTx.telemetries.telemetriesAnalog[1].value = system->mpptMonitor.getCurrentCharge();
+    aprsPacketTx.telemetries.telemetriesAnalog[2].value = system->weatherSensors.getTemperature();
+    aprsPacketTx.telemetries.telemetriesAnalog[3].value = system->weatherSensors.getHumidity();
+    aprsPacketTx.telemetries.telemetriesAnalog[4].value = system->mpptMonitor.isWatchdogEnabled() ? system->mpptMonitor.getWatchdogPowerOffTime() : 0;
+    aprsPacketTx.telemetries.telemetriesBoolean[0].value = system->mpptMonitor.isNight();
+    aprsPacketTx.telemetries.telemetriesBoolean[1].value = system->mpptMonitor.isAlert();
+    aprsPacketTx.telemetries.telemetriesBoolean[2].value = system->mpptMonitor.isWatchdogEnabled();
+    aprsPacketTx.telemetries.telemetriesBoolean[3].value = system->gpio.isWifiEnabled();
+    aprsPacketTx.telemetries.telemetriesBoolean[4].value = system->mpptMonitor.isPowerEnabled();
+
+    if (aprsPacketTx.telemetries.telemetrySequenceNumber % APRS_TELEMETRY_PARAMS_SEQUENCE == 0)
+    {
+        aprsPacketTx.type = TelemetryLabel;
+        send();
+
+        aprsPacketTx.type = TelemetryUnit;
+        send();
+
+        if (APRS_TELEMETRY_EQUATIONS_ENABLED) {
+            aprsPacketTx.type = TelemetryEquation;
+            send();
+
+            aprsPacketTx.type = TelemetryBitSense;
+            send();
+        }
+    }
 
     aprsPacketTx.type = Telemetry;
-    aprsPacketTx.telemetries.telemetrySequenceNumber = telemetrySequenceNumber++;
-    aprsPacketTx.telemetries.telemetriesAnalog[0].value = vb;
-    aprsPacketTx.telemetries.telemetriesAnalog[1].value = ib;
-    aprsPacketTx.telemetries.telemetriesAnalog[2].value = vs;
-    aprsPacketTx.telemetries.telemetriesAnalog[3].value = is;
-    aprsPacketTx.telemetries.telemetriesAnalog[4].value = uptime;
-
     send();
 }
 
@@ -112,40 +197,43 @@ void Communication::sent() {
 
     system->turnOffRGB();
 
-    Log.noticeln(F("Lora TX done"));
+    Log.traceln(F("[LORA_TX] Done"));
 }
 
 void Communication::received(uint8_t * payload, uint16_t size, int16_t rssi, int8_t snr) {
-    Log.noticeln(F("Lora RX payload of size %d, RSSI : %d and SNR : %d"), size, rssi, snr);
-    Log.infoln(F("Lora RX %s"), payload);
+    Log.traceln(F("[LORA_RX] Payload of size %d, RSSI : %d and SNR : %d"), size, rssi, snr);
+    Log.infoln(F("[LORA_RX] %s"), payload);
+    Log2.infoln(F("[LORA_RX] %s"), payload);
 
     for (uint16_t i = 0; i < size; i++) {
-        Log.traceln(F("Lora RX payload[%d]=%X %c"), i, payload[i], payload[i]);
+        Log.verboseln(F("[LORA_RX] Payload[%d]=%X %c"), i, payload[i], payload[i]);
     }
 
     system->turnOnRGB(COLOR_RECEIVED);
 
-    system->displayText("LoRa received", reinterpret_cast<const char *>(payload), 5000);
+    system->displayText("LoRa received", reinterpret_cast<const char *>(payload));
 
     system->turnOffRGB();
 
     if (!Aprs::decode(reinterpret_cast<const char *>(payload + sizeof(uint8_t) * 3), &aprsPacketRx)) {
-        Log.errorln(F("Error during APRS decode"));
+        Log.errorln(F("[APRS] Error during decode"));
     } else {
-        Log.infoln(F("APRS decoded from %s to %s"), aprsPacketRx.source, aprsPacketRx.destination);
+        Log.traceln(F("[APRS] Decoded from %s to %s"), aprsPacketRx.source, aprsPacketRx.destination);
 
         if (strstr_P(reinterpret_cast<const char *>(payload), PSTR(APRS_CALLSIGN)) != nullptr) {
-            Log.infoln(F("APRS meesage for me : %s"), aprsPacketRx.content);
+            Log.traceln(F("[APRS] Message for me : %s"), aprsPacketRx.content);
 
-            system->display.clear();
-            system->display.drawString(0, 0, F("APRS received for me"));
-            system->display.drawStringMaxWidth(0, 10, 128, aprsPacketRx.content);
-            system->display.display();
+            system->displayText(PSTR("[APRS] Received for me"), aprsPacketRx.content);
 
-            if (strlen(aprsPacketRx.message.ackToConfirm)) {
-                strcpy(aprsPacketTx.message.ackToConfirm, aprsPacketRx.message.ackToConfirm);
-                delay(250);
-                sendMessage(PSTR(""));
+            bool processCommandResult = system->command.processCommand(aprsPacketRx.message.message);
+
+            // TODO lora command result
+//            sprintf_P(stringBuffer, PSTR("Command : %d"), processCommandResult);
+//            delay(250);
+//            sendMessage(PSTR(APRS_DESTINATION), stringBuffer);
+
+            if (strlen(aprsPacketRx.message.message) > 0) {
+                sendMessage(PSTR(APRS_DESTINATION), PSTR(""), aprsPacketRx.message.ackToConfirm);
             }
         }
     }

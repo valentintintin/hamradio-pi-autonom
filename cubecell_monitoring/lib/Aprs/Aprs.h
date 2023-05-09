@@ -2,15 +2,15 @@
 #define CUBECELL_MONITORING_APRS_H
 
 #define MAX_PACKET_LENGTH 200
-#define CALLSIGN_LENGTH 9
+#define CALLSIGN_LENGTH 11
 #define MAX_PATH 8
 #define MAX_TELEMETRY_ANALOG 5
 #define MAX_TELEMETRY_BOOLEAN 8
-#define TELEMETRY_NAME_LENGTH 7
-#define TELEMETRY_UNIT_LENGTH 7
-#define TELEMETRY_PROJECT_NAME_LENGTH 23
-#define MESSAGE_LENGTH 67
-#define ACK_MESSAGE_LENGTH 3
+#define TELEMETRY_NAME_LENGTH 8
+#define TELEMETRY_UNIT_LENGTH 8
+#define TELEMETRY_PROJECT_NAME_LENGTH 24
+#define MESSAGE_LENGTH 68
+#define ACK_MESSAGE_LENGTH 4
 
 #include <cstdint>
 
@@ -25,7 +25,7 @@ typedef struct {
 
 typedef struct {
     char name[TELEMETRY_NAME_LENGTH]{};
-    uint8_t value = 0;
+    double value = 0;
     char unit[TELEMETRY_UNIT_LENGTH]{};
     AprsTelemetryEquation equation{};
     bool bitSense = true;
@@ -46,14 +46,17 @@ typedef struct {
     double courseDeg = 0;
     double speedKnots = 0;
     double altitudeFeet = 0;
+    bool withTelemetry = false;
 } AprsPosition;
 
 typedef struct {
     char destination[CALLSIGN_LENGTH]{};
     char message[MESSAGE_LENGTH]{};
-    char ackToConfirm[ACK_MESSAGE_LENGTH]{};
-    char ackToReject[ACK_MESSAGE_LENGTH]{};
-    char ackToAsk[ACK_MESSAGE_LENGTH]{};
+    char ackToConfirm[ACK_MESSAGE_LENGTH]{}; // when RX
+    char ackToReject[ACK_MESSAGE_LENGTH]{}; // when RX
+    char ackToAsk[ACK_MESSAGE_LENGTH]{}; // when TX
+    char ackConfirmed[ACK_MESSAGE_LENGTH]{}; // when RX after TX
+    char ackRejected[ACK_MESSAGE_LENGTH]{}; // when RX after TX
 } AprsMessage;
 
 typedef struct {
@@ -76,7 +79,12 @@ private:
     static void appendPosition(AprsPosition* position, char* aprsResult);
     static void appendTelemetries(AprsPacket *aprsPacket, char* aprsResult);
     static void appendMessage(AprsMessage *message, char* aprsResult);
-    static char *ax25Base91Enc(char *s, uint8_t n, uint32_t v);
+    static char *ax25Base91Enc(char *destination, uint8_t width, uint32_t value);
+    static const char *formatDouble(double value);
+    static void trim(char *string);
+    static void trimStart(char *string);
+    static void trimEnd(char *string);
+    static void trimFirstSpace(char *string);
 };
 
 #endif //CUBECELL_MONITORING_APRS_H

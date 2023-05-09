@@ -24,7 +24,7 @@ int main() {
     packet.telemetries.telemetrySequenceNumber = 789;
     strcpy(packet.telemetries.projectName, "Test project");
     packet.telemetries.telemetriesAnalog[0] = {
-            "Test",
+            "Battery",
             123,
             "VS"
     };
@@ -35,21 +35,21 @@ int main() {
     };
     packet.telemetries.telemetriesAnalog[2] = {
             "",
-            45,
+            67,
             "",
             {
-                1, -2, 34.5
+                1, -2.0987, 34.5
             }
     };
     packet.telemetries.telemetriesBoolean[0] = {
-            "Bool 1",
+            "Bool1",
             1,
             "on"
     };
     packet.telemetries.telemetriesBoolean[1] = {
-            "Bool 2",
+            "B2",
             0,
-            "oui"
+            "yes"
     };
     packet.telemetries.telemetriesBoolean[2] = {
             "",
@@ -62,6 +62,10 @@ int main() {
     packet.type = Position;
     uint8_t size = Aprs::encode(&packet, encoded_packet);
     printf("\nAPRS Position Size : %d\n%s\n", size, encoded_packet);
+
+    packet.position.withTelemetry = true;
+    size = Aprs::encode(&packet, encoded_packet);
+    printf("\nAPRS Position with telemtry Size : %d\n%s\n", size, encoded_packet);
 
     packet.type = Message;
     size = Aprs::encode(&packet, encoded_packet);
@@ -106,11 +110,21 @@ int main() {
 
     printf("\n");
 
+    packet.type = Message;
+    packet.message.ackToReject[0] = '\0';
+    packet.message.ackToAsk[0] = '3';
+    packet.message.ackToAsk[1] = '\0';
+    packet.message.ackToConfirm[0] = '\0';
+    Aprs::encode(&packet, encoded_packet);
+
     AprsPacket packet2;
-    if (!Aprs::decode(encoded_packet, &packet2)) {
+    if (!Aprs::decode("F4HVV-10>APDR16,WIDE1-1::F4HVV-15 :ack1 coucou{2", &packet2)) {
         printf("Decode error for %s\n\n", encoded_packet);
     } else {
-        printf("Received from %s to %s by %s : %s\n\n", packet2.source, packet2.destination, packet2.path, packet2.content);
+        printf("Received from %s to %s by %s --> %s\nMessage length %ld to %s with ack %s and confirmed %s --> %s\n\n",
+               packet2.source, packet2.destination, packet2.path, packet2.content,
+               strlen(packet2.message.message), packet2.message.destination, packet2.message.ackToConfirm, packet2.message.ackConfirmed,
+               packet2.message.message);
     }
 
     return 0;

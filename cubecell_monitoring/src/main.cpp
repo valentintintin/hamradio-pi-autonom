@@ -1,17 +1,20 @@
 #include <Arduino.h>
 #include <radio/radio.h>
 #include <ArduinoLog.h>
-
-#include "../lib/mpptChg/mpptChg.h"
-#include "../lib/Aprs/Aprs.h"
 #include "System.h"
-#include "Communication.h"
-#include "MpptMonitor.h"
 
-System systemControl;
+Logging Log2 = Logging();
+
+SH1107Wire display = SH1107Wire(0x3c, 500000, SDA, SCL, GEOMETRY_128_64, GPIO10);
+CubeCell_NeoPixel pixels = CubeCell_NeoPixel(1, RGB, NEO_GRB + NEO_KHZ800);
+System systemControl(&display, &pixels);
 Communication communication(&systemControl);
-MpptMonitor mpptMonitor(&communication);
-RadioEvents_t RadioEvents;
+
+RadioEvents_t radioEvents;
+
+static TimerEvent_t sleep;
+static TimerEvent_t wakeUp;
+bool isLowPower = false;
 
 void sentEvent() {
     communication.sent();
@@ -21,52 +24,67 @@ void receivedEvent(uint8_t * payload, uint16_t size, int16_t rssi, int8_t snr) {
     communication.received(payload, size, rssi, snr);
 }
 
-void userKey() {
-    Log.noticeln(F("User key pressed"));
+void onSleep() {
+    isLowPower = true;
 
-    delay(100);
+    systemControl.sleep();
 
-    systemControl.turnScreenOn();
+//    TimerSetValue(&wakeUp, TIME_SLEEP_MS);
+//    TimerStart(&wakeUp);
+}
+
+void onWakeUp() {
+    isLowPower = false;
+
+    systemControl.wakeUp();
+
+//    TimerSetValue(&sleep, TIME_WAKEUP_MS);
+//    TimerStart(&sleep);
+}
+
+void userButton() {
+    Log.traceln(F("[GPIO] User key pressed"));
+
+    delay(250);
+
+    systemControl.userButton();
 }
 
 void setup() {
-    RadioEvents.RxDone = receivedEvent;
-    RadioEvents.TxDone = sentEvent;
+    radioEvents.RxDone = receivedEvent;
+    radioEvents.TxDone = sentEvent;
 
     boardInitMcu();
+    pinMode(Vext, OUTPUT);
+    digitalWrite(Vext, HIGH);
 
     Serial.begin(115200);
-    Log.begin(LOG_LEVEL_VERBOSE, &Serial);
-    Log.infoln(F("Starting"));
+    Serial1.begin(115200);
 
-    systemControl.begin();
-    attachInterrupt(USER_BUTTON, userKey, FALLING);
+    Log.begin(LOG_LEVEL_INFO, &Serial);
+    Log2.begin(LOG_LEVEL_INFO, &Serial1);
 
-    if (!communication.begin(&RadioEvents)) {
-        systemControl.displayText(PSTR("LoRa error"), PSTR("Init failed"), 5000);
-    }
+    systemControl.begin(&radioEvents);
 
-    if (!mpptMonitor.begin()) {
-        systemControl.displayText(PSTR("Mppt error"), PSTR("Init failed"), 5000);
-    }
+//    if (TIME_SLEEP_MS == 0) {
+        pinMode(USER_KEY, INPUT);
+        attachInterrupt(USER_KEY, userButton, FALLING);
+//    }
 
-    systemControl.turnOffRGB();
+//    systemControl.communication->sendPosition(PSTR("Ready"));
+//    systemControl.communication->sendMessage(PSTR(APRS_DESTINATION), PSTR("Ping"));
 
-    systemControl.displayText(PSTR("Init"), PSTR("Ready"));
-
-    Log.infoln(F("Started"));
-
-    communication.sendPosition(PSTR("Ready"));
+//    if (TIME_SLEEP_MS > 0) {
+//        TimerInit(&sleep, onSleep);
+//        TimerInit(&wakeUp, onWakeUp);
+//        onSleep();
+//    }
 }
 
 void loop() {
-    if (Serial.available()) {
-        Log.traceln(F("Serial incoming"));
-        const char* stringReceived = Serial.readString().c_str();
-        Log.infoln(F("Serial received %s"), stringReceived);
-    }
-
-    mpptMonitor.update();
-    communication.update();
     systemControl.update();
+
+    if (isLowPower){
+        lowPowerHandler();
+    }
 }
