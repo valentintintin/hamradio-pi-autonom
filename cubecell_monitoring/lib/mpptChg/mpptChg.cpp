@@ -58,6 +58,9 @@ mpptChg::mpptChg(int aPin, int nPin)
 
 bool mpptChg::begin()
 {
+#ifdef ARDUINO
+    return begin(Wire);
+#else
     if (alertPin != -1) {
         pinMode(alertPin, INPUT);
     }
@@ -65,20 +68,20 @@ bool mpptChg::begin()
         pinMode(nightPin, INPUT);
     }
 
-    uint16_t val;
-
-#ifdef ARDUINO
-    Wire.begin();
-    return _Read16(0, &val) && val > 0;
-#else
     linuxI2cFd = wiringPiI2CSetup(MPPT_CHG_I2C_ADDR);
 	return(linuxI2cFd != -1) && _Read16(0, &val) && val > 0;
 #endif
 }
 
 
-#ifdef ESP8266
 bool mpptChg::begin(int sda, int sck)
+{
+	Wire.begin(sda, sck);
+    return begin(Wire);
+}
+
+
+bool mpptChg::begin(TwoWire &wire)
 {
 	if (alertPin != -1) {
 		pinMode(alertPin, INPUT);
@@ -87,10 +90,11 @@ bool mpptChg::begin(int sda, int sck)
 		pinMode(nightPin, INPUT);
 	}
 
-	Wire.begin(sda, sck);
-	return(true);
+    this->wire = wire;
+
+    uint16_t val;
+    return _Read16(0, &val) && val > 0;
 }
-#endif
 
 
 bool mpptChg::getStatusValue(mpptChg_sys_t index, uint16_t* val)
@@ -317,15 +321,15 @@ bool mpptChg::_Read8(uint8_t reg, uint8_t* val)
 
 #ifdef ARDUINO
     // Set register
-    Wire.beginTransmission(MPPT_CHG_I2C_ADDR);
-    (void) Wire.write(reg);
-    retVal = Wire.endTransmission();
+    wire.beginTransmission(MPPT_CHG_I2C_ADDR);
+    (void) wire.write(reg);
+    retVal = wire.endTransmission();
 
     // Read value
     if (retVal == 0) {
-        retVal = Wire.requestFrom(MPPT_CHG_I2C_ADDR, 1);
+        retVal = wire.requestFrom(MPPT_CHG_I2C_ADDR, 1);
         if (retVal == 1) {
-            *val = (uint8_t) Wire.read();
+            *val = (uint8_t) wire.read();
             success = true;
         } else {
             success = false;
@@ -354,16 +358,16 @@ bool mpptChg::_Read16(uint8_t reg, uint16_t* val)
 
 #ifdef ARDUINO
     // Set register
-    Wire.beginTransmission(MPPT_CHG_I2C_ADDR);
-    (void) Wire.write(reg);
-    retVal = Wire.endTransmission();
+    wire.beginTransmission(MPPT_CHG_I2C_ADDR);
+    (void) wire.write(reg);
+    retVal = wire.endTransmission();
 
     // Read value
     if (retVal == 0) {
-        retVal = Wire.requestFrom(MPPT_CHG_I2C_ADDR, 2);
+        retVal = wire.requestFrom(MPPT_CHG_I2C_ADDR, 2);
         if (retVal == 2) {
-            *val = (uint16_t) Wire.read() << 8;
-            *val |= (uint16_t) Wire.read();
+            *val = (uint16_t) wire.read() << 8;
+            *val |= (uint16_t) wire.read();
             success = true;
         } else {
             success = false;
@@ -393,10 +397,10 @@ bool mpptChg::_Write8(uint8_t reg, uint8_t val)
 
 #ifdef ARDUINO
     // Write register
-    Wire.beginTransmission(MPPT_CHG_I2C_ADDR);
-    (void) Wire.write(reg);
-    (void) Wire.write(val);
-    retVal = Wire.endTransmission();
+    wire.beginTransmission(MPPT_CHG_I2C_ADDR);
+    (void) wire.write(reg);
+    (void) wire.write(val);
+    retVal = wire.endTransmission();
     success = (retVal == 0);
 #else
     retVal = wiringPiI2CWriteReg8(linuxI2cFd, (int) reg, (int) val);
@@ -414,11 +418,11 @@ bool mpptChg::_Write16(uint8_t reg, uint16_t val)
 
 #ifdef ARDUINO
     // Write register
-    Wire.beginTransmission(MPPT_CHG_I2C_ADDR);
-    (void) Wire.write(reg);
-    (void) Wire.write(val >> 8);
-    (void) Wire.write(val & 0xFF);
-    retVal = Wire.endTransmission();
+    wire.beginTransmission(MPPT_CHG_I2C_ADDR);
+    (void) wire.write(reg);
+    (void) wire.write(val >> 8);
+    (void) wire.write(val & 0xFF);
+    retVal = wire.endTransmission();
     success = (retVal == 0);
 #else
     // Swap bytes because endianness is backwards

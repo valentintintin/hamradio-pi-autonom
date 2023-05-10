@@ -13,6 +13,9 @@ public:
 
     bool processCommand(const char *command);
 
+    inline const char getResponse() const {
+        return *response;
+    }
 private:
     static System *system;
 
@@ -24,6 +27,7 @@ private:
     static void doTelemetry(MyCommandParser::Argument *args, char *response);
     static void doWatchdog(MyCommandParser::Argument *args, char *response);
     static void doLora(MyCommandParser::Argument *args, char *response);
+    static void doSetTime(MyCommandParser::Argument *args, char *response);
 };
 
 

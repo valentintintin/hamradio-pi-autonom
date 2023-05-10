@@ -3,13 +3,19 @@
 #include "ArduinoLog.h"
 
 System::System(SH1107Wire *display, CubeCell_NeoPixel *pixels) :
-display(display), pixels(pixels),
-mpptMonitor(this), weatherSensors(this), gpio(this), command(this) {
+display(display), pixels(pixels), RTC(WireUsed),
+mpptMonitor(this, WireUsed), weatherSensors(this), gpio(this), command(this) {
 }
 
 bool System::begin(RadioEvents_t *radioEvents) {
     Log.infoln(F("[SYSTEM] Starting"));
     Log2.infoln(F("[SYSTEM] Starting"));
+
+    Wire.begin(SDA, SCL, 500000);
+
+    if (&WireUsed == &Wire1) {
+        Wire1.begin(SDA1, SCL1, 500000);
+    }
 
     pixels->begin();
     pixels->clear();
@@ -18,26 +24,13 @@ bool System::begin(RadioEvents_t *radioEvents) {
         Log.warningln(F("Display error"));
     }
 
-    display->flipScreenVertically();
-
-    if (USE_SCREEN_AND_LED) {
-        turnScreenOn();
-    } else {
-        turnScreenOff();
-    }
+    turnScreenOn();
 
     weatherSensors.begin();
     mpptMonitor.begin();
     communication->begin(radioEvents);
 
-//    RTC.setClockMode(false);  // set to 24h
-//    RTC.setYear(23);
-//    RTC.setMonth(5);
-//    RTC.setDate(7);
-//    RTC.setDoW(7);
-//    RTC.setHour(8);
-//    RTC.setMinute(39);
-//    RTC.setSecond(30);
+    setTimeFromRTcToInternalRtc(RTClib::now().unixtime());
 
     nowToString(bufferText);
 
@@ -67,13 +60,13 @@ void System::update() {
 
         command.processCommand(bufferText);
     } else {
-        mpptMonitor.update();
-        weatherSensors.update();
-
         if (forceSendTelemetry || timerTime.hasExpired()) {
             timeUpdate();
             timerTime.restart();
         }
+
+        mpptMonitor.update();
+        weatherSensors.update();
 
         if (timerTelemetry.hasExpired() || timerPosition.hasExpired() || forceSendTelemetry) {
             communication->update(forceSendTelemetry || timerTelemetry.hasExpired(), forceSendTelemetry || timerPosition.hasExpired());
@@ -89,11 +82,15 @@ void System::update() {
         }
     }
 
+    if (timerScreen.hasExpired()) {
+        turnScreenOff();
+    }
+
     delay(10);
 }
 
 void System::turnOnRGB(uint32_t color) {
-    if (screenOn) {
+    if (screenOn || color == 0) {
         Log.verboseln(F("Turn led color : %l"), color);
 
         uint8_t red, green, blue;
@@ -107,7 +104,6 @@ void System::turnOnRGB(uint32_t color) {
 
 void System::turnOffRGB() {
     turnOnRGB(0);
-    digitalWrite(Vext, HIGH);
 }
 
 void System::turnScreenOn() {
@@ -116,6 +112,8 @@ void System::turnScreenOn() {
 
         display->wakeup();
         screenOn = true;
+
+        timerScreen.restart();
     }
 }
 
@@ -146,21 +144,17 @@ void System::displayText(const char *title, const char *content, uint16_t pause)
 
 void System::userButton() {
     if (millis() >= 5000) {
-        forceSendTelemetry = true;
+        if (timerScreen.hasExpired()) {
+            turnScreenOn();
+        } else {
+            forceSendTelemetry = true;
+        }
     }
 }
 
-void System::wakeUp() {
-    Radio.Rx(0);
-}
-
-void System::sleep() {
-    turnScreenOff();
-    Radio.Sleep();
-}
-
 void System::nowToString(char *result) {
-    DateTime now = RTClib::now();
+//    DateTime now = RTClib::now();
+    DateTime now = DateTime(TimerGetSysTime().Seconds);
     sprintf(result, "%04d-%02d-%02dT%02d:%02d:%02d %ld %ld", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), now.unixtime(), millis() / 1000);
 }
 
@@ -169,4 +163,10 @@ void System::timeUpdate() {
     Log.infoln(F("[TIME] %s"), bufferText);
     Log2.infoln(F("[TIME] %s"), bufferText);
     displayText(PSTR("Time"), bufferText, 1000);
+}
+
+void System::setTimeFromRTcToInternalRtc(uint64_t epoch) {
+    TimerSysTime_t currentTime;
+    currentTime.Seconds = epoch;
+    TimerSetSysTime(currentTime);
 }

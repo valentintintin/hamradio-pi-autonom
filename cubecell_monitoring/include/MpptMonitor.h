@@ -8,7 +8,7 @@
 
 class MpptMonitor {
 public:
-    explicit MpptMonitor(System *system);
+    explicit MpptMonitor(System *system, TwoWire &wire);
 
     bool begin();
     bool update();
@@ -63,6 +63,7 @@ public:
     }
 private:
     System *system;
+    TwoWire &wire;
     mpptChg charger;
     Timer timer = Timer(INTERVAL_MPPT, true);
 

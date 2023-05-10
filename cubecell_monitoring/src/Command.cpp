@@ -14,6 +14,7 @@ Command::Command(System *system) {
     parser.registerCommand(PSTR("telem"), PSTR(""), doTelemetry);
     parser.registerCommand(PSTR("dog"), PSTR("u"), doWatchdog);
     parser.registerCommand(PSTR("lora"), PSTR("s"), doLora);
+    parser.registerCommand(PSTR("time"), PSTR("u"), doSetTime);
 }
 
 bool Command::processCommand(const char *command) {
@@ -69,4 +70,13 @@ void Command::doLora(MyCommandParser::Argument *args, char *response) {
     system->communication->sendMessage(PSTR(APRS_DESTINATION), message);
 
     sprintf_P(response, PSTR("OK"));
+}
+
+void Command::doSetTime(MyCommandParser::Argument *args, char *response) {
+    uint64_t epoch = args[0].asUInt64;
+
+    system->RTC.setEpoch((long long) epoch, true);
+    system->setTimeFromRTcToInternalRtc(epoch);
+
+    System::nowToString(response);
 }

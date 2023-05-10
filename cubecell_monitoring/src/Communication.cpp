@@ -66,12 +66,12 @@ bool Communication::begin(RadioEvents_t *radioEvents) {
 void Communication::update(bool sendTelemetry, bool sendPosition) {
     Radio.IrqProcess();
 
-    if (sendTelemetry) {
-        this->sendTelemetry();
-    }
-
     if (sendPosition) {
         this->sendPosition(PSTR(APRS_COMMENT));
+    }
+
+    if (sendTelemetry) {
+        this->sendTelemetry();
     }
 }
 
@@ -83,13 +83,13 @@ void Communication::send() {
 
     system->turnOnRGB(COLOR_SEND);
 
-    while (USE_RF && Radio.GetStatus() == RF_TX_RUNNING) {
+    while (USE_RF && Radio.GetStatus() != RF_RX_RUNNING) {
         Log.warningln(F("[LORA_TX] Locked. Radio Status : %d"), Radio.GetStatus());
-        delay(1000);
+        delay(2500);
         Radio.IrqProcess();
     }
 
-    Log.traceln(F("[LORA_TX] Radio ready"));
+    Log.traceln(F("[LORA_TX] Radio ready, status : %d"), Radio.GetStatus());
 
     system->turnOnRGB(COLOR_SEND);
 
@@ -194,6 +194,7 @@ void Communication::sendPosition(const char* comment) {
 
 void Communication::sent() {
     Radio.Rx(0);
+    Radio.IrqProcess();
 
     system->turnOffRGB();
 
@@ -225,16 +226,13 @@ void Communication::received(uint8_t * payload, uint16_t size, int16_t rssi, int
 
             system->displayText(PSTR("[APRS] Received for me"), aprsPacketRx.content);
 
-            bool processCommandResult = system->command.processCommand(aprsPacketRx.message.message);
-
-            // TODO lora command result
-//            sprintf_P(stringBuffer, PSTR("Command : %d"), processCommandResult);
-//            delay(250);
-//            sendMessage(PSTR(APRS_DESTINATION), stringBuffer);
-
             if (strlen(aprsPacketRx.message.message) > 0) {
                 sendMessage(PSTR(APRS_DESTINATION), PSTR(""), aprsPacketRx.message.ackToConfirm);
             }
+
+            bool processCommandResult = system->command.processCommand(aprsPacketRx.message.message);
+            sprintf_P(bufferText, PSTR("Command %s"), processCommandResult, system->command.getResponse());
+            sendMessage(PSTR(APRS_DESTINATION), bufferText);
         }
     }
 }

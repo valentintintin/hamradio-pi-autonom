@@ -2,11 +2,11 @@
 #include "MpptMonitor.h"
 #include "ArduinoLog.h"
 
-MpptMonitor::MpptMonitor(System *system) : system(system) {
+MpptMonitor::MpptMonitor(System *system, TwoWire &wire) : system(system), wire(wire) {
 }
 
 bool MpptMonitor::begin() {
-    if (!charger.begin()) {
+    if (!charger.begin(wire)) {
         Log.errorln(F("[MPPT] Charger error"));
         system->displayText(PSTR("Mppt error"), PSTR("Init failed"));
 
@@ -32,6 +32,7 @@ bool MpptMonitor::update() {
     if (!charger.getStatusValue(SYS_STATUS, &status)) {
         Log.errorln(F("[MPPT] Fetch charger data status error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data status"));
+        init = false;
         return false;
     } else {
         Log.traceln(F("[MPPT] Charger status : %s"), mpptChg::getStatusAsString(status));
@@ -40,6 +41,7 @@ bool MpptMonitor::update() {
     if (!charger.getIndexedValue(VAL_VS, &vs)) {
         Log.errorln(F("[MPPT] Fetch charger data VS error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data VS"));
+        init = false;
         return false;
     } else {
         Log.traceln(F("[MPPT] Charger VS : %d"), vs);
@@ -48,6 +50,7 @@ bool MpptMonitor::update() {
     if (!charger.getIndexedValue(VAL_IS, &is)) {
         Log.errorln(F("[MPPT] Fetch charger data IS error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data IS"));
+        init = false;
         return false;
     } else {
         Log.traceln(F("[MPPT] Charger IS : %d"), is);
@@ -56,6 +59,7 @@ bool MpptMonitor::update() {
     if (!charger.getIndexedValue(VAL_VB, &vb)) {
         Log.errorln(F("[MPPT] Fetch charger data VB error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data VB"));
+        init = false;
         return false;
     } else {
         Log.traceln(F("[MPPT] Charger VB : %d"), vb);
@@ -64,6 +68,7 @@ bool MpptMonitor::update() {
     if (!charger.getIndexedValue(VAL_IB, &ib)) {
         Log.errorln(F("[MPPT] Fetch charger data IB error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data IB"));
+        init = false;
         return false;
     } else {
         Log.traceln(F("[MPPT] Charger IB : %d"), ib);
@@ -72,6 +77,7 @@ bool MpptMonitor::update() {
     if (!charger.isNight(&night)) {
         Log.errorln(F("[MPPT] Fetch charger data night error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data night"));
+        init = false;
         return false;
     } else {
         Log.traceln(F("[MPPT] Charger night : %d"), night);
@@ -80,6 +86,7 @@ bool MpptMonitor::update() {
     if (!charger.isAlert(&alert)) {
         Log.errorln(F("[MPPT] Fetch charger data alert error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data alert"));
+        init = false;
         return false;
     } else {
         Log.traceln(F("[MPPT] Charger alert : %d"), alert);
@@ -88,6 +95,7 @@ bool MpptMonitor::update() {
     if (!charger.isPowerEnabled(&powerEnabled)) {
         Log.errorln(F("[MPPT] Fetch charger data power enabled error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data power enabled"));
+        init = false;
         return false;
     } else {
         Log.traceln(F("[MPPT] Charger power enabled : %d"), powerEnabled);
@@ -96,6 +104,7 @@ bool MpptMonitor::update() {
     if (!charger.getWatchdogEnable(&watchdogEnabled)) {
         Log.errorln(F("[MPPT] Fetch charger data watchdog error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data watchdog"));
+        init = false;
         return false;
     } else {
         Log.traceln(F("[MPPT] Charger watchdog : %d"), watchdogEnabled);
@@ -104,6 +113,7 @@ bool MpptMonitor::update() {
     if (!charger.getWatchdogPoweroff(&watchdogPowerOffTime)) {
         Log.errorln(F("[MPPT] Fetch charger data watchdog poweroff error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data watchdog poweroff"));
+        init = false;
         return false;
     } else {
         Log.traceln(F("Charger watchdog poweroff : %d"), watchdogPowerOffTime);
@@ -112,6 +122,7 @@ bool MpptMonitor::update() {
     if (!charger.getWatchdogTimeout(&watchdogCounter)) {
         Log.errorln(F("Fetch charger data watchdog counter error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data watchdog counter"));
+        init = false;
         return false;
     } else {
         Log.traceln(F("[MPPT] Charger watchdog counter : %d"), watchdogCounter);
@@ -144,6 +155,7 @@ void MpptMonitor::updateWatchdog() {
         if (!charger.setWatchdogTimeout(WATCHDOG_TIMEOUT)) {
             Log.errorln(F("[MPPT_WATCHDOG]Change watchdog counter error"));
             system->displayText(PSTR("Mttp error"), PSTR("Failed to set watchdog counter"));
+            init = false;
         } else {
             timer.restart();
         }
@@ -161,6 +173,7 @@ bool MpptMonitor::setWatchdog(uint32_t powerOffTime) {
         if (!charger.setWatchdogPoweroff(powerOffTime)) {
             Log.errorln(F("[MPPT_WATCHDOG]Change watchdog poweroff error"));
             system->displayText(PSTR("Mttp error"), PSTR("Failed to set watchdog poweroff"));
+            init = false;
             return false;
         }
 
@@ -169,6 +182,7 @@ bool MpptMonitor::setWatchdog(uint32_t powerOffTime) {
         if (!charger.setWatchdogTimeout(WATCHDOG_TIMEOUT)) {
             Log.errorln(F("[MPPT_WATCHDOG]Change watchdog counter error"));
             system->displayText(PSTR("Mttp error"), PSTR("Failed to set watchdog counter"));
+            init = false;
             return false;
         }
 
@@ -178,6 +192,7 @@ bool MpptMonitor::setWatchdog(uint32_t powerOffTime) {
     if (!charger.setWatchdogEnable(enabled)) {
         Log.errorln(F("[MPPT_WATCHDOG]Change watchdog enable error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to set watchdog"));
+        init = false;
         return false;
     }
 

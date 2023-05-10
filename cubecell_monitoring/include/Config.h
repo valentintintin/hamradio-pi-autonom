@@ -3,11 +3,9 @@
 
 #include <ArduinoLog.h>
 
-//#define TIME_SLEEP_MS 0
-//#define TIME_WAKEUP_MS 0
+#define WireUsed Wire
 
 #define USE_RF true
-#define USE_SCREEN_AND_LED false
 
 #define RF_FREQUENCY 433775000 // Hz
 #define LORA_BANDWIDTH 0 // [0: 125 kHz,
@@ -29,9 +27,10 @@
 #define INTERVAL_REFRESH_APRS 60000
 #define INTERVAL_POSITION 900000
 #define INTERVAL_WEATHER 10000
-#define INTERVAL_MPPT 5000
+#define INTERVAL_MPPT 10000
 #define INTERVAL_TIME 10000
-#define TIME_SCREEN 2000
+#define TIME_SCREEN 1500
+#define TIME_SCREEN_ON 15000
 
 #define APRS_CALLSIGN "F4HVV-15"
 #define APRS_PATH "RFONLY"
@@ -40,8 +39,8 @@
 #define APRS_SYMBOL_TABLE '/'
 #define APRS_LATITUDE 45.324863
 #define APRS_LONGITUDE 5.605224
-#define APRS_COMMENT "f4hvv.valentin-saugnier.fr"
-#define APRS_TELEMETRY_PARAMS_SEQUENCE 100
+#define APRS_COMMENT "Solaire camera + NPR70"
+#define APRS_TELEMETRY_PARAMS_SEQUENCE 55
 #define APRS_TELEMETRY_EQUATIONS_ENABLED false
 
 #define PIN_DHT GPIO11

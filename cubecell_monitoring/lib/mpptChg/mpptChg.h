@@ -36,6 +36,7 @@
 
 #include <inttypes.h>
 #include <pgmspace.h>
+#include <Wire.h>
 
 
 // ================================================================================
@@ -172,9 +173,8 @@ public:
     mpptChg(int aPin);
     mpptChg(int aPin, int nPin);
     bool begin();
-#ifdef ESP8266
     bool begin(int sda, int sck);
-#endif
+    bool begin(TwoWire &wire);
     bool getStatusValue(mpptChg_sys_t index, uint16_t* val);
     bool getIndexedValue(mpptChg_val_t index, int16_t* val);
     bool getConfigurationValue(mpptChg_cfg_t index, uint16_t* val);
@@ -197,6 +197,8 @@ private:
     bool _Read16(uint8_t reg, uint16_t* val);
     bool _Write8(uint8_t reg, uint8_t val);
     bool _Write16(uint8_t reg, uint16_t val);
+
+    TwoWire &wire = Wire;
 
     int alertPin;
     int nightPin;

@@ -21,22 +21,20 @@ public:
     bool begin(RadioEvents_t *radioEvents);
     void update();
     void userButton();
-    void wakeUp();
-    void sleep();
+    void setTimeFromRTcToInternalRtc(uint64_t epoch);
 
     void turnOnRGB(uint32_t color);
     void turnOffRGB();
-
-    void turnScreenOn();
-    void turnScreenOff();
     void displayText(const char* title, const char* content, uint16_t pause = TIME_SCREEN) const;
 
+    static void nowToString(char *result);
+
     Communication *communication;
-    SH1107Wire *display;
     Command command;
     MpptMonitor mpptMonitor;
     WeatherSensors weatherSensors;
     Gpio gpio;
+    DS3231 RTC;
 
     bool forceSendTelemetry = false;
 private:
@@ -46,13 +44,14 @@ private:
     Timer timerPosition = Timer(INTERVAL_POSITION, true);
     Timer timerTelemetry = Timer(INTERVAL_REFRESH_APRS, false);
     Timer timerTime = Timer(INTERVAL_TIME, true);
+    Timer timerScreen = Timer(TIME_SCREEN_ON);
 
     CubeCell_NeoPixel *pixels;
-    DS3231 RTC;
+    SH1107Wire *display;
 
     void timeUpdate();
-
-    static void nowToString(char *result);
+    void turnScreenOn();
+    void turnScreenOff();
 };
 
 #endif //CUBECELL_MONITORING_SYSTEM_H
