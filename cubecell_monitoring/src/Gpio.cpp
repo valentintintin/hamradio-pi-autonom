@@ -34,3 +34,29 @@ void Gpio::setWifi(bool enabled) {
 void Gpio::setNpr(bool enabled) {
     setState(PIN_NPR, enabled, PSTR("NPR"), npr, true);
 }
+
+uint16_t Gpio::getLdr() {
+    return getAdcState(PIN_LDR, PSTR("LDR"));
+}
+
+bool Gpio::getState(uint8_t pin, const char* name) {
+    pinMode(pin, INPUT);
+
+    bool status = digitalRead(pin);
+
+    Log.infoln("[GPIO] %s (%d) is %d", name, pin, status);
+    Log2.infoln("[GPIO] %s:%d", name, status);
+
+    return status;
+}
+
+uint16_t Gpio::getAdcState(uint8_t pin, const char *name) {
+    pinMode(pin, INPUT);
+
+    uint16_t val = analogRead(pin);
+
+    Log.infoln("[GPIO] %s (%d) is %d", name, pin, val);
+    Log2.infoln("[GPIO] %s:%d", name, val);
+
+    return val;
+}

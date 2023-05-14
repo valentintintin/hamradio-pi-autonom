@@ -12,6 +12,8 @@ public:
     void setWifi(bool enabled);
     void setNpr(bool enabled);
 
+    uint16_t getLdr();
+
     inline bool isWifiEnabled() const {
         return wifi;
     }
@@ -27,6 +29,8 @@ private:
     bool npr = false;
 
     void setState(uint8_t pin, bool enabled, const char* name, bool &status, bool inverted = false);
+    bool getState(uint8_t pin, const char* name);
+    uint16_t getAdcState(uint8_t pin, const char* name);
 };
 
 #endif //CUBECELL_MONITORING_GPIO_H

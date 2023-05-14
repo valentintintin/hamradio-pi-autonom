@@ -35,7 +35,8 @@ Communication::Communication(System *system) : system(system) {
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[1].name, PSTR("Alrt"));
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[2].name, PSTR("WDog"));
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[3].name, PSTR("Wifi"));
-    strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[4].name, PSTR("USB"));
+    strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[4].name, PSTR("5V"));
+    strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[5].name, PSTR("Box"));
 }
 
 bool Communication::begin(RadioEvents_t *radioEvents) {
@@ -158,6 +159,7 @@ void Communication::sendTelemetry() {
     aprsPacketTx.telemetries.telemetriesBoolean[2].value = system->mpptMonitor.isWatchdogEnabled();
     aprsPacketTx.telemetries.telemetriesBoolean[3].value = system->gpio.isWifiEnabled();
     aprsPacketTx.telemetries.telemetriesBoolean[4].value = system->mpptMonitor.isPowerEnabled();
+    aprsPacketTx.telemetries.telemetriesBoolean[5].value = system->isBoxOpened();
 
     if (aprsPacketTx.telemetries.telemetrySequenceNumber % APRS_TELEMETRY_PARAMS_SEQUENCE == 0)
     {

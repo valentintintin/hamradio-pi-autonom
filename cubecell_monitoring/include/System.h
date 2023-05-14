@@ -22,10 +22,11 @@ public:
     void update();
     void userButton();
     void setTimeFromRTcToInternalRtc(uint64_t epoch);
+    bool isBoxOpened();
 
     void turnOnRGB(uint32_t color);
     void turnOffRGB();
-    void displayText(const char* title, const char* content, uint16_t pause = TIME_SCREEN) const;
+    void displayText(const char* title, const char* content, uint16_t pause = DELAY_SCREEN_DISPLAYED) const;
 
     static void nowToString(char *result);
 
@@ -45,6 +46,8 @@ private:
     Timer timerTelemetry = Timer(INTERVAL_REFRESH_APRS, false);
     Timer timerTime = Timer(INTERVAL_TIME, true);
     Timer timerScreen = Timer(TIME_SCREEN_ON);
+    Timer timerBoxOpened = Timer(INTERVAL_ALARM_BOX_OPENED, true);
+    Timer timerSecond = Timer(1000, true);
 
     CubeCell_NeoPixel *pixels;
     SH1107Wire *display;

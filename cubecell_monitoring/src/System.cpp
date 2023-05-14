@@ -60,6 +60,16 @@ void System::update() {
 
         command.processCommand(bufferText);
     } else {
+        if (timerSecond.hasExpired()) {
+            if (timerBoxOpened.hasExpired() && isBoxOpened()) {
+                Log.warningln(F("Box opened !"));
+                Log2.warningln(F("[SYSTEM] Box opened"));
+
+                timerBoxOpened.restart();
+                communication->sendMessage(PSTR(APRS_DESTINATION), PSTR("Box opened !"));
+            }
+        }
+
         if (forceSendTelemetry || timerTime.hasExpired()) {
             timeUpdate();
             timerTime.restart();
@@ -84,6 +94,10 @@ void System::update() {
 
     if (timerScreen.hasExpired()) {
         turnScreenOff();
+    }
+
+    if (timerSecond.hasExpired()) {
+        timerSecond.restart();
     }
 
     delay(10);
@@ -169,4 +183,8 @@ void System::setTimeFromRTcToInternalRtc(uint64_t epoch) {
     TimerSysTime_t currentTime;
     currentTime.Seconds = epoch;
     TimerSetSysTime(currentTime);
+}
+
+bool System::isBoxOpened() {
+    return millis() >= 60000 && gpio.getLdr() >= LDR_ALARM_LEVEL;
 }
