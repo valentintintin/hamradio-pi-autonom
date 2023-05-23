@@ -13,7 +13,7 @@ public:
 
     bool processCommand(const char *command);
 
-    inline const char getResponse() const {
+    inline char getResponse() const {
         return *response;
     }
 private:

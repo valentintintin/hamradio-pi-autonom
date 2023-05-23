@@ -3,7 +3,7 @@
 #include <ArduinoLog.h>
 #include "System.h"
 
-Logging Log2 = Logging();
+extern JsonWriter serialJsonWriter(&SerialPiUsed);
 
 SH1107Wire  display(0x3c, 500000, SDA, SCL ,GEOMETRY_128_64,GPIO10); // addr, freq, sda, scl, resolution, rst
 CubeCell_NeoPixel pixels = CubeCell_NeoPixel(1, RGB, NEO_GRB + NEO_KHZ800);
@@ -38,18 +38,17 @@ void setup() {
     digitalWrite(Vext, HIGH); // 0V
 
     Serial.begin(115200);
-    Serial1.begin(115200);
+
+    if (&SerialPiUsed == &Serial1) {
+        Serial1.begin(115200);
+    }
 
     Log.begin(LOG_LEVEL_INFO, &Serial);
-    Log2.begin(LOG_LEVEL_INFO, &Serial1);
 
     systemControl.begin(&radioEvents);
 
     pinMode(USER_KEY, INPUT);
     attachInterrupt(USER_KEY, userButton, FALLING);
-
-//    systemControl.communication->sendPosition(PSTR("Ready"));
-//    systemControl.communication->sendMessage(PSTR(APRS_DESTINATION), PSTR("Ping"));
 }
 
 void loop() {

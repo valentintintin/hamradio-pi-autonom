@@ -114,9 +114,14 @@ void Communication::send() {
             Radio.IrqProcess();
         }
 
-        Log.infoln(F("[LORA_TX] Start send : %s"), bufferText);
-        Log2.infoln(F("[LORA_TX] %s"), bufferText);
+        serialJsonWriter
+                .beginObject()
+                .property(F("type"), PSTR("lora"))
+                .property(F("state"), PSTR("tx"))
+                .property(F("payload"), bufferText)
+                .endObject(); SerialPiUsed.println();
 
+        Log.infoln(F("[LORA_TX] Start send : %s"), bufferText);
         system->displayText("LoRa send", bufferText);
 
         if (!USE_RF) {
@@ -206,7 +211,13 @@ void Communication::sent() {
 void Communication::received(uint8_t * payload, uint16_t size, int16_t rssi, int8_t snr) {
     Log.traceln(F("[LORA_RX] Payload of size %d, RSSI : %d and SNR : %d"), size, rssi, snr);
     Log.infoln(F("[LORA_RX] %s"), payload);
-    Log2.infoln(F("[LORA_RX] %s"), payload);
+
+    serialJsonWriter
+            .beginObject()
+            .property(F("type"), PSTR("lora"))
+            .property(F("state"), PSTR("rx"))
+            .property(F("payload"), payload)
+            .endObject(); SerialPiUsed.println();
 
     for (uint16_t i = 0; i < size; i++) {
         Log.verboseln(F("[LORA_RX] Payload[%d]=%X %c"), i, payload[i], payload[i]);

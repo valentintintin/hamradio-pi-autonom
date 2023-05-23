@@ -1,11 +1,13 @@
 #ifndef CUBECELL_MONITORING_CONFIG_H
 #define CUBECELL_MONITORING_CONFIG_H
 
-#include <ArduinoLog.h>
+#include <JsonWriter.h>
 
 #define WireUsed Wire
+#define SerialPiUsed Serial1
 
-#define USE_RF true
+#define USE_RF false
+#define SET_RTC 0
 
 #define RF_FREQUENCY 433775000 // Hz
 #define LORA_BANDWIDTH 0 // [0: 125 kHz,
@@ -53,6 +55,6 @@
 #define LOW_VOLTAGE 11400
 #define LDR_ALARM_LEVEL 1000
 
-extern Logging Log2;
+extern JsonWriter serialJsonWriter;
 
 #endif //CUBECELL_MONITORING_CONFIG_H

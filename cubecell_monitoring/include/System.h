@@ -28,9 +28,9 @@ public:
     void turnOffRGB();
     void displayText(const char* title, const char* content, uint16_t pause = DELAY_SCREEN_DISPLAYED) const;
 
-    static void nowToString(char *result);
+    static DateTime nowToString(char *result);
 
-    Communication *communication;
+    Communication *communication{};
     Command command;
     MpptMonitor mpptMonitor;
     WeatherSensors weatherSensors;
@@ -52,7 +52,7 @@ private:
     CubeCell_NeoPixel *pixels;
     SH1107Wire *display;
 
-    void timeUpdate();
+    void showTime();
     void turnScreenOn();
     void turnScreenOff();
 };

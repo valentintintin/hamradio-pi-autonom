@@ -7,24 +7,34 @@
 Gpio::Gpio(System *system) : system(system) {
     setWifi(wifi);
     setNpr(npr);
+    initialized = true;
 }
 
 void Gpio::setState(uint8_t pin, bool enabled, const char* name, bool &status, bool inverted) {
-    Log.infoln("[GPIO] %s (%d) change to state %d", name, pin, enabled);
-    Log2.infoln("[GPIO] %s:%d", name, enabled);
-
     pinMode(pin, OUTPUT);
 
-    sprintf_P(buffer, PSTR("Pin %s (%d) changed to %d"), name, pin, enabled);
-    system->displayText(PSTR("GPIO"), buffer);
+    if (initialized) {
+        Log.infoln(F("[GPIO] %s (%d) change to state %d"), name, pin, enabled);
+
+        serialJsonWriter
+                .beginObject()
+                .property(F("type"), PSTR("gpio"))
+                .property(F("state"), (byte) enabled)
+                .property(F("name"), (char*) name)
+                .property(F("pin"), pin)
+                .endObject();
+        SerialPiUsed.println();
+
+        sprintf_P(buffer, PSTR("Pin %s (%d) changed to %d"), name, pin, enabled);
+        system->displayText(PSTR("GPIO"), buffer);
+    }
 
     if (inverted) {
         digitalWrite(pin, !enabled);
+        status = enabled;
     } else {
         digitalWrite(pin, enabled);
     }
-
-    status = enabled;
 }
 
 void Gpio::setWifi(bool enabled) {
@@ -42,12 +52,22 @@ uint16_t Gpio::getLdr() {
 bool Gpio::getState(uint8_t pin, const char* name) {
     pinMode(pin, INPUT);
 
-    bool status = digitalRead(pin);
+    bool enabled = digitalRead(pin);
 
-    Log.infoln("[GPIO] %s (%d) is %d", name, pin, status);
-    Log2.infoln("[GPIO] %s:%d", name, status);
+    if (initialized) {
+        Log.infoln(F("[GPIO] %s (%d) is %d"), name, pin, enabled);
 
-    return status;
+        serialJsonWriter
+                .beginObject()
+                .property(F("type"), PSTR("gpio"))
+                .property(F("state"), (byte) enabled)
+                .property(F("name"), (char*) name)
+                .property(F("pin"), pin)
+                .endObject();
+        SerialPiUsed.println();
+    }
+
+    return enabled;
 }
 
 uint16_t Gpio::getAdcState(uint8_t pin, const char *name) {
@@ -55,8 +75,18 @@ uint16_t Gpio::getAdcState(uint8_t pin, const char *name) {
 
     uint16_t val = analogRead(pin);
 
-    Log.infoln("[GPIO] %s (%d) is %d", name, pin, val);
-    Log2.infoln("[GPIO] %s:%d", name, val);
+    if (initialized) {
+        Log.infoln(F("[GPIO] %s (%d) is %d"), name, pin, val);
+
+        serialJsonWriter
+                .beginObject()
+                .property(F("type"), PSTR("gpio"))
+                .property(F("state"), val)
+                .property(F("name"), (char*) name)
+                .property(F("pin"), pin)
+                .endObject();
+        SerialPiUsed.println();
+    }
 
     return val;
 }

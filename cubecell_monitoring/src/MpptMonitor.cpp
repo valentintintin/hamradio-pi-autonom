@@ -24,6 +24,7 @@ bool MpptMonitor::update() {
     }
 
     if (!init && !begin()) {
+        timer.restart();
         return false;
     }
 
@@ -120,7 +121,7 @@ bool MpptMonitor::update() {
     }
 
     if (!charger.getWatchdogTimeout(&watchdogCounter)) {
-        Log.errorln(F("Fetch charger data watchdog counter error"));
+        Log.errorln(F("[MPPT] Fetch charger data watchdog counter error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data watchdog counter"));
         init = false;
         return false;
@@ -128,9 +129,24 @@ bool MpptMonitor::update() {
         Log.traceln(F("[MPPT] Charger watchdog counter : %d"), watchdogCounter);
     }
 
-    sprintf_P(bufferText, PSTR("Vb:%dmV Ib:%dmA Vs:%dmV Is:%dmA Ic:%dmA Status:%s Night:%d Alert:%d WD:%d WDOff:%ds WDCnt:%ds 5V:%d"), vb, ib, vs, is, getCurrentCharge(), mpptChg::getStatusAsString(status), night, alert, watchdogEnabled, watchdogPowerOffTime, watchdogCounter, powerEnabled);
-    Log.infoln(F("[MPPT] %s"), bufferText);
-    Log2.infoln(F("[MPPT] %s"), bufferText);
+    serialJsonWriter
+            .beginObject()
+            .property(F("type"), PSTR("mppt"))
+            .property(F("batteryVoltage"), vb)
+            .property(F("batteryCurrent"), ib)
+            .property(F("solarVoltage"), vs)
+            .property(F("solarCurrent"), is)
+            .property(F("currentCharge"), getCurrentCharge())
+            .property(F("status"), status)
+            .property(F("night"), night)
+            .property(F("alert"), alert)
+            .property(F("watchdogEnabled"), watchdogEnabled)
+            .property(F("watchdogPowerOffTime"), watchdogPowerOffTime)
+            .property(F("watchdogCounter"), watchdogCounter)
+            .property(F("powerEnabled"), powerEnabled)
+            .endObject(); SerialPiUsed.println();
+
+    Log.infoln(F("[MPPT] Vb: %dmV Ib: %dmA Vs: %dmV Is: %dmA Ic: %dmA Status: %s Night: %d Alert: %d WD: %d WDOff: %ds WDCnt: %ds 5V: %d"), vb, ib, vs, is, getCurrentCharge(), mpptChg::getStatusAsString(status), night, alert, watchdogEnabled, watchdogPowerOffTime, watchdogCounter, powerEnabled);
 
     sprintf_P(bufferText, PSTR("Vb:%dmV Ib:%dmA Vs:%dmV Is:%dmA Ic:%dmA Status:%s"), vb, ib, vs, is, getCurrentCharge(), mpptChg::getStatusAsString(status));
     system->displayText(PSTR("MPPT"), bufferText);

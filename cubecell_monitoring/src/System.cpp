@@ -3,13 +3,20 @@
 #include "ArduinoLog.h"
 
 System::System(SH1107Wire *display, CubeCell_NeoPixel *pixels) :
-display(display), pixels(pixels), RTC(WireUsed),
-mpptMonitor(this, WireUsed), weatherSensors(this), gpio(this), command(this) {
+        display(display), pixels(pixels), RTC(WireUsed),
+        mpptMonitor(this, WireUsed), weatherSensors(this), gpio(this), command(this) {
 }
 
 bool System::begin(RadioEvents_t *radioEvents) {
+    bool boxOpened = isBoxOpened();
+
     Log.infoln(F("[SYSTEM] Starting"));
-    Log2.infoln(F("[SYSTEM] Starting"));
+    serialJsonWriter
+            .beginObject()
+            .property(F("type"), PSTR("system"))
+            .property(F("state"), PSTR("starting"))
+            .property(F("boxOpened"), boxOpened)
+            .endObject(); SerialPiUsed.println();
 
     Wire.begin(SDA, SCL, 500000);
 
@@ -21,7 +28,7 @@ bool System::begin(RadioEvents_t *radioEvents) {
     pixels->clear();
 
     if (!display->init()) {
-        Log.warningln(F("Display error"));
+        Log.warningln(F("[SYSTEM] Display error"));
     }
 
     turnScreenOn();
@@ -30,12 +37,22 @@ bool System::begin(RadioEvents_t *radioEvents) {
     mpptMonitor.begin();
     communication->begin(radioEvents);
 
+    if (SET_RTC > 0) {
+        Log.warningln(F("[TIME] Set clock to %l"), SET_RTC + 60);
+        RTC.setEpoch(SET_RTC + 60);
+    }
+
     setTimeFromRTcToInternalRtc(RTClib::now().unixtime());
 
     nowToString(bufferText);
 
     Log.infoln(F("[SYSTEM] Started at %s"), bufferText);
-    Log2.infoln(F("[SYSTEM] Started DateTime:%s"), bufferText);
+    serialJsonWriter
+            .beginObject()
+            .property(F("type"), PSTR("system"))
+            .property(F("state"), PSTR("started"))
+            .property(F("boxOpened"), boxOpened)
+            .endObject(); SerialPiUsed.println();
     displayText(PSTR("Started"), bufferText);
 
     return true;
@@ -46,10 +63,10 @@ void System::update() {
 
     if (Serial1.available()) {
         streamReceived = &Serial1;
-        Log.verboseln(F("Serial 2 incoming"));
+        Log.verboseln(F("Serial Pi incoming"));
     } else if (Serial.available()) {
         streamReceived = &Serial;
-        Log.verboseln(F("Serial 1 (USB) incoming"));
+        Log.verboseln(F("Serial USB incoming"));
     }
 
     if (streamReceived != nullptr) {
@@ -62,8 +79,13 @@ void System::update() {
     } else {
         if (timerSecond.hasExpired()) {
             if (timerBoxOpened.hasExpired() && isBoxOpened()) {
-                Log.warningln(F("Box opened !"));
-                Log2.warningln(F("[SYSTEM] Box opened"));
+                Log.warningln(F("[SYSTEM] Box opened !"));
+                serialJsonWriter
+                        .beginObject()
+                        .property(F("type"), PSTR("system"))
+                        .property(F("state"), PSTR("alert"))
+                        .property(F("boxOpened"), true)
+                        .endObject(); SerialPiUsed.println();
 
                 timerBoxOpened.restart();
                 communication->sendMessage(PSTR(APRS_DESTINATION), PSTR("Box opened !"));
@@ -71,7 +93,7 @@ void System::update() {
         }
 
         if (forceSendTelemetry || timerTime.hasExpired()) {
-            timeUpdate();
+            showTime();
             timerTime.restart();
         }
 
@@ -166,16 +188,23 @@ void System::userButton() {
     }
 }
 
-void System::nowToString(char *result) {
+DateTime System::nowToString(char *result) {
 //    DateTime now = RTClib::now();
     DateTime now = DateTime(TimerGetSysTime().Seconds);
-    sprintf(result, "%04d-%02d-%02dT%02d:%02d:%02d %ld %ld", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), now.unixtime(), millis() / 1000);
+    sprintf(result, "%04d-%02d-%02dT%02d:%02d:%02d Uptime %lds", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), millis() / 1000);
+    return now;
 }
 
-void System::timeUpdate() {
-    nowToString(bufferText);
+void System::showTime() {
+    DateTime now = nowToString(bufferText);
+    serialJsonWriter
+            .beginObject()
+            .property(F("type"), PSTR("time"))
+            .property(F("state"), now.unixtime())
+            .property(F("uptime"), millis() / 1000)
+            .endObject(); SerialPiUsed.println();
+
     Log.infoln(F("[TIME] %s"), bufferText);
-    Log2.infoln(F("[TIME] %s"), bufferText);
     displayText(PSTR("Time"), bufferText, 1000);
 }
 

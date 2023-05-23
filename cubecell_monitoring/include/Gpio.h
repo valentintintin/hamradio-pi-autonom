@@ -24,6 +24,7 @@ public:
 private:
     System *system;
     char buffer[32]{};
+    bool initialized = false;
 
     bool wifi = false;
     bool npr = false;

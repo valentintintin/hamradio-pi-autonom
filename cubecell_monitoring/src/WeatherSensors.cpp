@@ -19,15 +19,20 @@ bool WeatherSensors::update() {
     Log.traceln(F("Fetch weather sensors data"));
 
     if (!readDht()) {
-        Log.warningln(F("Fetch DHT sensor error"));
+        Log.warningln(F("[WEATHER] Fetch DHT sensor error"));
         system->displayText(PSTR("Weather error"), PSTR("Failed to fetch DHT sensor"));
         return false;
     }
 
-    sprintf_P(bufferText, PSTR("Temperature:%.2fC Humidity:%d%%"), temperature, humidity);
-    Log.infoln(PSTR("[WEATHER] %s"), bufferText);
-    Log2.infoln(PSTR("[WEATHER] %s"), bufferText);
+    serialJsonWriter
+            .beginObject()
+            .property(F("type"), PSTR("weather"))
+            .property(F("temperature"), temperature)
+            .property(F("humidity"), humidity)
+            .endObject(); SerialPiUsed.println();
 
+    sprintf_P(bufferText, PSTR("Temperature %.2fC Humidity=%d%"), temperature, humidity);
+    Log.infoln(PSTR("[WEATHER] %s"), bufferText);
     system->displayText(PSTR("Weather"), bufferText);
 
     timer.restart();
@@ -39,7 +44,7 @@ bool WeatherSensors::readDht() {
     dht.temperature().getEvent(&event);
 
     if (isnan(event.temperature)) {
-        Log.warningln(F("Error reading temperature"));
+        Log.warningln(F("[WEATHER] Error reading temperature"));
         return false;
     } else {
         temperature = event.temperature;
@@ -48,7 +53,7 @@ bool WeatherSensors::readDht() {
     dht.humidity().getEvent(&event);
 
     if (isnan(event.relative_humidity)) {
-        Log.warningln(F("Error reading humidity"));
+        Log.warningln(F("[WEATHER] Error reading humidity"));
         return false;
     } else {
         humidity = (u_int8_t) event.relative_humidity;
