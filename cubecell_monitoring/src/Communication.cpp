@@ -131,6 +131,7 @@ void Communication::send() {
 }
 
 void Communication::sendMessage(const char* destination, const char* message, const char* ackToConfirm) {
+    strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH_MESSAGE));
     strcpy(aprsPacketTx.message.destination, destination);
     strcpy(aprsPacketTx.message.message, message);
 
@@ -152,6 +153,8 @@ void Communication::sendMessage(const char* destination, const char* message, co
 }
 
 void Communication::sendTelemetry() {
+    strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH));
+
     sprintf_P(aprsPacketTx.comment, PSTR("Chg:%s Up:%lds"), mpptChg::getStatusAsString(system->mpptMonitor.getStatus()), millis() / 1000);
     aprsPacketTx.telemetries.telemetrySequenceNumber = telemetrySequenceNumber++;
     aprsPacketTx.telemetries.telemetriesAnalog[0].value = system->mpptMonitor.getVoltageBattery();
@@ -188,6 +191,7 @@ void Communication::sendTelemetry() {
 }
 
 void Communication::sendPosition(const char* comment) {
+    strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH));
     strcpy(aprsPacketTx.comment, comment);
 
     aprsPacketTx.type = Position;

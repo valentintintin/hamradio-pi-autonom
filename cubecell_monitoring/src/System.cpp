@@ -21,7 +21,7 @@ bool System::begin(RadioEvents_t *radioEvents) {
     Wire.begin(SDA, SCL, 500000);
 
     if (&WireUsed == &Wire1) {
-        Wire1.begin(SDA1, SCL1, 500000);
+        Wire1.begin(SDA1, SCL1);
     }
 
     pixels->begin();
