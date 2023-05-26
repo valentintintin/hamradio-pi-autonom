@@ -129,6 +129,24 @@ bool MpptMonitor::update() {
         Log.traceln(F("[MPPT] Charger watchdog counter : %d"), watchdogCounter);
     }
 
+    if (!charger.getConfigurationValue(CFG_PWR_OFF_TH, &powerOffVoltage)) {
+        Log.errorln(F("[MPPT] Fetch charger data power off voltage error"));
+        system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data power off voltage"));
+        init = false;
+        return false;
+    } else {
+        Log.traceln(F("[MPPT] Charger watchdog counter : %d"), watchdogCounter);
+    }
+
+    if (!charger.getConfigurationValue(CFG_PWR_ON_TH, &powerOnVoltage)) {
+        Log.errorln(F("[MPPT] Fetch charger data power on voltage error"));
+        system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data power on voltage"));
+        init = false;
+        return false;
+    } else {
+        Log.traceln(F("[MPPT] Charger watchdog counter : %d"), watchdogCounter);
+    }
+
     serialJsonWriter
             .beginObject()
             .property(F("type"), PSTR("mppt"))
@@ -144,14 +162,16 @@ bool MpptMonitor::update() {
             .property(F("watchdogPowerOffTime"), watchdogPowerOffTime)
             .property(F("watchdogCounter"), watchdogCounter)
             .property(F("powerEnabled"), powerEnabled)
+            .property(F("powerOffVoltage"), powerOffVoltage)
+            .property(F("powerOnVoltage"), powerOnVoltage)
             .endObject(); SerialPiUsed.println();
 
-    Log.infoln(F("[MPPT] Vb: %dmV Ib: %dmA Vs: %dmV Is: %dmA Ic: %dmA Status: %s Night: %d Alert: %d WD: %d WDOff: %ds WDCnt: %ds 5V: %d"), vb, ib, vs, is, getCurrentCharge(), mpptChg::getStatusAsString(status), night, alert, watchdogEnabled, watchdogPowerOffTime, watchdogCounter, powerEnabled);
+    Log.infoln(F("[MPPT] Vb: %dmV Ib: %dmA Vs: %dmV Is: %dmA Ic: %dmA Status: %s Night: %d Alert: %d WD: %d WDOff: %ds WDCnt: %ds 5V: %d PowOffVolt: %d PowOnVolt: %d"), vb, ib, vs, is, getCurrentCharge(), mpptChg::getStatusAsString(status), night, alert, watchdogEnabled, watchdogPowerOffTime, watchdogCounter, powerEnabled, powerOffVoltage, powerOnVoltage);
 
-    sprintf_P(bufferText, PSTR("Vb:%dmV Ib:%dmA Vs:%dmV Is:%dmA Ic:%dmA Status:%s"), vb, ib, vs, is, getCurrentCharge(), mpptChg::getStatusAsString(status));
+    sprintf_P(bufferText, PSTR("Vb:%dmV Ib:%dmA Vs:%dmV Is:%dmA Ic:%dmA Status:%s PowOnVolt: %d"), vb, ib, vs, is, getCurrentCharge(), mpptChg::getStatusAsString(status), powerOnVoltage);
     system->displayText(PSTR("MPPT"), bufferText);
 
-    sprintf_P(bufferText, PSTR("Night:%d Alert:%d WD:%d WDOff:%ds WDCnt:%ds 5V:%d"), night, alert, watchdogEnabled, watchdogPowerOffTime, watchdogCounter, powerEnabled);
+    sprintf_P(bufferText, PSTR("Night:%d Alert:%d WD:%d WDOff:%ds WDCnt:%ds 5V:%d PowOffVolt: %d"), night, alert, watchdogEnabled, watchdogPowerOffTime, watchdogCounter, powerEnabled, powerOffVoltage);
     system->displayText(PSTR("MPPT"), bufferText);
 
 //    updateWatchdog();
@@ -229,4 +249,13 @@ void MpptMonitor::checkAnormalCase() {
         system->displayText(PSTR("WatchDog"), PSTR("Strange state : all green but watchdog not running"));
         setWatchdog(1);
     }
+}
+
+bool MpptMonitor::setPowerOnOff(uint16_t powerOnVoltage, uint16_t powerOffVoltage) {
+    sprintf_P(bufferText, PSTR("[MPPT_POWER] On : %dmV Off : %dmV"), powerOnVoltage, powerOffVoltage);
+    Log.infoln(bufferText);
+    system->displayText(PSTR("Power"), bufferText, 3000);
+
+    return charger.setConfigurationValue(CFG_PWR_ON_TH, powerOnVoltage)
+           && charger.setConfigurationValue(CFG_PWR_OFF_TH, powerOffVoltage);
 }

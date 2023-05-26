@@ -26,6 +26,7 @@ private:
     static void doNpr(MyCommandParser::Argument *args, char *response);
     static void doTelemetry(MyCommandParser::Argument *args, char *response);
     static void doWatchdog(MyCommandParser::Argument *args, char *response);
+    static void doMpptPower(MyCommandParser::Argument *args, char *response);
     static void doLora(MyCommandParser::Argument *args, char *response);
     static void doSetTime(MyCommandParser::Argument *args, char *response);
 };

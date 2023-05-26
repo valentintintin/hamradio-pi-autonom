@@ -23,7 +23,7 @@ public:
     }
 private:
     System *system;
-    char buffer[32]{};
+    char buffer[64]{};
     bool initialized = false;
 
     bool wifi = false;

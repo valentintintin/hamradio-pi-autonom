@@ -100,6 +100,16 @@ void System::update() {
         mpptMonitor.update();
         weatherSensors.update();
 
+        if (!mpptMonitor.isPowerEnabled()) {
+            if (gpio.isNprEnabled()) {
+                gpio.setNpr(false);
+            }
+
+            if (gpio.isWifiEnabled()) {
+                gpio.setWifi(false);
+            }
+        }
+
         if (timerTelemetry.hasExpired() || timerPosition.hasExpired() || forceSendTelemetry) {
             communication->update(forceSendTelemetry || timerTelemetry.hasExpired(), forceSendTelemetry || timerPosition.hasExpired());
             forceSendTelemetry = false;

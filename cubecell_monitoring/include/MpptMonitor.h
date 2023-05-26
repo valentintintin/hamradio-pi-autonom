@@ -13,6 +13,7 @@ public:
     bool begin();
     bool update();
     bool setWatchdog(uint32_t powerOffTime);
+    bool setPowerOnOff(uint16_t powerOnVoltage, uint16_t powerOffVoltage);
 
     inline int16_t getVoltageBattery() const {
         return vb;
@@ -61,6 +62,14 @@ public:
     inline uint16_t getWatchdogPowerOffTime() const {
         return watchdogPowerOffTime;
     }
+
+    inline uint16_t getPowerOffVoltage() const {
+        return powerOffVoltage;
+    }
+
+    inline uint16_t getPowerOnVoltage() const {
+        return powerOnVoltage;
+    }
 private:
     System *system;
     TwoWire &wire;
@@ -71,7 +80,7 @@ private:
 
     bool init = false, night = false, alert = false, watchdogEnabled = false, powerEnabled = false;
     uint8_t watchdogCounter = 0;
-    uint16_t status = 0, watchdogPowerOffTime = 0;
+    uint16_t status = 0, watchdogPowerOffTime = 0, powerOffVoltage, powerOnVoltage;
     int16_t vs = 0, is = 0, vb = 0, ib = 0;
 
     void updateWatchdog();

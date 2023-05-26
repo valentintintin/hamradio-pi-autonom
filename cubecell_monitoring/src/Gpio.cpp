@@ -25,8 +25,9 @@ void Gpio::setState(uint8_t pin, bool enabled, const char* name, bool &status, b
                 .endObject();
         SerialPiUsed.println();
 
-        sprintf_P(buffer, PSTR("Pin %s (%d) changed to %d"), name, pin, enabled);
-        system->displayText(PSTR("GPIO"), buffer);
+        // fixme bug freeze if display
+//        sprintf_P(buffer, PSTR("Pin %s (%d) changed to %d"), name, pin, enabled);
+//        system->displayText(PSTR("GPIO"), buffer);
     }
 
     if (inverted) {

@@ -13,6 +13,7 @@ Command::Command(System *system) {
     parser.registerCommand(PSTR("npr"), PSTR("s"), doNpr);
     parser.registerCommand(PSTR("telem"), PSTR(""), doTelemetry);
     parser.registerCommand(PSTR("dog"), PSTR("u"), doWatchdog);
+    parser.registerCommand(PSTR("pow"), PSTR("uu"), doMpptPower);
     parser.registerCommand(PSTR("lora"), PSTR("s"), doLora);
     parser.registerCommand(PSTR("time"), PSTR("u"), doSetTime);
 }
@@ -79,4 +80,13 @@ void Command::doSetTime(MyCommandParser::Argument *args, char *response) {
     system->setTimeFromRTcToInternalRtc(epoch);
 
     System::nowToString(response);
+}
+
+void Command::doMpptPower(MyCommandParser::Argument *args, char *response) {
+    uint64_t powerOnVoltage = args[0].asUInt64;
+    uint64_t powerOffVoltage = args[1].asUInt64;
+
+    bool ok = system->mpptMonitor.setPowerOnOff(powerOnVoltage, powerOffVoltage);
+
+    sprintf_P(response, ok ? PSTR("OK") : PSTR("KO"));
 }
