@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+        <RuntimeIdentifiers>linux-arm;linux-x64</RuntimeIdentifiers>
+        <AssemblyName>Monitor</AssemblyName>
+        <RootNamespace>Monitor</RootNamespace>
+        <PackageId>Monitor</PackageId>
+        <Authors>Monitor</Authors>
+        <Company>Monitor</Company>
+        <Product>Monitor</Product>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <Content Update="appsettings.Development.json">
+        <DependentUpon>appsettings.json</DependentUpon>
+      </Content>
+      <Content Remove="storage\**" />
+      <None Remove="Dockerfile" />
+      <Content Include="Dockerfile">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.5">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.5" />
+      <PackageReference Include="SunCalcNet" Version="1.2.2" />
+      <PackageReference Include="System.IO.Ports" Version="7.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Remove="storage\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Remove="storage\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="storage\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="obj\Debug\net7.0\" />
+    </ItemGroup>
+
+</Project>

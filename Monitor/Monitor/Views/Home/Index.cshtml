@@ -1,0 +1,128 @@
+﻿@model Monitor.Models.Views.HomeModel;
+
+@{
+    ViewData["Title"] = "Accueil";
+}
+
+<header>
+    <h2>Tableau de bord</h2>
+</header>
+
+<meta http-equiv="refresh" content="60;URL=/">
+                 
+<div class="sensors">
+    <header>
+        <h2>
+            Capteurs
+        </h2>
+    </header>
+                 
+    <section>
+        <article class="card card-number bg-green">
+            <span class="title">Température</span>
+            <strong class="value">@Model.State.Weather.Temperature °C</strong>
+        </article>
+                 
+        <article class="card card-number bg-green">
+            <span class="title">Humidité</span>
+            <strong class="value">@Model.State.Weather.Humidity %</strong>
+        </article>
+        
+    </section>
+                 
+    <section>
+        <article class="card card-number bg-blue">
+            <span class="title">Voltage solaire</span>
+            <strong class="value">@Model.State.Mppt.SolarVoltage mV</strong>
+        </article>
+                 
+        <article class="card card-number bg-orange">
+            <span class="title">Intensité de charge</span>
+            <strong class="value">@Model.State.Mppt.CurrentCharge mA</strong>
+        </article>
+    </section>
+                 
+    <section>
+        <article class="card card-number bg-blue">
+            <span class="title">Voltage batterie</span>
+            <strong class="value">@Model.State.Mppt.BatteryVoltage mV</strong>
+        </article>
+                 
+        <article class="card card-number bg-orange">
+            <span class="title">Uptime</span>
+            <strong class="value">@Model.State.System.UptimeTimeSpan.ToString()</strong>
+        </article>
+    </section>
+</div>
+                 
+<div class="photos">
+    <header>
+        <h2>
+            Dernière photo
+        </h2>
+    </header>
+                 
+    <section>
+        @if (!string.IsNullOrWhiteSpace(Model.LastPhoto))
+        {
+            <article class="photo">
+                <a href="@Model.LastPhoto" target="_blank">
+                    <img src="@Model.LastPhoto" alt="Dernière photo prise" />
+                </a>
+            </article>
+        }
+        else
+        {
+            <strong>Aucune photo</strong>
+        }
+    </section>
+</div>
+                 
+<div class="infos">
+    <header>
+        <h2>La station</h2>
+    </header>
+                 
+    <section>
+        <article>
+            <ul>
+                <li>
+                    <a href="https://store.arduino.cc/arduino-pro-mini" target="_blank">Un Arduino Pro Mini pour le
+                        watchdog</a>
+                </li>
+                <li>
+                    <a href="http://www.orangepi.org/orangepizerolts/" target="_blank">Un Orange Pi Zero LTS</a>
+                </li>
+                <li>
+                    <a href="https://www.all-batteries.fr/batterie-plomb/sonnenschein/a512-10s.html" target="_blank">Une
+                        batterie Plomb/Gel 10Ah</a>
+                </li>
+                <li>
+                    <a href="https://www.amazon.fr/gp/product/B07KG2TB6V" target="_blank">Un panneau de 25W</a>
+                </li>
+                <li>
+                    <a href="http://www.danjuliodesigns.com/products/makerpower.html" target="_blank">Un chargeur
+                        MPPT</a>
+                </li>
+                <li>
+                    <a href="https://hackaday.io/project/164092-npr-new-packet-radio" target="_blank">Un NPR 70</a>
+                </li>
+            </ul>
+        </article>
+                 
+        @* <article> *@
+        @*     <a href="/images/lien.jpg" target="_blank"> *@
+        @*         <img src="/images/lien.jpg" alt="Liens réseaux" style="width: 200px"/> *@
+        @*     </a> *@
+        @*     <a href="/images/station-boite.jpg" target="_blank"> *@
+        @*         <img src="/images/station-boite.jpg" alt="Station boîte intérieur" style="width: 200px"/> *@
+        @*     </a> *@
+        @*     <a href="/images/station-sol.jpg" target="_blank"> *@
+        @*         <img src="/images/station-sol.jpg" alt="Station au sol" style="width: 200px"/> *@
+        @*     </a> *@
+        @*     <a href="/images/station-sol2.jpg" target="_blank"> *@
+        @*         <img src="/images/station-sol2.jpg" alt="Station on sol 2" style="width: 200px"/> *@
+        @*     </a> *@
+        @* </article> *@
+    </section>
+</div>
