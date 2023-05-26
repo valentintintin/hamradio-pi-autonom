@@ -1,0 +1,11 @@
+[Unit]
+Description=Run timelapse every minutes
+After=startup.service
+Wants=startup.service
+
+[Timer]
+OnCalendar=*:0/1
+Persistent=true
+
+[Install]
+WantedBy=timers.target

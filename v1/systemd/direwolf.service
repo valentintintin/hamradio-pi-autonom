@@ -1,0 +1,14 @@
+[Unit]
+Description=Direwolf packet radio
+after=sound.service
+Wants=startup.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecPreStart=/bin/sleep 10
+ExecStart=/home/valentin/bin/start-direwolf.sh
+ExecStop=/home/valentin/bin/stop-direwolf.sh
+
+[Install]
+WantedBy=multi-user.target

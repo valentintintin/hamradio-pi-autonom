@@ -1,0 +1,11 @@
+[Unit]
+Description=Shutdown
+DefaultDependencies=false
+
+[Service]
+Type=oneshot
+ExecStart=/home/valentin/bin/shutdown.sh
+Restart=no
+
+[Install]
+WantedBy=poweroff.target halt.target

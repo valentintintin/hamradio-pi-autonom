@@ -1,0 +1,7 @@
+[Service]
+After=startup.service
+Wants=startup.service
+ExecStart=/home/valentin/softs/MPPT-Solar-Charger/mpptChgD/mpptChgD -f /home/valentin/mpptChgD.config
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,268 @@
+#!/bin/sh
+#
+# script: /sbin/fake-hwclock
+# Changed by I.S. to use RTC if it is connected
+# modified to take advantage of module ds3232 on newer kernels.
+# if ds3231 attached, change ds3231attached to yes, else to no
+# if ds3231 attached and module rtc_ds3232 available on your kernel,
+# you will be able to read temperature from rtc module via hwmon
+#
+# Trivial script to load/save current contents of the kernel clock
+# from/to a file. Helpful as a *bootstrap* clock on machines where
+# there isn't a useful RTC driver (e.g. on development boards). Using
+# NTP is still recommended on these machines to get to real time sync
+# once more of the system is up and running.
+#
+# Copyright 2012 Steve McIntyre <93sam@debian.org>
+#
+# License: GPLv2, see COPYING
+
+# Config variables
+
+# RTC is attached on bus...
+i2c_bus=0
+eeprom_address="57"
+rtc_address="68"
+ds3231attached=yes
+
+# Orange  PI +2e have RTC, so our device will be:
+rtc_device="rtc1"
+
+# fake-hwclock is using cron.hourly to periodically save system clock
+cronfile="/etc/cron.hourly/fake-hwclock"
+
+# If you want to periodically synchronize rtc with system time, change this to true
+update_rtc_periodically=false
+
+# End of config variables
+
+i2c=false
+if [ "$ds3231attached" = "yes" ]; then
+  modprobe rtc_ds3232 > /dev/null 2>&1
+	module=$?
+  if [ "$module" != "0" ]; then
+    ds3231attached=no
+  fi
+fi
+
+
+# I don't know are all needed programs in PATH,
+# therefore I'll declare all mine
+echo="/bin/echo"
+i2cdetect="/usr/sbin/i2cdetect"
+grep="/bin/grep"
+awk="/usr/bin/awk"
+ln="/bin/ln"
+hwclock="/sbin/hwclock"
+readlink="/bin/readlink"
+
+progs="$echo $i2cdetect $grep $awk $ln $hwclock $readlink"
+
+check_external_progs(){
+  not_found=""
+  prog=""
+  for prog in ${progs}
+  do
+    if [ ! -e "$prog" ]; then
+      not_found=$prog" "$not_found
+      echo "Required program not found: $prog"
+    fi
+  done
+
+  if [ "$not_found"x = ""x ] ; then
+    progs_ok=true
+  else
+    progs_ok=false
+  fi
+  unset not_found
+  unset prog
+}
+
+recreate_cronjob() {
+if [ ! -e "$1" ]; then
+cat << 'EOF' > "$1"
+#!/bin/sh
+#
+# Simple cron script - save the current clock periodically in case of
+# a power failure or other crash
+
+if (command -v fake-hwclock >/dev/null 2>&1) ; then
+  fake-hwclock save
+fi
+EOF
+fi
+}
+
+is_rtc_connected(){
+  check_external_progs
+  if $progs_ok; then
+    #
+    if $i2c; then
+      list=$($i2cdetect -y "$i2c_bus")
+      rtc=$(echo "$list" | $grep "60:" | $awk '{print $10}')
+      eeprom=$(echo "$list" | $grep "50:" | $awk '{print $9}')
+
+      #rtc=68
+
+      if [ "$eeprom" -eq "$eeprom_address" ]; then
+        
+        case $rtc in
+          "UU")
+            t="/dev/$rtc_device"
+            r=$($readlink -f /dev/rtc)
+            if [ "$r" = "$t" ]; then
+              $echo "true"
+            else
+              $ln -sf /dev/$rtc_device /dev/rtc >/dev/null 2>&1
+              r=$($readlink -f /dev/rtc)
+              if [ "$r" = "$t" ]; then
+                $echo "true"
+              else
+                $echo "false"
+              fi
+            fi;;
+
+          $rtc_address)
+            if [ "$ds3231attached" = "yes" ]; then
+	            $echo ds3232 0x$rtc_address > /sys/class/i2c-adapter/i2c-$i2c_bus/new_device
+	          else
+	            $echo ds1307 0x$rtc_address > /sys/class/i2c-adapter/i2c-$i2c_bus/new_device
+	          fi
+	          
+            sleep 5
+
+            $ln -sf /dev/$rtc_device /dev/rtc >/dev/null 2>&1
+
+            t="/dev/$rtc_device"
+            r=$($readlink -f /dev/rtc)
+
+            if [ "$r" = "$t" ]; then
+              $echo "true"
+            else
+              $echo "false"
+            fi;;
+
+          *)
+            $echo "false";;
+        esac
+      else
+        $echo "false"
+      fi
+    else
+      $echo "false"
+    fi
+    #
+  else
+    $echo "false"
+  fi
+}
+
+#i2c=true
+#is_rtc_connected
+#exit
+
+
+if [ "$FILE"x = ""x ] ; then
+    FILE=/etc/fake-hwclock.data
+fi
+
+COMMAND=$1
+if [ "$COMMAND"x = ""x ] ; then
+    COMMAND="save"
+fi
+
+FORCE=false
+if [ "$2"x = "force"x ] ; then
+    FORCE=true
+fi
+
+# Wait for i2c
+$i2cdetect -y "$i2c_bus" >/dev/null 2>&1
+r=$?
+if [ "$COMMAND" = "load" ] || [ "$r" -eq 0 ]; then
+  c=20
+  r=1
+
+  until [ "$r" -eq 0 ] || [ "$c" -eq 0 ]
+  do
+    $i2cdetect -y "$i2c_bus" >/dev/null 2>&1
+    r=$?
+    c=$(($c - 1))
+    if [ "$r" -eq 0 ]; then
+      i2c=true
+    else
+      sleep 1
+    fi
+  done
+fi
+
+# Is RTC installed?
+rtc_installed=$(is_rtc_connected)
+
+if $rtc_installed; then
+  # We dont need periodically saving
+  rm -f "$cronfile" >/dev/null 2>&1
+else
+  # Restore periodically saving
+  recreate_cronjob "$cronfile"
+fi
+
+case $COMMAND in
+    save)
+        if $rtc_installed; then
+          #$echo "RTC save"
+          $hwclock -w
+          if $update_rtc_periodically; then
+            $echo "cronjob restore"
+            recreate_cronjob "$cronfile"
+          fi
+        else
+          if [ -e $FILE ] ; then
+              SAVED="$(cat $FILE)"
+              SAVED_SEC=$(date -u -d "$SAVED" '+%s')
+              NOW_SEC=$(date -u '+%s')
+              if $FORCE || [ $NOW_SEC -ge $SAVED_SEC ] ; then
+                  date -u '+%Y-%m-%d %H:%M:%S' > $FILE
+              else
+                  echo "Current system time: $(date -u '+%Y-%m-%d %H:%M:%S')"
+                  echo "fake-hwclock saved clock information is in the future: $SAVED"
+                  echo "To force the saved system clock backwards anyway, use \"force\""
+              fi
+          else
+              date -u '+%Y-%m-%d %H:%M:%S' > $FILE
+          fi
+        fi
+        ;;
+    load)
+        if $rtc_installed; then
+          #$echo "RTC load"
+          $hwclock -s
+        else
+          if [ -e $FILE ] ; then
+              SAVED="$(cat $FILE)"
+              SAVED_SEC=$(date -u -d "$SAVED" '+%s')
+              NOW_SEC=$(date -u '+%s')
+              if $FORCE || [ $NOW_SEC -le $SAVED_SEC ] ; then
+                  date -u -s "$SAVED"
+              else
+                  echo "Current system time: $(date -u '+%Y-%m-%d %H:%M:%S')"
+                  echo "fake-hwclock saved clock information is in the past: $SAVED"
+                  echo "To set system time to this saved clock anyway, use \"force\""
+              fi
+          else
+              echo "Unable to read saved clock information: $FILE does not exist"
+          fi
+        fi
+        ;;
+    check)
+        if $rtc_installed; then
+          echo "RTC installed"
+        else
+          echo "RTC not installed"
+        fi
+        ;;
+    *)
+        echo $0: Unknown command $COMMAND
+        exit 1
+        ;;
+esac

@@ -1,0 +1,11 @@
+[Service]
+Type=oneshot
+RemainAfterExit=no
+ExecStart=/home/valentin/bin/telemetry.sh
+User=valentin
+Group=valentin
+After=startup.service
+Wants=startup.service
+
+[Install]
+WantedBy=multi-user.target

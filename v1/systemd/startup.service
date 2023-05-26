@@ -1,0 +1,11 @@
+[Unit]
+Description=Startup
+After=multi-user.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/valentin/bin/startup.sh
+Restart=no
+
+[Install]
+WantedBy=multi-user.target
