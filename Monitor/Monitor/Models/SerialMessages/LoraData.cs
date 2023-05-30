@@ -5,10 +5,10 @@ namespace Monitor.Models.SerialMessages;
 public class LoraData : Message
 {
     [JsonPropertyName("state")]
-    public string State { get; set; }
+    public required string State { get; set; }
 
     [JsonPropertyName("payload")]
-    public string Payload { get; set; }
+    public required string Payload { get; set; }
 
     public bool IsTx => State == "tx";
 

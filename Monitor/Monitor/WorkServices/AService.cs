@@ -1,4 +1,4 @@
-namespace Monitor.Services;
+namespace Monitor.WorkServices;
 
 public abstract class AService
 {

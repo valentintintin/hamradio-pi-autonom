@@ -156,6 +156,7 @@ bool MpptMonitor::update() {
             .property(F("solarCurrent"), is)
             .property(F("currentCharge"), getCurrentCharge())
             .property(F("status"), status)
+            .property(F("statusString"), mpptChg::getStatusAsString(status))
             .property(F("night"), night)
             .property(F("alert"), alert)
             .property(F("watchdogEnabled"), watchdogEnabled)

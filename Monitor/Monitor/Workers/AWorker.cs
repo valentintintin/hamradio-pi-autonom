@@ -1,4 +1,4 @@
-using Monitor.Services;
+using Monitor.WorkServices;
 
 namespace Monitor.Workers;
 

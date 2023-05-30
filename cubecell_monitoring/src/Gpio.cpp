@@ -16,15 +16,6 @@ void Gpio::setState(uint8_t pin, bool enabled, const char* name, bool &status, b
     if (initialized) {
         Log.infoln(F("[GPIO] %s (%d) change to state %d"), name, pin, enabled);
 
-        serialJsonWriter
-                .beginObject()
-                .property(F("type"), PSTR("gpio"))
-                .property(F("state"), (byte) enabled)
-                .property(F("name"), (char*) name)
-                .property(F("pin"), pin)
-                .endObject();
-        SerialPiUsed.println();
-
         // fixme bug freeze if display
 //        sprintf_P(buffer, PSTR("Pin %s (%d) changed to %d"), name, pin, enabled);
 //        system->displayText(PSTR("GPIO"), buffer);
@@ -57,15 +48,6 @@ bool Gpio::getState(uint8_t pin, const char* name) {
 
     if (initialized) {
         Log.infoln(F("[GPIO] %s (%d) is %d"), name, pin, enabled);
-
-        serialJsonWriter
-                .beginObject()
-                .property(F("type"), PSTR("gpio"))
-                .property(F("state"), (byte) enabled)
-                .property(F("name"), (char*) name)
-                .property(F("pin"), pin)
-                .endObject();
-        SerialPiUsed.println();
     }
 
     return enabled;
@@ -78,16 +60,17 @@ uint16_t Gpio::getAdcState(uint8_t pin, const char *name) {
 
     if (initialized) {
         Log.infoln(F("[GPIO] %s (%d) is %d"), name, pin, val);
-
-        serialJsonWriter
-                .beginObject()
-                .property(F("type"), PSTR("gpio"))
-                .property(F("state"), val)
-                .property(F("name"), (char*) name)
-                .property(F("pin"), pin)
-                .endObject();
-        SerialPiUsed.println();
     }
 
     return val;
+}
+
+void Gpio::printJson() {
+    serialJsonWriter
+            .beginObject()
+            .property(F("type"), PSTR("gpio"))
+            .property(F("wifi"), isWifiEnabled() ? PSTR("true") : PSTR("false"))
+            .property(F("npr"), isNprEnabled() ? PSTR("true") : PSTR("false"))
+            .property(F("ldr"), getLdr())
+            .endObject(); SerialPiUsed.println();
 }

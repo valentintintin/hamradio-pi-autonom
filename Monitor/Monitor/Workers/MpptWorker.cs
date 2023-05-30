@@ -1,6 +1,6 @@
 using Monitor.Extensions;
 using Monitor.Models.SerialMessages;
-using Monitor.Services;
+using Monitor.WorkServices;
 using Timer = System.Timers.Timer;
 
 namespace Monitor.Workers;

@@ -1,4 +1,4 @@
-namespace Monitor.Services;
+namespace Monitor.WorkServices;
 
 public class CameraService : AService
 {
@@ -29,7 +29,7 @@ public class CameraService : AService
         }
         catch (Exception e)
         {
-            Logger.LogError("Get webcam snapshot to {filePath} KO", filePath);
+            Logger.LogError(e, "Get webcam snapshot to {filePath} KO", filePath);
         }
     }
     

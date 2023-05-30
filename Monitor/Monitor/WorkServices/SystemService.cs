@@ -2,7 +2,7 @@ using System.Text.Json;
 using Monitor.Extensions;
 using Monitor.Models;
 
-namespace Monitor.Services;
+namespace Monitor.WorkServices;
 
 public class SystemService : AService
 {

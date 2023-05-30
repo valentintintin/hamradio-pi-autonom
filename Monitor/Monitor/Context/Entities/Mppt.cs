@@ -19,6 +19,8 @@ public class Mppt : IEntity
     public int CurrentCharge { get; set; }
 
     public int Status { get; set; }
+    
+    public string? StatusString { get; set; }
 
     public bool Night { get; set; }
 

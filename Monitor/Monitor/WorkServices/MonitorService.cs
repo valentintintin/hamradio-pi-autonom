@@ -3,10 +3,11 @@ using Monitor.Context.Entities;
 using Monitor.Extensions;
 using Monitor.Models;
 using Monitor.Models.SerialMessages;
+using NetDaemon.Extensions.MqttEntityManager;
 using SunCalcNet;
 using SunCalcNet.Model;
 
-namespace Monitor.Services;
+namespace Monitor.WorkServices;
 
 public class MonitorService : AService
 {
@@ -16,24 +17,27 @@ public class MonitorService : AService
     private readonly IConfiguration _configuration;
     private readonly SystemService _systemService;
     private readonly SerialMessageService _serialMessageService;
+    private readonly IMqttEntityManager _entityManager;
 
     private readonly double _latitude;
     private readonly double _longitude;
     
     public MonitorService(ILogger<MonitorService> logger, DataContext context,
-        IConfiguration configuration, SystemService systemService, SerialMessageService serialMessageService) : base(logger)
+        IConfiguration configuration, SystemService systemService, SerialMessageService serialMessageService,
+        IMqttEntityManager entityManager) : base(logger)
     {
         _context = context;
         _configuration = configuration;
         _systemService = systemService;
         _serialMessageService = serialMessageService;
+        _entityManager = entityManager;
 
         IConfigurationSection positionConfiguration = _configuration.GetSection("Position");
         _latitude = positionConfiguration.GetValueOrThrow<double>("Latitude");
         _longitude = positionConfiguration.GetValueOrThrow<double>("Longitude");
     }
 
-    public void UpdateStateFromMessage(Message message)
+    public async Task UpdateStateFromMessage(Message message)
     {
         State.LastMessagesReceived.Add(message);
         
@@ -41,6 +45,7 @@ public class MonitorService : AService
         {
             case McuSystemData systemData:
                 State.McuSystem = systemData;
+                // await _entityManager.SetStateAsync(entityId, systemData.BoxOpened);
                 break;
             case WeatherData weatherData:
                 State.Weather = weatherData;
@@ -63,6 +68,7 @@ public class MonitorService : AService
                     SolarCurrent = mpptData.SolarCurrent,
                     CurrentCharge = mpptData.CurrentCharge,
                     Status = mpptData.Status,
+                    StatusString = mpptData.StatusString,
                     Night = mpptData.Night,
                     Alert = mpptData.Alert,
                     WatchdogEnabled = mpptData.WatchdogEnabled,
@@ -76,14 +82,7 @@ public class MonitorService : AService
                 _systemService.SetTime(State.Time.DateTime.DateTime);
                 break;
             case GpioData gpioData:
-                if (gpioData.Name.ToUpper() == "WIFI")
-                {
-                    State.Gpio.Wifi = gpioData.Enabled;
-                }
-                else if (gpioData.Name.ToUpper() == "NPR")
-                {
-                    State.Gpio.Npr = gpioData.Enabled;
-                }
+                State.Gpio = gpioData;
                 break;
             case LoraData loraData:
                 if (loraData.IsTx)

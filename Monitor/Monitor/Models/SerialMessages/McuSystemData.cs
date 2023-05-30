@@ -5,7 +5,7 @@ namespace Monitor.Models.SerialMessages;
 public class McuSystemData : Message
 {
     [JsonPropertyName("state")]
-    public string State { get; set; }
+    public required string State { get; set; }
 
     [JsonPropertyName("boxOpened")]
     public bool BoxOpened { get; set; }

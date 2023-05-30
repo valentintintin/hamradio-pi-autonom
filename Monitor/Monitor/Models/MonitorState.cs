@@ -4,15 +4,31 @@ namespace Monitor.Models;
 
 public class MonitorState
 {
-    public readonly GpioState Gpio = new();
+    public GpioData Gpio = new()
+    {
+        Type = "gpio"
+    };
     
-    public WeatherData Weather { get; set; } = new ();
+    public WeatherData Weather { get; set; } = new ()
+    {
+        Type = "weather"
+    };
 
-    public TimeData Time { get; set; } = new();
+    public TimeData Time { get; set; } = new()
+    {
+        Type = "time"
+    };
 
-    public McuSystemData McuSystem = new();
+    public McuSystemData McuSystem = new()
+    {
+        State = "no data",
+        Type = "system"
+    };
 
-    public MpptData Mppt { get; set; } = new();
+    public MpptData Mppt { get; set; } = new()
+    {
+        Type = "mppt"
+    };
 
     public LoraState Lora { get; } = new();
     

@@ -22,6 +22,9 @@ public class MpptData : Message
     [JsonPropertyName("status")]
     public int Status { get; set; }
 
+    [JsonPropertyName("statusString")]
+    public string? StatusString { get; set; }
+
     [JsonPropertyName("night")]
     public bool Night { get; set; }
 

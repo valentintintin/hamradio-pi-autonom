@@ -4,19 +4,17 @@ namespace Monitor.Models.SerialMessages;
 
 public class GpioData : Message
 {
-    [JsonPropertyName("state")]
-    public int State { get; set; }
-
-    [JsonPropertyName("name")]
-    public string Name { get; set; }
+    [JsonPropertyName("wifi")]
+    public bool Wifi { get; set; }
     
-    [JsonPropertyName("pin")]
-    public int Pin { get; set; }
-
-    public bool Enabled => State > 0;
+    [JsonPropertyName("npr")]
+    public bool Npr { get; set; }
+    
+    [JsonPropertyName("ldr")]
+    public int Ldr { get; set; }
 
     public override string ToString()
     {
-        return $"{base.ToString()} {Name} is {State}";
+        return $"{base.ToString()} Wifi is {Wifi}. Npr is {Npr}. Ldr box is {Ldr}";
     }
 }

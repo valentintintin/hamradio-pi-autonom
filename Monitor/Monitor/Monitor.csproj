@@ -23,9 +23,17 @@
       <Content Include="Dockerfile">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <Content Remove="obj\**" />
+      <None Remove="obj\**" />
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="JoySoftware.NetDaemon.App" Version="22.1.12" />
+      <PackageReference Include="JoySoftware.NetDaemon.Extensions.Mqtt" Version="23.19.0" />
+      <PackageReference Include="JoySoftware.NetDaemon.Extensions.Scheduling" Version="23.19.0" />
+      <PackageReference Include="JoySoftware.NetDaemon.Fakes" Version="22.1.12" />
+      <PackageReference Include="JoySoftware.NetDaemon.HassModel" Version="23.19.0" />
+      <PackageReference Include="JoySoftware.NetDaemon.Runtime" Version="23.19.0" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.5">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -37,10 +45,12 @@
 
     <ItemGroup>
       <Compile Remove="storage\**" />
+      <Compile Remove="obj\**" />
     </ItemGroup>
 
     <ItemGroup>
       <EmbeddedResource Remove="storage\**" />
+      <EmbeddedResource Remove="obj\**" />
     </ItemGroup>
 
     <ItemGroup>

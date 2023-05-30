@@ -3,7 +3,7 @@ using System.Text.Json;
 using Monitor.Exceptions;
 using Monitor.Models.SerialMessages;
 
-namespace Monitor.Services;
+namespace Monitor.WorkServices;
 
 public class SerialMessageService : AService
 {

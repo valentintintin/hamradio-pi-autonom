@@ -9,6 +9,8 @@ class Gpio {
 public:
     explicit Gpio(System *system);
 
+    void printJson();
+
     void setWifi(bool enabled);
     void setNpr(bool enabled);
 

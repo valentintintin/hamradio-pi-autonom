@@ -1,0 +1,431 @@
+{
+  "domains": [
+    {
+      "domain": "binary_sensor",
+      "entities": [
+        {
+          "id": "binary_sensor.box_opened",
+          "friendlyName": "Box opened",
+          "cSharpName": "BoxOpened"
+        },
+        {
+          "id": "binary_sensor.mppt_alert",
+          "friendlyName": "MPPT Alert",
+          "cSharpName": "MpptAlert"
+        },
+        {
+          "id": "binary_sensor.mppt_night",
+          "friendlyName": "MPPT Night",
+          "cSharpName": "MpptNight"
+        },
+        {
+          "id": "binary_sensor.mppt_power_enaled",
+          "friendlyName": "MPPT Power Enabled",
+          "cSharpName": "MpptPowerEnaled"
+        },
+        {
+          "id": "binary_sensor.mppt_watchdog_enaled",
+          "friendlyName": "MPPT Watchdog Enabled",
+          "cSharpName": "MpptWatchdogEnaled"
+        }
+      ],
+      "attributes": [
+        {
+          "jsonName": "device_class",
+          "cSharpName": "DeviceClass",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "friendly_name",
+          "cSharpName": "FriendlyName",
+          "clrType": "System.String"
+        }
+      ]
+    },
+    {
+      "domain": "input_boolean",
+      "entities": [
+        {
+          "id": "input_boolean.dev_netdaemon_monitor_apps_init_app",
+          "friendlyName": "dev_netdaemon_monitor_apps_init_app",
+          "cSharpName": "DevNetdaemonMonitorAppsInitApp"
+        }
+      ],
+      "attributes": [
+        {
+          "jsonName": "editable",
+          "cSharpName": "Editable",
+          "clrType": "System.Boolean"
+        },
+        {
+          "jsonName": "friendly_name",
+          "cSharpName": "FriendlyName",
+          "clrType": "System.String"
+        }
+      ]
+    },
+    {
+      "domain": "person",
+      "entities": [
+        {
+          "id": "person.test",
+          "friendlyName": "Test",
+          "cSharpName": "Test"
+        }
+      ],
+      "attributes": [
+        {
+          "jsonName": "editable",
+          "cSharpName": "Editable",
+          "clrType": "System.Boolean"
+        },
+        {
+          "jsonName": "id",
+          "cSharpName": "Id",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "user_id",
+          "cSharpName": "UserId",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "device_trackers",
+          "cSharpName": "DeviceTrackers",
+          "clrType": "System.Collections.Generic.IReadOnlyList\u00601[System.Object]"
+        },
+        {
+          "jsonName": "friendly_name",
+          "cSharpName": "FriendlyName",
+          "clrType": "System.String"
+        }
+      ]
+    },
+    {
+      "domain": "sensor",
+      "entities": [
+        {
+          "id": "sensor.gpio_ldr_box",
+          "friendlyName": "LDR Box",
+          "cSharpName": "GpioLdrBox"
+        },
+        {
+          "id": "sensor.lora_rx_payload",
+          "friendlyName": "Lora RX Payload",
+          "cSharpName": "LoraRxPayload"
+        },
+        {
+          "id": "sensor.lora_tx_payload",
+          "friendlyName": "Lora TX Payload",
+          "cSharpName": "LoraTxPayload"
+        },
+        {
+          "id": "sensor.mcu_status",
+          "friendlyName": "MCU Status",
+          "cSharpName": "McuStatus"
+        },
+        {
+          "id": "sensor.mcu_uptime",
+          "friendlyName": "MCU Uptime",
+          "cSharpName": "McuUptime"
+        },
+        {
+          "id": "sensor.mppt_status",
+          "friendlyName": "MPPT Status",
+          "cSharpName": "MpptStatus"
+        },
+        {
+          "id": "sensor.sun_next_dawn",
+          "friendlyName": "Sun Prochaine aube",
+          "cSharpName": "SunNextDawn"
+        },
+        {
+          "id": "sensor.sun_next_dusk",
+          "friendlyName": "Sun Prochain cr\u00E9puscule",
+          "cSharpName": "SunNextDusk"
+        },
+        {
+          "id": "sensor.sun_next_midnight",
+          "friendlyName": "Sun Prochain minuit",
+          "cSharpName": "SunNextMidnight"
+        },
+        {
+          "id": "sensor.sun_next_noon",
+          "friendlyName": "Sun Prochain midi",
+          "cSharpName": "SunNextNoon"
+        },
+        {
+          "id": "sensor.sun_next_rising",
+          "friendlyName": "Sun Prochain lev\u00E9",
+          "cSharpName": "SunNextRising"
+        },
+        {
+          "id": "sensor.sun_next_setting",
+          "friendlyName": "Sun Prochain couch\u00E9",
+          "cSharpName": "SunNextSetting"
+        },
+        {
+          "id": "sensor.weather_humidity",
+          "friendlyName": "Outside Humidity",
+          "cSharpName": "WeatherHumidity"
+        },
+        {
+          "id": "sensor.weather_temperature",
+          "friendlyName": "Outside Temperature",
+          "cSharpName": "WeatherTemperature"
+        }
+      ],
+      "attributes": [
+        {
+          "jsonName": "device_class",
+          "cSharpName": "DeviceClass",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "icon",
+          "cSharpName": "Icon",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "friendly_name",
+          "cSharpName": "FriendlyName",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "state_class",
+          "cSharpName": "StateClass",
+          "clrType": "System.String"
+        }
+      ]
+    },
+    {
+      "domain": "sensor",
+      "isNumeric": true,
+      "entities": [
+        {
+          "id": "sensor.hacs",
+          "friendlyName": "hacs",
+          "cSharpName": "Hacs"
+        },
+        {
+          "id": "sensor.mppt_battery_current",
+          "friendlyName": "MPPT Battery Current",
+          "cSharpName": "MpptBatteryCurrent"
+        },
+        {
+          "id": "sensor.mppt_battery_voltage",
+          "friendlyName": "MPPT Battery Voltage",
+          "cSharpName": "MpptBatteryVoltage"
+        },
+        {
+          "id": "sensor.mppt_charge_current",
+          "friendlyName": "MPPT Charge Current",
+          "cSharpName": "MpptChargeCurrent"
+        },
+        {
+          "id": "sensor.mppt_power_off_voltage",
+          "friendlyName": "MPPT Power Off Voltage",
+          "cSharpName": "MpptPowerOffVoltage"
+        },
+        {
+          "id": "sensor.mppt_power_on_voltage",
+          "friendlyName": "MPPT Power On Voltage",
+          "cSharpName": "MpptPowerOnVoltage"
+        },
+        {
+          "id": "sensor.mppt_solar_current",
+          "friendlyName": "MPPT Solar Current",
+          "cSharpName": "MpptSolarCurrent"
+        },
+        {
+          "id": "sensor.mppt_solar_voltage",
+          "friendlyName": "MPPT Solar Voltage",
+          "cSharpName": "MpptSolarVoltage"
+        },
+        {
+          "id": "sensor.mppt_watchdog_counter",
+          "friendlyName": "MPPT Watchdog Counter",
+          "cSharpName": "MpptWatchdogCounter"
+        },
+        {
+          "id": "sensor.mppt_watchdog_power_off_time",
+          "friendlyName": "MPPT Watchdog Power Off time",
+          "cSharpName": "MpptWatchdogPowerOffTime"
+        }
+      ],
+      "attributes": [
+        {
+          "jsonName": "repositories",
+          "cSharpName": "Repositories",
+          "clrType": "System.Collections.Generic.IReadOnlyList\u00601[System.Object]"
+        },
+        {
+          "jsonName": "unit_of_measurement",
+          "cSharpName": "UnitOfMeasurement",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "icon",
+          "cSharpName": "Icon",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "friendly_name",
+          "cSharpName": "FriendlyName",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "state_class",
+          "cSharpName": "StateClass",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "device_class",
+          "cSharpName": "DeviceClass",
+          "clrType": "System.String"
+        }
+      ]
+    },
+    {
+      "domain": "sun",
+      "entities": [
+        {
+          "id": "sun.sun",
+          "friendlyName": "Sun",
+          "cSharpName": "Sun"
+        }
+      ],
+      "attributes": [
+        {
+          "jsonName": "next_dawn",
+          "cSharpName": "NextDawn",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "next_dusk",
+          "cSharpName": "NextDusk",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "next_midnight",
+          "cSharpName": "NextMidnight",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "next_noon",
+          "cSharpName": "NextNoon",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "next_rising",
+          "cSharpName": "NextRising",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "next_setting",
+          "cSharpName": "NextSetting",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "elevation",
+          "cSharpName": "Elevation",
+          "clrType": "System.Double"
+        },
+        {
+          "jsonName": "azimuth",
+          "cSharpName": "Azimuth",
+          "clrType": "System.Double"
+        },
+        {
+          "jsonName": "rising",
+          "cSharpName": "Rising",
+          "clrType": "System.Boolean"
+        },
+        {
+          "jsonName": "friendly_name",
+          "cSharpName": "FriendlyName",
+          "clrType": "System.String"
+        }
+      ]
+    },
+    {
+      "domain": "switch",
+      "entities": [
+        {
+          "id": "switch.gpio_npr",
+          "friendlyName": "NPR",
+          "cSharpName": "GpioNpr"
+        },
+        {
+          "id": "switch.gpio_wifi",
+          "friendlyName": "Wifi",
+          "cSharpName": "GpioWifi"
+        }
+      ],
+      "attributes": [
+        {
+          "jsonName": "device_class",
+          "cSharpName": "DeviceClass",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "friendly_name",
+          "cSharpName": "FriendlyName",
+          "clrType": "System.String"
+        }
+      ]
+    },
+    {
+      "domain": "zone",
+      "entities": [
+        {
+          "id": "zone.home",
+          "friendlyName": "Maison",
+          "cSharpName": "Home"
+        }
+      ],
+      "attributes": [
+        {
+          "jsonName": "latitude",
+          "cSharpName": "Latitude",
+          "clrType": "System.Double"
+        },
+        {
+          "jsonName": "longitude",
+          "cSharpName": "Longitude",
+          "clrType": "System.Double"
+        },
+        {
+          "jsonName": "radius",
+          "cSharpName": "Radius",
+          "clrType": "System.Double"
+        },
+        {
+          "jsonName": "passive",
+          "cSharpName": "Passive",
+          "clrType": "System.Boolean"
+        },
+        {
+          "jsonName": "persons",
+          "cSharpName": "Persons",
+          "clrType": "System.Collections.Generic.IReadOnlyList\u00601[System.Object]"
+        },
+        {
+          "jsonName": "editable",
+          "cSharpName": "Editable",
+          "clrType": "System.Boolean"
+        },
+        {
+          "jsonName": "icon",
+          "cSharpName": "Icon",
+          "clrType": "System.String"
+        },
+        {
+          "jsonName": "friendly_name",
+          "cSharpName": "FriendlyName",
+          "clrType": "System.String"
+        }
+      ]
+    }
+  ]
+}

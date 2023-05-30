@@ -94,6 +94,7 @@ void System::update() {
 
         if (forceSendTelemetry || timerTime.hasExpired()) {
             showTime();
+            gpio.printJson();
             timerTime.restart();
         }
 
