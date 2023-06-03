@@ -201,6 +201,21 @@ void MpptMonitor::updateWatchdog() {
 
 bool MpptMonitor::setWatchdog(uint32_t powerOffTime) {
     if (!init) {
+        if (!begin()) {
+            return false;
+        }
+    }
+
+    if (!charger.isAlert(&alert)) {
+        Log.errorln(F("[MPPT_WATCHDOG]Change watchdog alert error"));
+        system->displayText(PSTR("Mttp error"), PSTR("Failed to get alert for watchdog"));
+        init = false;
+        return false;
+    }
+
+    if (alert) {
+        Log.errorln(F("[MPPT_WATCHDOG]Change watchdog error because alert"));
+        system->displayText(PSTR("Mttp watchdog"), PSTR("Failed to set watchdog because alert"));
         return false;
     }
 
