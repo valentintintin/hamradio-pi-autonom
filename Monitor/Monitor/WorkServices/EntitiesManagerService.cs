@@ -5,6 +5,9 @@ namespace Monitor.WorkServices;
 
 public class EntitiesManagerService : AService
 {
+    public static MqttEntities Entities { get; private set; }
+    
+    private readonly List<MqttEntity> _entitiesToUpdate = new();
     private readonly IMqttEntityManager _mqttEntityManager;
     private readonly IHaContext _haContext;
 
@@ -15,9 +18,136 @@ public class EntitiesManagerService : AService
         _haContext = haContext;
     }
 
-    public async Task<BinarySensorEntity> Boolean(string id, string name, BinarySensorDeviceClass? deviceClass = null, bool? value = null)
+    public void Update<T>(MqttEntity entity, T value)
     {
-        BinarySensorEntity entity = new(_haContext, $"binary_sensor.{id}");
+        if (value is bool valueBool)
+        {
+            entity.SetState(valueBool);
+        } 
+        else if (value is int valueInt)
+        {
+            entity.SetState(valueInt);    
+        }
+        else if (value is long valueLong)
+        {
+            entity.SetState(valueLong);    
+        }
+        else if (value is float valueFloat)
+        {
+            entity.SetState(valueFloat);    
+        }
+        else if (value is double valueDouble)
+        {
+            entity.SetState(valueDouble);    
+        }
+        else if (value is string valueString)
+        {
+            entity.SetState(valueString);
+        }
+        else if (value is DateTime valueDateTime)
+        {
+            entity.SetState(valueDateTime);    
+        }
+        else if (value is TimeSpan valueTimeSpan)
+        {
+            entity.SetState(valueTimeSpan);
+        }
+
+        _entitiesToUpdate.Add(entity);
+    }
+    
+    public async Task UpdateEntities()
+    {
+        foreach (MqttEntity entity in _entitiesToUpdate)
+        {
+            Logger.LogTrace("Update {entityId} to {state}", entity.EntityId, entity.NewState);
+            
+            await _mqttEntityManager.SetStateAsync(entity.EntityId, entity.NewState ?? "");
+            entity.ClearState();
+        }
+        
+        _entitiesToUpdate.Clear();
+    }
+
+    public async Task Init()
+    {
+        Entities = new MqttEntities
+        {
+            GpioWifi = await Switch("gpio_wifi", "Wifi", true),
+            GpioNpr = await Switch("gpio_npr", "NPR", true),
+            GpioBoxLdr = await Sensor("gpio_box_ldr", "Box LDR", SensorDeviceClass.ILLUMINANCE),
+            SystemBoxOpened = await BinarySensor("system_box_opened", "Box opened", BinarySensorDeviceClass.LOCK),
+            McuStatus = await Sensor("mcu_status", "MCU Status", SensorDeviceClass.ENUM),
+            McuUptime = await Sensor("mcu_uptime", "MCU Uptime", SensorDeviceClass.DURATION),
+            WeatherTemperature = await Sensor("weather_temperature", "Weather Temperature", SensorDeviceClass.TEMPERATURE, null, "°C"),
+            WeatherHumidity = await Sensor("weather_humidity", "Weather Humidity", SensorDeviceClass.HUMIDITY, null, "%"),
+            MpptBatteryVoltage = await Sensor("mppt_battery_voltage", "MPPT Battery Voltage", SensorDeviceClass.VOLTAGE, null, "mV"),
+            MpptBatteryCurrent = await Sensor("mppt_battery_current", "MPPT Battery Current", SensorDeviceClass.CURRENT, null, "mA"),
+            MpptSolarVoltage = await Sensor("mppt_solar_voltage", "MPPT Solar Voltage", SensorDeviceClass.VOLTAGE, null, "mV"),
+            MpptSolarCurrent = await Sensor("mppt_solar_current", "MPPT Solar Current", SensorDeviceClass.CURRENT, null, "mA"),
+            MpptChargeCurrent = await Sensor("mppt_charge_current", "MPPT Charge Current", SensorDeviceClass.CURRENT, null, "mA"),
+            MpptStatus = await Sensor("mppt_status", "MPPT Status", SensorDeviceClass.ENUM),
+            MpptNight = await BinarySensor("mppt_night", "MPPT Night", BinarySensorDeviceClass.LIGHT),
+            MpptAlert = await BinarySensor("mppt_alert", "MPPT Alert", BinarySensorDeviceClass.PROBLEM),
+            MpptPower = await BinarySensor("mppt_power", "MPPT Power", BinarySensorDeviceClass.POWER),
+            MpptWatchdog = await BinarySensor("mppt_watchdog", "MPPT Watchdog", BinarySensorDeviceClass.RUNNING),
+            MpptWatchdogCounter = await Sensor("mppt_watchdog_counter", "MPPT Watchdog Counter", null, null, "s"),
+            MpptWatchdogPowerOffTime = await Sensor("mppt_watchdog_poweroff_time", "MPPT Watchdog PowerOff Time", null, null, "s"),
+            MpptPowerOffVoltage = await Number("mppt_poweroff_voltage", "MPPT Power Off Voltage", NumberDeviceClass.VOLTAGE, null, "mV", 11000, 12000),
+            MpptPowerOnVoltage = await Number("mppt_poweron_voltage", "MPPT Power On Voltage", NumberDeviceClass.VOLTAGE, null, "mV", 11000, 12000),
+            MpptLowBatteryVoltage = await Number("mppt_low_battery_voltage", "MPPT Low Battery Voltage", NumberDeviceClass.VOLTAGE, null, "mV", 11000, 12000),
+            MpptLowBatteryTimeOff = await Number("mppt_low_battery_time_off", "MPPT Low Battery Time Off", null, null, "min", 5, 1000),
+            MpptNightTurnOn = await Switch("mppt_night_turn_on", "MPPT Night Turn On"),
+            MpptNightLimitVoltage = await Number("mppt_night_limit_voltage", "MPPT Night Limit Voltage", NumberDeviceClass.VOLTAGE, null, "mV", 11000, 12000),
+            MpptNightTimeOff = await Number("mppt_night_time_off", "MPPT Night Time Off", null, null, "h", 1, 12),
+            MpptNightUseSun = await Switch("mppt_night_use_sun", "MPPT Night Use Sun"),
+            LoraTxPayload = await Text("lora_tx_payload", "LoRa TX Payload"),
+            LoraRxPayload = await Sensor("lora_rx_payload", "LoRa RX Payload"),
+            TimeSleep = await Number("will_turn_off", "System will turn off", null, "0", "min", 0, 1000),
+        };
+    }
+
+    private async Task<MqttEntity> Button(string id, string name)
+    {
+        MqttEntity entity = new(_haContext, $"button.{id}");
+        
+        await _mqttEntityManager.CreateAsync(entity.EntityId, new EntityCreationOptions
+        {
+            Name = name,
+        });
+        
+        return entity;
+    }
+
+    private async Task<MqttEntity> Select(string id, string name, List<string> options, string? value = null)
+    {
+        MqttEntity entity = new(_haContext, $"select.{id}");
+        
+        await _mqttEntityManager.CreateAsync(entity.EntityId, new EntityCreationOptions
+        {
+            Name = name,
+        }, new
+        {
+            options
+        });
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            await _mqttEntityManager.SetStateAsync(entity.EntityId, value);
+        }
+        
+        (await _mqttEntityManager.PrepareCommandSubscriptionAsync(entity.EntityId))
+            .SubscribeAsync(async state =>
+            {
+                await _mqttEntityManager.SetStateAsync(entity.EntityId, state);
+            });
+        
+        return entity;
+    }
+
+    private async Task<MqttEntity> BinarySensor(string id, string name, BinarySensorDeviceClass? deviceClass = null, bool? value = null)
+    {
+        MqttEntity entity = new(_haContext, $"binary_sensor.{id}");
         
         await _mqttEntityManager.CreateAsync(entity.EntityId, new EntityCreationOptions
         {
@@ -27,20 +157,77 @@ public class EntitiesManagerService : AService
 
         if (value.HasValue)
         {
-            await _mqttEntityManager.SetStateAsync(entity.EntityId, value == true ? "true" : "false");
+            await _mqttEntityManager.SetStateAsync(entity.EntityId, value == true ? "on" : "off");
         }
         
         return entity;
     }
 
-    public async Task<SensorEntity> Value(string id, string name, SensorDeviceClass? deviceClass = null, string? value = null, string? unit = null)
+    private async Task<MqttEntity> Switch(string id, string name, bool isOutlet = false, bool? value = null)
     {
-        SensorEntity entity = new(_haContext, $"binary_sensor.{id}");
+        MqttEntity entity = new(_haContext, $"switch.{id}");
+        
+        await _mqttEntityManager.CreateAsync(entity.EntityId, new EntityCreationOptions
+        {
+            Name = name,
+            DeviceClass = isOutlet ? "outlet" : "switch"
+        });
+
+        if (value.HasValue)
+        {
+            await _mqttEntityManager.SetStateAsync(entity.EntityId, value == true ? "on" : "off");
+        }
+        
+        (await _mqttEntityManager.PrepareCommandSubscriptionAsync(entity.EntityId))
+            .SubscribeAsync(async state =>
+            {
+                await _mqttEntityManager.SetStateAsync(entity.EntityId, state);
+            });
+        
+        return entity;
+    }
+
+    private async Task<MqttEntity> Number(string id, string name, NumberDeviceClass? deviceClass = null, string? value = null, string? unit = null, double min = 0, double max = 100)
+    {
+        MqttEntity entity = new(_haContext, $"number.{id}");
         
         await _mqttEntityManager.CreateAsync(entity.EntityId, new EntityCreationOptions
         {
             Name = name,
             DeviceClass = deviceClass?.ToString().ToLower()
+        }, new
+        {
+            unit_of_measurement = unit,
+            mode = "box",
+            min,
+            max
+        });
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            await _mqttEntityManager.SetStateAsync(entity.EntityId, value);
+        }
+        
+        (await _mqttEntityManager.PrepareCommandSubscriptionAsync(entity.EntityId))
+            .SubscribeAsync(async state =>
+            {
+                await _mqttEntityManager.SetStateAsync(entity.EntityId, state);
+            });
+        
+        return entity;
+    }
+
+    private async Task<MqttEntity> Sensor(string id, string name, SensorDeviceClass? deviceClass = null, string? value = null, string? unit = null)
+    {
+        MqttEntity entity = new(_haContext, $"sensor.{id}");
+        
+        await _mqttEntityManager.CreateAsync(entity.EntityId, new EntityCreationOptions
+        {
+            Name = name,
+            DeviceClass = deviceClass?.ToString().ToLower()
+        }, new
+        {
+            unit_of_measurement = unit
         });
 
         if (!string.IsNullOrWhiteSpace(value))
@@ -50,6 +237,72 @@ public class EntitiesManagerService : AService
         
         return entity;
     }
+
+    private async Task<MqttEntity> Text(string id, string name, string? value = null)
+    {
+        MqttEntity entity = new(_haContext, $"text.{id}");
+        
+        await _mqttEntityManager.CreateAsync(entity.EntityId, new EntityCreationOptions
+        {
+            Name = name,
+        });
+
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            await _mqttEntityManager.SetStateAsync(entity.EntityId, value);
+        }
+        
+        (await _mqttEntityManager.PrepareCommandSubscriptionAsync(entity.EntityId))
+            .SubscribeAsync(async state =>
+            {
+                await _mqttEntityManager.SetStateAsync(entity.EntityId, state);
+            });
+        
+        return entity;
+    }
+}
+
+public record MqttEntities
+{
+    public required MqttEntity GpioWifi { get; init; }
+    public required MqttEntity GpioNpr { get; init; }
+    public required MqttEntity GpioBoxLdr { get; init; }
+    
+    public required MqttEntity SystemBoxOpened { get; init; }
+    
+    public required MqttEntity McuStatus { get; init; }
+    public required MqttEntity McuUptime { get; init; }
+    
+    public required MqttEntity WeatherTemperature { get; init; }
+    public required MqttEntity WeatherHumidity { get; init; }
+    
+    public required MqttEntity MpptBatteryVoltage { get; init; }
+    public required MqttEntity MpptBatteryCurrent { get; init; }
+    public required MqttEntity MpptSolarVoltage { get; init; }
+    public required MqttEntity MpptSolarCurrent { get; init; }
+    public required MqttEntity MpptChargeCurrent { get; init; }
+    public required MqttEntity MpptStatus { get; init; }
+    public required MqttEntity MpptNight { get; init; }
+    public required MqttEntity MpptAlert { get; init; }
+    public required MqttEntity MpptPower { get; init; }
+    public required MqttEntity MpptWatchdog { get; init; }
+    public required MqttEntity MpptWatchdogCounter { get; init; }
+    public required MqttEntity MpptWatchdogPowerOffTime { get; init; }
+    public required MqttEntity MpptPowerOffVoltage { get; init; }
+    public required MqttEntity MpptPowerOnVoltage { get; init; }
+    
+    public required MqttEntity MpptNightTurnOn { get; init; }
+    public required MqttEntity MpptNightLimitVoltage { get; init; }
+    public required MqttEntity MpptNightTimeOff { get; init; }
+    public required MqttEntity MpptNightUseSun { get; init; }
+    
+    public required MqttEntity MpptLowBatteryVoltage { get; init; }
+    public required MqttEntity MpptLowBatteryTimeOff { get; init; }
+    
+    public required MqttEntity LoraTxPayload { get; init; }
+    public required MqttEntity LoraRxPayload { get; init; }
+    
+    public required MqttEntity TimeSleep { get; init; }
 }
 
 public enum BinarySensorDeviceClass
@@ -137,3 +390,50 @@ public enum SensorDeviceClass
     WIND_SPEED
 }
 
+public enum NumberDeviceClass
+{
+    APPARANT_POWER, // VA
+    AQI, // None
+    ATMOSPHERIC_PRESSURE, // cbar, bar, hPa, inHg, kPa, mbar, Pa, psi
+    BATTERY, // %
+    CARBON_DIOXIDE, // ppm
+    CARBON_MONOXIDE, // ppm
+    CURRENT, // A, mA
+    DATA_RATE, // bit/s, kbit/s, Mbit/s, Gbit/s, B/s, kB/s, MB/s, GB/s, KiB/s, MiB/s, GiB/s
+    DATA_SIZE, // bit, kbit, Mbit, Gbit, B, kB, MB, GB, TB, PB, EB, ZB, YB, KiB, MiB, GiB, TiB, PiB, EiB, ZiB, YiB
+    DISTANCE, // km, m, cm, mm, mi, yd, in
+    ENERGY, // Wh, kWh, MWh, MJ, GJ
+    ENERGY_STORAGE, // Wh, kWh, MWh, MJ, GJ
+    FREQUENCY, // Hz, kHz, MHz, GHz
+    GAS, // m³, ft³, CCF
+    HUMIDITY, // %
+    ILLUMINANCE, // lx
+    IRRADIANCE, // W/m², BTU/(h⋅ft²)
+    MOISTURE, // %
+    MONETARY, // ISO 4217
+    NITROGEN_DIOXIDE, // µg/m³
+    NITROGEN_MONOXIDE, // µg/m³
+    NITROUS_OXIDE, // µg/m³
+    OZONE, // µg/m³
+    PM1, // µg/m³
+    PM25, // µg/m³
+    PM10, // µg/m³
+    POWER, // W, kW
+    POWER_FACTOR, // %, None
+    PRECIPITATION, // cm, in, mm
+    PRECIPITATION_INTENSITY, // in/d, in/h, mm/d, mm/h
+    PRESSURE, // cbar, bar, hPa, inHg, kPa, mbar, Pa, psi
+    REACTIVE_POWER, // var
+    SIGNAL_STRENGTH, // dB, dBm
+    SOUND_PRESSURE, // dB, dBA
+    SPEED, // ft/s, in/d, in/h, km/h, kn, m/s, mph, mm/d
+    SULPHUR_DIOXIDE, // µg/m³
+    TEMPERATURE, // °C, °F, K
+    VOLATILE_ORGANIC_COMPOUNDS, // µg/m³
+    VOLTAGE, // V, mV
+    VOLUME, // L, mL, gal, fl. oz., m³, ft³, CCF
+    VOLUME_STORAGE, // L, mL, gal, fl. oz., m³, ft³, CCF
+    WATER, // L, gal, m³, ft³, CCF
+    WEIGHT, // kg, g, mg, µg, oz, lb, st
+    WIND_SPEED // ft/s, in/d, in/h, km/h, kn, m/s, mph, mm/d
+}

@@ -39,7 +39,6 @@
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
       <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.5" />
-      <PackageReference Include="SunCalcNet" Version="1.2.2" />
       <PackageReference Include="System.IO.Ports" Version="7.0.0" />
     </ItemGroup>
 
@@ -59,6 +58,11 @@
 
     <ItemGroup>
       <Folder Include="obj\Debug\net7.0\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <_ContentIncludedByDefault Remove="NetDaemonCodegen\EntityMetaData.json" />
+      <_ContentIncludedByDefault Remove="NetDaemonCodegen\ServicesMetaData.json" />
     </ItemGroup>
 
 </Project>

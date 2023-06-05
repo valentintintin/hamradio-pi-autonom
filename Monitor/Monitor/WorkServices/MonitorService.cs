@@ -3,9 +3,8 @@ using Monitor.Context.Entities;
 using Monitor.Extensions;
 using Monitor.Models;
 using Monitor.Models.SerialMessages;
-using NetDaemon.Extensions.MqttEntityManager;
-using SunCalcNet;
-using SunCalcNet.Model;
+using NetDaemon.HassModel;
+using NetDaemon.HassModel.Entities;
 
 namespace Monitor.WorkServices;
 
@@ -14,27 +13,15 @@ public class MonitorService : AService
     public static readonly MonitorState State = new();
 
     private readonly DataContext _context;
-    private readonly IConfiguration _configuration;
     private readonly SystemService _systemService;
-    private readonly SerialMessageService _serialMessageService;
-    private readonly IMqttEntityManager _entityManager;
-
-    private readonly double _latitude;
-    private readonly double _longitude;
+    private readonly EntitiesManagerService _entitiesManagerService;
     
     public MonitorService(ILogger<MonitorService> logger, DataContext context,
-        IConfiguration configuration, SystemService systemService, SerialMessageService serialMessageService,
-        IMqttEntityManager entityManager) : base(logger)
+        SystemService systemService, EntitiesManagerService entitiesManagerService) : base(logger)
     {
         _context = context;
-        _configuration = configuration;
         _systemService = systemService;
-        _serialMessageService = serialMessageService;
-        _entityManager = entityManager;
-
-        IConfigurationSection positionConfiguration = _configuration.GetSection("Position");
-        _latitude = positionConfiguration.GetValueOrThrow<double>("Latitude");
-        _longitude = positionConfiguration.GetValueOrThrow<double>("Longitude");
+        _entitiesManagerService = entitiesManagerService; 
     }
 
     public async Task UpdateStateFromMessage(Message message)
@@ -45,10 +32,15 @@ public class MonitorService : AService
         {
             case McuSystemData systemData:
                 State.McuSystem = systemData;
-                // await _entityManager.SetStateAsync(entityId, systemData.BoxOpened);
+                
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.McuStatus, systemData.State);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.SystemBoxOpened, systemData.BoxOpened);
                 break;
             case WeatherData weatherData:
                 State.Weather = weatherData;
+                
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.WeatherTemperature, weatherData.Temperature);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.WeatherHumidity, weatherData.Humidity);
 
                 _context.Add(new Weather
                 {
@@ -59,6 +51,21 @@ public class MonitorService : AService
                 break;
             case MpptData mpptData:
                 State.Mppt = mpptData;
+                
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptBatteryVoltage, mpptData.BatteryVoltage);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptBatteryCurrent, mpptData.BatteryCurrent);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptSolarVoltage, mpptData.SolarVoltage);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptSolarCurrent, mpptData.SolarCurrent);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptChargeCurrent, mpptData.CurrentCharge);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptStatus, mpptData.StatusString);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptNight, mpptData.Night);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptAlert, mpptData.Alert);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptPower, mpptData.PowerEnabled);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptWatchdog, mpptData.WatchdogEnabled);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptWatchdogCounter, mpptData.WatchdogCounter);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptWatchdogPowerOffTime, mpptData.WatchdogPowerOffTime);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptPowerOffVoltage, mpptData.PowerOffVoltage);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptPowerOnVoltage, mpptData.PowerOnVoltage);
 
                 _context.Add(new Mppt
                 {
@@ -79,22 +86,34 @@ public class MonitorService : AService
             case TimeData timeData:
                 State.Time = timeData;
                 
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.McuUptime, timeData.Uptime);
+                
                 _systemService.SetTime(State.Time.DateTime.DateTime);
                 break;
             case GpioData gpioData:
                 State.Gpio = gpioData;
+                
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.GpioWifi, gpioData.Wifi);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.GpioNpr, gpioData.Npr);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.GpioBoxLdr, gpioData.Ldr);
                 break;
             case LoraData loraData:
                 if (loraData.IsTx)
                 {
                     State.Lora.LastTx.Add(loraData.Payload);
+                
+                    _entitiesManagerService.Update(EntitiesManagerService.Entities.LoraTxPayload, loraData.Payload);
                 }
                 else
                 {
                     State.Lora.LastRx.Add(loraData.Payload);
+                
+                    _entitiesManagerService.Update(EntitiesManagerService.Entities.LoraRxPayload, loraData.Payload);
                 }
                 break;
         }
+
+        await _entitiesManagerService.UpdateEntities();
     }
 
     public void AddLog(string log)
@@ -115,79 +134,5 @@ public class MonitorService : AService
             McuUptime = State.Time.Uptime
         });
         _context.SaveChanges();
-    }
-
-    public void ComputeBattery()
-    {
-        MpptData mppt = State.Mppt;
-        IConfigurationSection configurationSection = _configuration.GetSection("Mppt");
-        IConfigurationSection lowVoltageSection = configurationSection.GetSection("LowVoltage");
-        
-        int powerOnVoltage = configurationSection.GetValueOrThrow<int>("PowerOnVoltage");
-        int powerOffVoltage = configurationSection.GetValueOrThrow<int>("PowerOffVoltage");
-
-        if (mppt.PowerOnVoltage != powerOnVoltage || mppt.PowerOffVoltage != powerOffVoltage)
-        {                    
-            Logger.LogInformation("Set power off voltage to {powerOffVoltage} and power on voltage to {powerOnVoltage}", powerOffVoltage, powerOnVoltage);
-
-            _serialMessageService.SetPowerOnOffVoltage(
-                powerOnVoltage,
-                powerOffVoltage
-            );
-        }
-        
-        if (mppt.Night)
-        {
-            Logger.LogInformation("Mppt is night, morning should be at {morning}", GetMorningDateTime());
-            
-            IConfigurationSection nightSection = configurationSection.GetSection("Night");
-
-            if (nightSection.GetValueOrThrow<bool>("Enabled"))
-            {
-                if (mppt.BatteryVoltage < nightSection.GetValueOrThrow<int>("LimitVoltage"))
-                {
-                    Logger.LogInformation("Mppt battery too low {batteryVoltate}mV for night", mppt.BatteryVoltage);
-                    
-                    Sleep(TimeSpan.FromHours(nightSection.GetValueOrThrow<int>("TimeOffAllNightHours")));
-                }
-                else
-                {
-                    Logger.LogInformation("Mppt battery good {batteryVoltate}mV for night", mppt.BatteryVoltage);
-                    
-                    Sleep(TimeSpan.FromMinutes(nightSection.GetValueOrThrow<int>("TimeOffMinutes")));
-                }
-            }
-            else
-            {
-                Logger.LogInformation("Mppt sleep for night");
-                    
-                Sleep(TimeSpan.FromHours(nightSection.GetValueOrThrow<int>("TimeOffAllNightHours")));
-            }
-        }
-        else if (lowVoltageSection.GetValueOrThrow<bool>("Enabled")
-                 && mppt.BatteryVoltage < lowVoltageSection.GetValueOrThrow<int>("Voltage"))
-        {
-            Logger.LogInformation("Mppt battery low voltage {batteryVoltage}", mppt.BatteryVoltage);
-            
-            Sleep(TimeSpan.FromMinutes(lowVoltageSection.GetValueOrThrow<int>("TimeOffMinutes")));
-        }
-    }
-
-    private void Sleep(TimeSpan sleepDuration)
-    {
-        Logger.LogInformation("Sleep during {sleepTime} => {wakeUpTime}", sleepDuration, DateTime.UtcNow.Add(sleepDuration));
-            
-        _serialMessageService.SetWatchdog(sleepDuration);
-    }
-
-    public DateTime GetMorningDateTime()
-    {
-        DateTime sunToday = SunCalc.GetSunPhases(DateTime.UtcNow, _latitude, _longitude)
-            .First(p => p.Name.Value == SunPhaseName.Dawn.Value).PhaseTime;
-
-        DateTime sunTomorrow = SunCalc.GetSunPhases(DateTime.UtcNow.AddDays(1), _latitude, _longitude)
-            .First(p => p.Name.Value == SunPhaseName.Dawn.Value).PhaseTime;
-        
-        return sunToday < DateTime.UtcNow ? sunTomorrow : sunToday;
     }
 }

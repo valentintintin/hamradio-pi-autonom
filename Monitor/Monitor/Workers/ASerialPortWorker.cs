@@ -22,13 +22,13 @@ public abstract class ASerialPortWorker : AWorker
         _speed = ConfigurationSection.GetValueOrThrow<int>("Speed");
     }
 
-    protected abstract void MessageReceived(string input);
+    protected abstract Task MessageReceived(string input);
     
     protected override Task Start()
     {
         if (ConfigurationSection.GetValue<bool?>("Simulate") == true)
         {
-            Timer timer = new(1000);
+            Timer timer = new(2500);
 
             string[] lines = _fakeInput.Split('\n');
             int currentLine = 0;

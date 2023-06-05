@@ -23,8 +23,10 @@ I: [WEATHER] Temperature 22.80C Humidity=61")
     {
     }
 
-    protected override void MessageReceived(string input)
+    protected override Task MessageReceived(string input)
     {
         MonitorService.AddLog(input);
+
+        return Task.CompletedTask;
     }
 }
