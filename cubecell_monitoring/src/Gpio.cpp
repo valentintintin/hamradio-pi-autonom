@@ -30,11 +30,11 @@ void Gpio::setState(uint8_t pin, bool enabled, const char* name, bool &status, b
 }
 
 void Gpio::setWifi(bool enabled) {
-    setState(PIN_WIFI, enabled, PSTR("WIFI"), wifi, true);
+    setState(PIN_WIFI, enabled, PSTR("WIFI"), wifi);
 }
 
 void Gpio::setNpr(bool enabled) {
-    setState(PIN_NPR, enabled, PSTR("NPR"), npr, true);
+    setState(PIN_NPR, enabled, PSTR("NPR"), npr);
 }
 
 uint16_t Gpio::getLdr() {
