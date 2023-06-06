@@ -2,6 +2,7 @@
 #include <radio/radio.h>
 #include <ArduinoLog.h>
 #include "System.h"
+#include "innerWdt.h"
 
 extern JsonWriter serialJsonWriter(&SerialPiUsed);
 
@@ -44,6 +45,8 @@ void setup() {
     }
 
     Log.begin(LOG_LEVEL_INFO, &Serial);
+
+    innerWdtEnable(true);
 
     systemControl.begin(&radioEvents);
 
