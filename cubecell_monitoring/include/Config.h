@@ -6,7 +6,7 @@
 #define WireUsed Wire
 #define SerialPiUsed Serial1
 
-#define USE_RF false
+#define USE_RF true
 #define SET_RTC 0
 
 #define RF_FREQUENCY 433775000 // Hz
@@ -28,9 +28,9 @@
 #define TRX_BUFFER 256
 #define INTERVAL_REFRESH_APRS 300000 // 5 minutes
 #define INTERVAL_POSITION 900000 // 15 minutes
-#define INTERVAL_WEATHER 60000
+#define INTERVAL_WEATHER 30000
 #define INTERVAL_MPPT 10000
-#define INTERVAL_TIME 60000
+#define INTERVAL_TIME 30000
 #define INTERVAL_ALARM_BOX_OPENED 60000
 #define DELAY_SCREEN_DISPLAYED 1500
 #define TIME_SCREEN_ON 20000
@@ -52,7 +52,7 @@
 #define PIN_NPR GPIO14
 #define PIN_LDR ADC2
 
-#define WATCHDOG_TIMEOUT 20
+#define WATCHDOG_TIMEOUT 30
 #define LOW_VOLTAGE 11400
 #define LDR_ALARM_LEVEL 1000
 

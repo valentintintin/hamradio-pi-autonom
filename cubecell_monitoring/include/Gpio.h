@@ -25,15 +25,15 @@ public:
     }
 private:
     System *system;
-    char buffer[64]{};
+//    char buffer[64]{};
     bool initialized = false;
 
     bool wifi = false;
     bool npr = false;
 
-    void setState(uint8_t pin, bool enabled, const char* name, bool &status, bool inverted = false);
+    void setState(uint8_t pin, bool enabled, const char* name, bool &status);
     bool getState(uint8_t pin, const char* name);
-    uint16_t getAdcState(uint8_t pin, const char* name);
+    uint16_t getAdcState(uint8_t pin, const char* name) const;
 };
 
 #endif //CUBECELL_MONITORING_GPIO_H

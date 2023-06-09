@@ -95,6 +95,14 @@ void System::update() {
         if (forceSendTelemetry || timerTime.hasExpired()) {
             showTime();
             gpio.printJson();
+
+            serialJsonWriter
+                    .beginObject()
+                    .property(F("type"), PSTR("system"))
+                    .property(F("state"), PSTR("running"))
+                    .property(F("boxOpened"), isBoxOpened())
+                    .endObject(); SerialPiUsed.println();
+
             timerTime.restart();
         }
 

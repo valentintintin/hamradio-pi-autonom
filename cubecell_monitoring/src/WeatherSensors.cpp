@@ -31,7 +31,7 @@ bool WeatherSensors::update() {
             .property(F("humidity"), humidity)
             .endObject(); SerialPiUsed.println();
 
-    sprintf_P(bufferText, PSTR("Temperature %.2fC Humidity=%d%"), temperature, humidity);
+    sprintf_P(bufferText, PSTR("Temperature: %.2fC Humidity: %d%"), temperature, humidity);
     Log.infoln(PSTR("[WEATHER] %s"), bufferText);
     system->displayText(PSTR("Weather"), bufferText);
 

@@ -10,22 +10,21 @@ Gpio::Gpio(System *system) : system(system) {
     initialized = true;
 }
 
-void Gpio::setState(uint8_t pin, bool enabled, const char* name, bool &status, bool inverted) {
+void Gpio::setState(uint8_t pin, bool enabled, const char* name, bool &status) {
     pinMode(pin, OUTPUT);
 
+    digitalWrite(pin, enabled);
+
+    status = enabled;
+
     if (initialized) {
-        Log.infoln(F("[GPIO] %s (%d) change to state %d"), name, pin, enabled);
+        Log.infoln(F("[GPIO] %s (%d) change to state %d"), name, pin, status);
+
+        printJson();
 
         // fixme bug freeze if display
-//        sprintf_P(buffer, PSTR("Pin %s (%d) changed to %d"), name, pin, enabled);
+//        sprintf_P(buffer, PSTR("Pin %s (%d) changed to %d"), name, pin, status);
 //        system->displayText(PSTR("GPIO"), buffer);
-    }
-
-    if (inverted) {
-        digitalWrite(pin, !enabled);
-        status = enabled;
-    } else {
-        digitalWrite(pin, enabled);
     }
 }
 
@@ -43,34 +42,23 @@ uint16_t Gpio::getLdr() {
 
 bool Gpio::getState(uint8_t pin, const char* name) {
     pinMode(pin, INPUT);
-
-    bool enabled = digitalRead(pin);
-
-    if (initialized) {
-        Log.infoln(F("[GPIO] %s (%d) is %d"), name, pin, enabled);
-    }
-
-    return enabled;
+    return digitalRead(pin);
 }
 
-uint16_t Gpio::getAdcState(uint8_t pin, const char *name) {
+uint16_t Gpio::getAdcState(uint8_t pin, const char *name) const {
     pinMode(pin, INPUT);
 
-    uint16_t val = analogRead(pin);
-
-    if (initialized) {
-        Log.infoln(F("[GPIO] %s (%d) is %d"), name, pin, val);
-    }
-
-    return val;
+    return analogRead(pin);
 }
 
 void Gpio::printJson() {
+    Log.infoln(F("[GPIO] Wifi: %d NPR: %d Box LDR: %d"), isWifiEnabled(), isNprEnabled(), getLdr());
+
     serialJsonWriter
             .beginObject()
             .property(F("type"), PSTR("gpio"))
-            .property(F("wifi"), isWifiEnabled() ? PSTR("true") : PSTR("false"))
-            .property(F("npr"), isNprEnabled() ? PSTR("true") : PSTR("false"))
+            .property(F("wifi"), isWifiEnabled())
+            .property(F("npr"), isNprEnabled())
             .property(F("ldr"), getLdr())
             .endObject(); SerialPiUsed.println();
 }
