@@ -32,8 +32,6 @@ public class MonitorState
 
     public LoraState Lora { get; } = new();
     
-    public SystemState System { get; set; } = new();
-
     public readonly LimitedList<Message> LastMessagesReceived = new(20);
     
     public readonly LimitedList<string> LastLogReceived = new(50);

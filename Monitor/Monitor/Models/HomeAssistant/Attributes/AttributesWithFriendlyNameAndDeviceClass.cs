@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Monitor.Models;
+namespace Monitor.Models.HomeAssistant.Attributes;
 
 public record AttributesWithFriendlyNameAndDeviceClass
 {

@@ -13,16 +13,20 @@ public class GpioApp : AApp
         SerialMessageService serialMessageService) 
         : base(ha, logger, entitiesManagerService)
     {
+        TimeSpan debunce = TimeSpan.FromSeconds(1);
+        
         EntitiesManagerService.Entities.GpioWifi.StateChanges(logger)
+            .Sample(debunce)
             .Subscribe(s =>
             {
-                serialMessageService.SetWifi(s.Entity.IsOn());
+                serialMessageService.SetWifi(s.New!.IsOn());
             });
         
         EntitiesManagerService.Entities.GpioNpr.StateChanges(logger)
+            .Sample(debunce)
             .Subscribe(s =>
             {
-                serialMessageService.SetNpr(s.Entity.IsOn());
+                serialMessageService.SetNpr(s.New!.IsOn());
             });
     }
 }

@@ -52,14 +52,4 @@ public class MpptData : Message
     public TimeSpan WatchdogCounterTimeSpan => TimeSpan.FromSeconds(WatchdogCounter);
     public TimeSpan WatchdogPowerOffTimeSpan => TimeSpan.FromSeconds(WatchdogPowerOffTime);
     public DateTime WatchdogPowerOffDateTime => DateTime.UtcNow.Add(WatchdogPowerOffTimeSpan);
-
-    public override string ToString()
-    {
-        return $"{base.ToString()} is {(PowerEnabled ? "powered" : "off")}. " +
-               $"Battery is {BatteryVoltage}mV, Solar current is {SolarCurrent}mA and balance is {CurrentCharge}mA." +
-               $"{(Alert ? " Alert triggered." : "")}" + $"{(Night ? " It's night" : " It's day")}" +
-               $" Watchdog {(WatchdogEnabled ? "enabled" : "disabled")} to poweroff for {WatchdogPowerOffTimeSpan}. Current counter : {WatchdogCounterTimeSpan}" +
-			   $" Power off voltage : {PowerOffVoltage}mV Power on voltage : {PowerOnVoltage}mV"
-               ;
-    }
 }

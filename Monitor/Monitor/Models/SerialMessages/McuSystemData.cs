@@ -11,9 +11,4 @@ public class McuSystemData : Message
     public bool BoxOpened { get; set; }
 
     public bool IsAlert => State == "alert";
-
-    public override string ToString()
-    {
-        return $"{base.ToString()} is {State}. Box is {(BoxOpened ? "opened" : "closed")}";
-    }
 }

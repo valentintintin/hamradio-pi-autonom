@@ -12,9 +12,4 @@ public class GpioData : Message
     
     [JsonPropertyName("ldr")]
     public int Ldr { get; set; }
-
-    public override string ToString()
-    {
-        return $"{base.ToString()} Wifi is {Wifi}. Npr is {Npr}. Ldr box is {Ldr}";
-    }
 }

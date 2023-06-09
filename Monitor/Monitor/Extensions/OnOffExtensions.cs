@@ -16,7 +16,7 @@ public static class OnOffExtensions
 
     public static bool IsOn(this Entity entity, ILogger? logger = null)
     {
-        return entity.IsState("on", logger) || !entity.IsState("0", logger);
+        return entity.IsState("on", logger);
     }
     
     public static bool IsOff(this Entity entity, ILogger? logger = null)
@@ -26,7 +26,7 @@ public static class OnOffExtensions
     
     public static bool IsOn(this EntityState entity, ILogger? logger = null)
     {
-        return entity.IsState("on", logger) || !entity.IsState("0", logger);
+        return entity.IsState("on", logger);
     }
     
     public static bool IsOff(this EntityState entity, ILogger? logger = null)

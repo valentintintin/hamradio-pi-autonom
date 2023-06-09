@@ -13,9 +13,10 @@ public class SleepApp : AApp
         SerialMessageService serialMessageService) : base(ha, logger, entitiesManagerService)
     {
         EntitiesManagerService.Entities.TimeSleep.StateChanges(logger)
-            .Where(s => !s.Entity.IsOff())
-            .Select(s => s.Entity.State.ToInt())
-            .Where(s => s > 0)
+            .Where(s => !s.Entity.IsOff(logger)) // We have time given
+            .Select(s => s.Entity.State.ToInt()) // Take time as int
+            .Where(s => s > 0) // Time > 0
+            .DistinctUntilChanged()
             .Subscribe(s =>
             {
                 TimeSpan sleepTime = TimeSpan.FromMinutes(s);

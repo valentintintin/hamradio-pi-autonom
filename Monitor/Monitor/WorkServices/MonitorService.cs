@@ -1,10 +1,7 @@
 using Monitor.Context;
 using Monitor.Context.Entities;
-using Monitor.Extensions;
 using Monitor.Models;
 using Monitor.Models.SerialMessages;
-using NetDaemon.HassModel;
-using NetDaemon.HassModel.Entities;
 
 namespace Monitor.WorkServices;
 
@@ -31,12 +28,16 @@ public class MonitorService : AService
         switch (message)
         {
             case McuSystemData systemData:
+                Logger.LogInformation("New system data received");
+                
                 State.McuSystem = systemData;
                 
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.McuStatus, systemData.State);
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.SystemBoxOpened, systemData.BoxOpened);
                 break;
             case WeatherData weatherData:
+                Logger.LogInformation("New weather data received");
+
                 State.Weather = weatherData;
                 
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.WeatherTemperature, weatherData.Temperature);
@@ -47,9 +48,11 @@ public class MonitorService : AService
                     Temperature = weatherData.Temperature,
                     Humidity = weatherData.Humidity
                 });
-                _context.SaveChanges();
+                await _context.SaveChangesAsync();
                 break;
             case MpptData mpptData:
+                Logger.LogInformation("New MPPT data received");
+
                 State.Mppt = mpptData;
                 
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptBatteryVoltage, mpptData.BatteryVoltage);
@@ -58,7 +61,7 @@ public class MonitorService : AService
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptSolarCurrent, mpptData.SolarCurrent);
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptChargeCurrent, mpptData.CurrentCharge);
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptStatus, mpptData.StatusString);
-                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptNight, mpptData.Night);
+                _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptDay, !mpptData.Night);
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptAlert, mpptData.Alert);
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptPower, mpptData.PowerEnabled);
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.MpptWatchdog, mpptData.WatchdogEnabled);
@@ -81,9 +84,11 @@ public class MonitorService : AService
                     WatchdogEnabled = mpptData.WatchdogEnabled,
                     WatchdogPowerOffTime = mpptData.WatchdogPowerOffTime
                 });
-                _context.SaveChanges();
+                await _context.SaveChangesAsync();
                 break;
             case TimeData timeData:
+                Logger.LogInformation("New time data received");
+
                 State.Time = timeData;
                 
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.McuUptime, timeData.Uptime);
@@ -91,18 +96,32 @@ public class MonitorService : AService
                 _systemService.SetTime(State.Time.DateTime.DateTime);
                 break;
             case GpioData gpioData:
+                Logger.LogInformation("New GPIO data received");
+
                 State.Gpio = gpioData;
                 
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.GpioWifi, gpioData.Wifi);
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.GpioNpr, gpioData.Npr);
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.GpioBoxLdr, gpioData.Ldr);
+
+                _context.Add(new Context.Entities.System
+                {
+                    Npr = gpioData.Npr,
+                    Wifi = gpioData.Wifi,
+                    Uptime = (long)_systemService.GetUptime().TotalSeconds,
+                    BoxOpened = State.McuSystem.BoxOpened,
+                    McuUptime = State.Time.Uptime
+                });
+                await _context.SaveChangesAsync();
                 break;
             case LoraData loraData:
+                Logger.LogInformation("New LoRa data received");
+
                 if (loraData.IsTx)
                 {
                     State.Lora.LastTx.Add(loraData.Payload);
                 
-                    _entitiesManagerService.Update(EntitiesManagerService.Entities.LoraTxPayload, loraData.Payload);
+                    // _entitiesManagerService.Update(EntitiesManagerService.Entities.LoraTxPayload, loraData.Payload);
                 }
                 else
                 {
@@ -116,23 +135,16 @@ public class MonitorService : AService
         await _entitiesManagerService.UpdateEntities();
     }
 
-    public void AddLog(string log)
+    public async Task AddLog(string log)
     {
         State.LastLogReceived.Add(log);
-    }
 
-    public void UpdateSystemInfo(SystemState state)
-    {
-        State.System = state;
-
-        _context.Add(new Context.Entities.System
+        if (log.StartsWith("E") || log.StartsWith("W") || log.ToLower().Contains("error"))
         {
-            Npr = State.Gpio.Npr,
-            Wifi = State.Gpio.Wifi,
-            BoxOpened = State.McuSystem.BoxOpened,
-            Uptime = State.System.Uptime,
-            McuUptime = State.Time.Uptime
-        });
-        _context.SaveChanges();
+            Logger.LogWarning("Error system received : {message}", log);
+
+            _entitiesManagerService.Update(EntitiesManagerService.Entities.McuStatus, log);
+            await _entitiesManagerService.UpdateEntities();
+        }
     }
 }

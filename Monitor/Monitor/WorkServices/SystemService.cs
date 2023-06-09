@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Monitor.Extensions;
 using Monitor.Models;
+using NetDaemon.HassModel.Entities;
 
 namespace Monitor.WorkServices;
 
@@ -9,19 +10,18 @@ public class SystemService : AService
     private readonly string? _shutdownFilePath;
     private readonly string? _infoFilePath;
     private readonly string? _timeFilePath;
-    private readonly bool _enabled;
-    
+
     public SystemService(ILogger<SystemService> logger, IConfiguration configuration) : base(logger)
     {
         IConfigurationSection configurationSection = configuration.GetSection("System");
         
-        _enabled = configurationSection.GetValueOrThrow<bool>("Enabled");
-
-        if (!_enabled) return;
-        
         _shutdownFilePath = configurationSection.GetValueOrThrow<string>("ShutdownFile");
-        _infoFilePath = configurationSection.GetValueOrThrow<string>("InfoFile");
+        _infoFilePath = configurationSection.GetValue<string>("InfoFile");
         _timeFilePath = configurationSection.GetValueOrThrow<string>("TimeFile");
+
+        Logger.LogInformation("Shutdown file is in {path}", _shutdownFilePath);
+        Logger.LogInformation("Info file is in {path}", _infoFilePath);
+        Logger.LogInformation("Time file is in {path}", _timeFilePath);
 
         File.WriteAllText(_shutdownFilePath, "0");
         File.Delete(_timeFilePath);
@@ -29,7 +29,12 @@ public class SystemService : AService
 
     public SystemState? GetInfo()
     {
-        if (!_enabled) return null;
+        if (string.IsNullOrWhiteSpace(_infoFilePath))
+        {
+            Logger.LogWarning("Get system without info file path");
+            
+            return null;
+        }
 
         try
         {
@@ -44,47 +49,45 @@ public class SystemService : AService
         }
     }
 
-    public void Shutdown()
+    public TimeSpan GetUptime()
     {
-        if (!_enabled) return;
+        string? uptimeString = EntitiesManagerService.Entities.Uptime?.State;
         
-        if (WillShutdown())
+        if (!DateTime.TryParse(uptimeString, out DateTime uptime))
         {
-            Logger.LogInformation("Will shutdown");
+            return TimeSpan.Zero;
         }
-        else
-        {
-            Logger.LogInformation("Send shutdown order");
-
-            try
-            {
-                File.WriteAllText(_shutdownFilePath!, "1");
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e, "Send shutdown order error");
-            }
-        }
+        
+        return DateTime.UtcNow - uptime;
     }
 
-    public bool WillShutdown()
+    public void Shutdown()
     {
-        if (!_enabled) return false;
+        Logger.LogInformation("Send shutdown command");
 
+        if (WillShutdown())
+        {
+            Logger.LogWarning("Will already shutdown");
+            return;
+        }
+         
         try
         {
-            return File.ReadAllText(_shutdownFilePath!) == "1";
+            File.WriteAllText(_shutdownFilePath!, "1");
         }
         catch (Exception e)
         {
-            Logger.LogError(e, "Read shutdown file error");
-            return false;
+            Logger.LogError(e, "Send shutdown command error");
         }
     }
 
     public void SetTime(DateTime dateTime)
     {
-        if (!_enabled) return;
+        if ((DateTime.UtcNow - dateTime).TotalSeconds <= 10)
+        {
+            Logger.LogDebug("Change dateTime not done because difference is < 10 second : {now} and {new}", DateTime.UtcNow, dateTime);
+            return;
+        }
         
         if (dateTime.Year != 2023)
         {
@@ -101,6 +104,19 @@ public class SystemService : AService
         catch (Exception e)
         {
             Logger.LogError(e, "Change dateTime error");
+        }
+    }
+
+    private bool WillShutdown()
+    {
+        try
+        {
+            return File.ReadAllText(_shutdownFilePath!) == "1";
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, "Read shutdown file error");
+            return false;
         }
     }
 }

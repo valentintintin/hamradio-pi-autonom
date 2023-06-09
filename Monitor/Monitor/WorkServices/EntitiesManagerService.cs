@@ -1,56 +1,56 @@
+using System.Reactive.Linq;
+using Monitor.Models.HomeAssistant;
 using NetDaemon.Extensions.MqttEntityManager;
 using NetDaemon.HassModel;
+using NetDaemon.HassModel.Entities;
 
 namespace Monitor.WorkServices;
 
 public class EntitiesManagerService : AService
 {
-    public static MqttEntities Entities { get; private set; }
-    
+    public static MqttEntities Entities { get; private set; } = null!;
+
     private readonly List<MqttEntity> _entitiesToUpdate = new();
     private readonly IMqttEntityManager _mqttEntityManager;
     private readonly IHaContext _haContext;
+    private readonly SerialMessageService _serialMessageService;
 
     public EntitiesManagerService(ILogger<EntitiesManagerService> logger, IMqttEntityManager mqttEntityManager,
-        IHaContext haContext) : base(logger)
+        IHaContext haContext, SerialMessageService serialMessageService) : base(logger)
     {
         _mqttEntityManager = mqttEntityManager;
         _haContext = haContext;
+        _serialMessageService = serialMessageService;
     }
 
     public void Update<T>(MqttEntity entity, T value)
     {
-        if (value is bool valueBool)
+        switch (value)
         {
-            entity.SetState(valueBool);
-        } 
-        else if (value is int valueInt)
-        {
-            entity.SetState(valueInt);    
-        }
-        else if (value is long valueLong)
-        {
-            entity.SetState(valueLong);    
-        }
-        else if (value is float valueFloat)
-        {
-            entity.SetState(valueFloat);    
-        }
-        else if (value is double valueDouble)
-        {
-            entity.SetState(valueDouble);    
-        }
-        else if (value is string valueString)
-        {
-            entity.SetState(valueString);
-        }
-        else if (value is DateTime valueDateTime)
-        {
-            entity.SetState(valueDateTime);    
-        }
-        else if (value is TimeSpan valueTimeSpan)
-        {
-            entity.SetState(valueTimeSpan);
+            case bool valueBool:
+                entity.SetState(valueBool);
+                break;
+            case int valueInt:
+                entity.SetState(valueInt);
+                break;
+            case long valueLong:
+                entity.SetState(valueLong);
+                break;
+            case float valueFloat:
+                entity.SetState(valueFloat);
+                break;
+            case double valueDouble:
+                entity.SetState(valueDouble);
+                break;
+            case string valueString:
+                entity.SetState(valueString);
+                break;
+            case DateTime valueDateTime:
+                entity.SetState(valueDateTime);
+                break;
+            case TimeSpan valueTimeSpan:
+                entity.SetState(valueTimeSpan);
+                break;
         }
 
         _entitiesToUpdate.Add(entity);
@@ -58,19 +58,31 @@ public class EntitiesManagerService : AService
     
     public async Task UpdateEntities()
     {
-        foreach (MqttEntity entity in _entitiesToUpdate)
+        if (_entitiesToUpdate.Any())
         {
-            Logger.LogTrace("Update {entityId} to {state}", entity.EntityId, entity.NewState);
-            
-            await _mqttEntityManager.SetStateAsync(entity.EntityId, entity.NewState ?? "");
-            entity.ClearState();
+            Logger.LogInformation("Update {count} entities to MQTT if there is change", _entitiesToUpdate.Count);
+
+            foreach (MqttEntity entity in _entitiesToUpdate)
+            {
+                if (entity.State?.ToLower() != entity.NewState?.ToLower())
+                {
+                    Logger.LogTrace("Update {entityId} to {state}. Old was {oldState}", entity.EntityId,
+                        entity.NewState, entity.State);
+
+                    await _mqttEntityManager.SetStateAsync(entity.EntityId, entity.NewState ?? "");
+                }
+
+                entity.ClearState();
+            }
+
+            _entitiesToUpdate.Clear();
         }
-        
-        _entitiesToUpdate.Clear();
     }
 
     public async Task Init()
     {
+        Logger.LogInformation("Init entities to MQTT");
+
         Entities = new MqttEntities
         {
             GpioWifi = await Switch("gpio_wifi", "Wifi", true),
@@ -79,35 +91,55 @@ public class EntitiesManagerService : AService
             SystemBoxOpened = await BinarySensor("system_box_opened", "Box opened", BinarySensorDeviceClass.LOCK),
             McuStatus = await Sensor("mcu_status", "MCU Status", SensorDeviceClass.ENUM),
             McuUptime = await Sensor("mcu_uptime", "MCU Uptime", SensorDeviceClass.DURATION),
-            WeatherTemperature = await Sensor("weather_temperature", "Weather Temperature", SensorDeviceClass.TEMPERATURE, null, "°C"),
-            WeatherHumidity = await Sensor("weather_humidity", "Weather Humidity", SensorDeviceClass.HUMIDITY, null, "%"),
-            MpptBatteryVoltage = await Sensor("mppt_battery_voltage", "MPPT Battery Voltage", SensorDeviceClass.VOLTAGE, null, "mV"),
-            MpptBatteryCurrent = await Sensor("mppt_battery_current", "MPPT Battery Current", SensorDeviceClass.CURRENT, null, "mA"),
-            MpptSolarVoltage = await Sensor("mppt_solar_voltage", "MPPT Solar Voltage", SensorDeviceClass.VOLTAGE, null, "mV"),
-            MpptSolarCurrent = await Sensor("mppt_solar_current", "MPPT Solar Current", SensorDeviceClass.CURRENT, null, "mA"),
-            MpptChargeCurrent = await Sensor("mppt_charge_current", "MPPT Charge Current", SensorDeviceClass.CURRENT, null, "mA"),
+            WeatherTemperature = await Sensor("weather_temperature", "Weather Temperature",
+                SensorDeviceClass.TEMPERATURE, null, "°C"),
+            WeatherHumidity = await Sensor("weather_humidity", "Weather Humidity", SensorDeviceClass.HUMIDITY, null,
+                "%"),
+            MpptBatteryVoltage = await Sensor("mppt_battery_voltage", "MPPT Battery Voltage",
+                SensorDeviceClass.VOLTAGE, null, "mV"),
+            MpptBatteryCurrent = await Sensor("mppt_battery_current", "MPPT Battery Current",
+                SensorDeviceClass.CURRENT, null, "mA"),
+            MpptSolarVoltage = await Sensor("mppt_solar_voltage", "MPPT Solar Voltage", SensorDeviceClass.VOLTAGE,
+                null, "mV"),
+            MpptSolarCurrent = await Sensor("mppt_solar_current", "MPPT Solar Current", SensorDeviceClass.CURRENT,
+                null, "mA"),
+            MpptChargeCurrent = await Sensor("mppt_charge_current", "MPPT Charge Current",
+                SensorDeviceClass.CURRENT, null, "mA"),
             MpptStatus = await Sensor("mppt_status", "MPPT Status", SensorDeviceClass.ENUM),
-            MpptNight = await BinarySensor("mppt_night", "MPPT Night", BinarySensorDeviceClass.LIGHT),
+            MpptDay = await BinarySensor("mppt_day", "MPPT Day", BinarySensorDeviceClass.LIGHT),
             MpptAlert = await BinarySensor("mppt_alert", "MPPT Alert", BinarySensorDeviceClass.PROBLEM),
             MpptPower = await BinarySensor("mppt_power", "MPPT Power", BinarySensorDeviceClass.POWER),
             MpptWatchdog = await BinarySensor("mppt_watchdog", "MPPT Watchdog", BinarySensorDeviceClass.RUNNING),
             MpptWatchdogCounter = await Sensor("mppt_watchdog_counter", "MPPT Watchdog Counter", null, null, "s"),
-            MpptWatchdogPowerOffTime = await Sensor("mppt_watchdog_poweroff_time", "MPPT Watchdog PowerOff Time", null, null, "s"),
-            MpptPowerOffVoltage = await Number("mppt_poweroff_voltage", "MPPT Power Off Voltage", NumberDeviceClass.VOLTAGE, null, "mV", 11000, 12000),
-            MpptPowerOnVoltage = await Number("mppt_poweron_voltage", "MPPT Power On Voltage", NumberDeviceClass.VOLTAGE, null, "mV", 11000, 12000),
-            MpptLowBatteryVoltage = await Number("mppt_low_battery_voltage", "MPPT Low Battery Voltage", NumberDeviceClass.VOLTAGE, null, "mV", 11000, 12000),
-            MpptLowBatteryTimeOff = await Number("mppt_low_battery_time_off", "MPPT Low Battery Time Off", null, null, "min", 5, 1000),
+            MpptWatchdogPowerOffTime = await Sensor("mppt_watchdog_poweroff_time", "MPPT Watchdog PowerOff Time",
+                null, null, "s"),
+            MpptWatchdogSwitchOff = await Button("mppt_watchdog_switch_off", "MPPT Watchdog Switch Off",
+                () => _serialMessageService.SetWatchdog(TimeSpan.Zero)),
+            MpptPowerOffVoltage = await Number("mppt_poweroff_voltage", "MPPT Power Off Voltage",
+                NumberDeviceClass.VOLTAGE, null, "mV", 11000, 13000),
+            MpptPowerOnVoltage = await Number("mppt_poweron_voltage", "MPPT Power On Voltage",
+                NumberDeviceClass.VOLTAGE, null, "mV", 12000, 13000),
+            MpptLowBatteryVoltage = await Number("mppt_low_battery_voltage", "MPPT Low Battery Voltage",
+                NumberDeviceClass.VOLTAGE, null, "mV", 11000, 13000),
+            MpptLowBatteryTimeOff = await Number("mppt_low_battery_time_off", "MPPT Low Battery Time Off", null,
+                null, "min", 5, 1000),
             MpptNightTurnOn = await Switch("mppt_night_turn_on", "MPPT Night Turn On"),
-            MpptNightLimitVoltage = await Number("mppt_night_limit_voltage", "MPPT Night Limit Voltage", NumberDeviceClass.VOLTAGE, null, "mV", 11000, 12000),
-            MpptNightTimeOff = await Number("mppt_night_time_off", "MPPT Night Time Off", null, null, "h", 1, 12),
+            MpptNightLimitVoltage = await Number("mppt_night_limit_voltage", "MPPT Night Limit Voltage",
+                NumberDeviceClass.VOLTAGE, null, "mV", 11000, 13000),
+            MpptNightTimeOff =
+                await Number("mppt_night_time_off", "MPPT Night Time Off", null, null, "min", 5, 1000),
             MpptNightUseSun = await Switch("mppt_night_use_sun", "MPPT Night Use Sun"),
             LoraTxPayload = await Text("lora_tx_payload", "LoRa TX Payload"),
             LoraRxPayload = await Sensor("lora_rx_payload", "LoRa RX Payload"),
             TimeSleep = await Number("will_turn_off", "System will turn off", null, "0", "min", 0, 1000),
+            Uptime = _haContext.Entity("sensor.uptime"),
+            LastBoot = _haContext.Entity("sensor.last_boot"),
+            SunRising = _haContext.Entity("sensor.sun_next_rising"),
+            MotionEye = _haContext.Entity("switch.docker_docker_motioneye_1")
         };
     }
 
-    private async Task<MqttEntity> Button(string id, string name)
+    private async Task<MqttEntity> Button(string id, string name, Action callback)
     {
         MqttEntity entity = new(_haContext, $"button.{id}");
         
@@ -115,6 +147,13 @@ public class EntitiesManagerService : AService
         {
             Name = name,
         });
+        
+        (await _mqttEntityManager.PrepareCommandSubscriptionAsync(entity.EntityId))
+            .Subscribe(_ =>
+            {
+                Logger.LogInformation("Action for entity {entityId} requested", entity.EntityId);
+                callback();
+            });
         
         return entity;
     }
@@ -139,6 +178,7 @@ public class EntitiesManagerService : AService
         (await _mqttEntityManager.PrepareCommandSubscriptionAsync(entity.EntityId))
             .SubscribeAsync(async state =>
             {
+                Logger.LogInformation("Change of entity {entityId} to {state}", entity.EntityId, state);
                 await _mqttEntityManager.SetStateAsync(entity.EntityId, state);
             });
         
@@ -179,8 +219,10 @@ public class EntitiesManagerService : AService
         }
         
         (await _mqttEntityManager.PrepareCommandSubscriptionAsync(entity.EntityId))
+            .Distinct()
             .SubscribeAsync(async state =>
             {
+                Logger.LogInformation("Change of entity {entityId} to {state}", entity.EntityId, state);
                 await _mqttEntityManager.SetStateAsync(entity.EntityId, state);
             });
         
@@ -211,6 +253,7 @@ public class EntitiesManagerService : AService
         (await _mqttEntityManager.PrepareCommandSubscriptionAsync(entity.EntityId))
             .SubscribeAsync(async state =>
             {
+                Logger.LogInformation("Change of entity {entityId} to {state}", entity.EntityId, state);
                 await _mqttEntityManager.SetStateAsync(entity.EntityId, state);
             });
         
@@ -255,6 +298,7 @@ public class EntitiesManagerService : AService
         (await _mqttEntityManager.PrepareCommandSubscriptionAsync(entity.EntityId))
             .SubscribeAsync(async state =>
             {
+                Logger.LogInformation("Change of entity {entityId} to {state}", entity.EntityId, state);
                 await _mqttEntityManager.SetStateAsync(entity.EntityId, state);
             });
         
@@ -282,12 +326,13 @@ public record MqttEntities
     public required MqttEntity MpptSolarCurrent { get; init; }
     public required MqttEntity MpptChargeCurrent { get; init; }
     public required MqttEntity MpptStatus { get; init; }
-    public required MqttEntity MpptNight { get; init; }
+    public required MqttEntity MpptDay { get; init; }
     public required MqttEntity MpptAlert { get; init; }
     public required MqttEntity MpptPower { get; init; }
     public required MqttEntity MpptWatchdog { get; init; }
     public required MqttEntity MpptWatchdogCounter { get; init; }
     public required MqttEntity MpptWatchdogPowerOffTime { get; init; }
+    public required MqttEntity MpptWatchdogSwitchOff { get; init; }
     public required MqttEntity MpptPowerOffVoltage { get; init; }
     public required MqttEntity MpptPowerOnVoltage { get; init; }
     
@@ -303,6 +348,14 @@ public record MqttEntities
     public required MqttEntity LoraRxPayload { get; init; }
     
     public required MqttEntity TimeSleep { get; init; }
+    
+    public Entity? Uptime { get; init; }
+    public Entity? LastBoot { get; init; }
+
+    public Entity? SunRising { get; init; }
+    
+    public Entity? MotionEye { get; init; }
+    public List<Entity> CamerasStillImage { get; set; } = new();
 }
 
 public enum BinarySensorDeviceClass

@@ -1,5 +1,6 @@
 using System.Reactive.Linq;
 using Monitor.Extensions;
+using Monitor.Models.HomeAssistant;
 using Monitor.WorkServices;
 using NetDaemon.AppModel;
 using NetDaemon.HassModel;
@@ -8,45 +9,90 @@ using NetDaemon.HassModel.Entities;
 namespace Monitor.Apps;
 
 [NetDaemonApp(Id = "mppt_night_app")]
-public class MpptNightApp : AApp
+public class MpptNightApp : AApp, IAsyncInitializable
 {
+    private readonly EntitiesManagerService _entitiesManagerService;
+    private readonly Entity _dayEntity;
+    
     public MpptNightApp(IHaContext ha, ILogger<MpptNightApp> logger, EntitiesManagerService entitiesManagerService)
         : base(ha, logger, entitiesManagerService)
     {
-        Entity sunRisingEntity = ha.GetAllEntities().First(e => e.EntityId == "sensor.sun_next_rising");
-        MqttEntity timeSleepEntity = EntitiesManagerService.Entities.TimeSleep;
+        _entitiesManagerService = entitiesManagerService;
+        _dayEntity = EntitiesManagerService.Entities.MpptDay;
         
-        EntitiesManagerService.Entities.MpptNight.TurnedOn(logger, true)
-            .Where(_ => timeSleepEntity.IsOff(logger))
+        _dayEntity.TurnedOff(Logger)
             .SubscribeAsync(async _ =>
+            {
+                await Do();
+            });
+    }
+
+    public async Task InitializeAsync(CancellationToken cancellationToken)
+    {
+        if (_dayEntity.IsOff(Logger))
         {
-            DateTime sunRisingDateTime = DateTime.Parse(sunRisingEntity.State!);
-            bool useSun = EntitiesManagerService.Entities.MpptNightUseSun.IsOn(logger); 
+            await Do();
+        }
+    }
+
+    private async Task Do()
+    {
+        MqttEntity entitiesTimeSleep = EntitiesManagerService.Entities.TimeSleep;
+        
+        if (!entitiesTimeSleep.IsOff(Logger))
+        {
+            Logger.LogDebug("Night but time sleep already set");
             
-            TimeSpan timeSleep = TimeSpan.FromHours(10);
-            TimeSpan durationBeforeSunRinsing = DateTime.UtcNow - sunRisingDateTime;
+            return;
+        }
+
+        TimeSpan timeSleep = TimeSpan.FromMinutes(EntitiesManagerService.Entities.MpptNightTimeOff.State.ToInt(60));
+        bool turnOn = EntitiesManagerService.Entities.MpptNightTurnOn.IsOn(Logger);
+        bool useSun = EntitiesManagerService.Entities.MpptNightUseSun.IsOn(Logger);
+        int batteryVoltage = EntitiesManagerService.Entities.MpptBatteryVoltage.State.ToInt();
+        int limitVoltage = EntitiesManagerService.Entities.MpptNightLimitVoltage.State.ToInt();
+        
+        if (batteryVoltage <= limitVoltage)
+        {
+            Logger.LogInformation("Night detected and Battery Voltage is {batteryVoltage} so below {limitVoltage}", batteryVoltage, limitVoltage);
             
+            turnOn = false;
+        }
+        
+        if (useSun && DateTime.TryParse(EntitiesManagerService.Entities.SunRising?.State, out DateTime sunRisingDateTime))
+        {
+            TimeSpan durationBeforeSunRinsing = sunRisingDateTime - DateTime.UtcNow;
             Logger.LogDebug("Sun rising is in {duration} ==> {sunRisingDateTime}", durationBeforeSunRinsing, sunRisingDateTime);
-
-            if (useSun)
-            {
-                timeSleep = durationBeforeSunRinsing;
-            }
             
-            if (EntitiesManagerService.Entities.MpptNightTurnOn.IsOn(logger))
+            if (turnOn)
             {
-                timeSleep = TimeSpan.FromMinutes(EntitiesManagerService.Entities.MpptNightTimeOff.State.ToInt(60));
-
-                if (useSun && timeSleep > durationBeforeSunRinsing)
+                if (timeSleep > durationBeforeSunRinsing)
                 {
-                    logger.LogInformation("Sleep too long and we will miss sunrise so sleep to sunrise in {sunDuration} instead of {duration}", durationBeforeSunRinsing, timeSleep);
+                    Logger.LogInformation("Sleep too long and we will miss sunrise so sleep to sunrise instead of {duration}", timeSleep);
 
                     timeSleep = durationBeforeSunRinsing;
                 }
             }
+            else
+            {
+                Logger.LogDebug("We do not turn on during night so sleep to sun rising");
+                
+                timeSleep = durationBeforeSunRinsing;
+            }
+        }
+        else
+        {
+            Logger.LogDebug("We do not use sun");
             
-            entitiesManagerService.Update(timeSleepEntity, timeSleep.TotalMinutes);
-            await entitiesManagerService.UpdateEntities();
-        });
+            if (!turnOn)
+            {
+                Logger.LogDebug("We do not turn on during night");
+                
+                timeSleep = TimeSpan.FromHours(10);
+            }
+        }
+
+        _entitiesManagerService.Update(entitiesTimeSleep, Math.Round(timeSleep.TotalMinutes));
+        await _entitiesManagerService.UpdateEntities();
     }
 }

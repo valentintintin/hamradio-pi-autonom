@@ -1,12 +1,15 @@
+using System.Reactive.Linq;
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Monitor.Apps;
 using Monitor.Context;
+using Monitor.Extensions;
 using Monitor.WorkServices;
-using Monitor.Workers;
 using NetDaemon.AppModel;
 using NetDaemon.Extensions.MqttEntityManager;
 using NetDaemon.Extensions.Scheduler;
+using NetDaemon.HassModel;
 using NetDaemon.Runtime;
 
 Console.WriteLine("Starting");
@@ -18,26 +21,20 @@ builder.Host
     .UseNetDaemonRuntime()
     .UseNetDaemonMqttEntityManagement();
 
-builder.Services.AddNetDaemonStateManager().AddNetDaemonScheduler();
+builder.Services
+    .AddAppsFromAssembly(Assembly.GetExecutingAssembly())
+    .AddNetDaemonStateManager()
+    .AddNetDaemonScheduler();
 
 builder.Services.AddControllersWithViews();
 
 builder.Services.AddDbContext<DataContext>(option =>
 {
-    option.UseSqlite(builder.Configuration.GetConnectionString("Default"));
+    option.UseSqlite(
+        builder.Configuration.GetConnectionString("Default")!
+        .Replace("{StoragePath}", builder.Configuration.GetValueOrThrow<string>("StoragePath"))
+    );
 });
-
-builder.Services.AddHostedService<SerialPortMessageWorker>();
-builder.Services.AddHostedService<SerialPortLogWorker>();
-// builder.Services.AddHostedService<WebcamWorker>();
-builder.Services.AddHostedService<SystemInfoWorker>();
-
-builder.Services.AddNetDaemonApp<MpptApp>();
-builder.Services.AddNetDaemonApp<MpptNightApp>();
-builder.Services.AddNetDaemonApp<MpptWatchdogApp>();
-builder.Services.AddNetDaemonApp<MpptLowBattery>();
-builder.Services.AddNetDaemonApp<GpioApp>();
-builder.Services.AddNetDaemonApp<SleepApp>();
 
 builder.Services.AddScoped<SerialMessageService>();
 builder.Services.AddScoped<MonitorService>();
@@ -49,9 +46,13 @@ WebApplication app = builder.Build();
 
 app.UseStaticFiles();
 
+string storagePath = app.Configuration.GetValueOrThrow<string>("StoragePath");
+
+Directory.CreateDirectory(storagePath);
+
 app.UseStaticFiles(new StaticFileOptions
 {
-    FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "storage")),
+    FileProvider = new PhysicalFileProvider(storagePath),
     RequestPath = "/storage"
 });
 
@@ -64,9 +65,18 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 using IServiceScope scope = app.Services.GetService<IServiceScopeFactory>()!.CreateScope();
-scope.ServiceProvider.GetRequiredService<DataContext>().Database.Migrate();
-await scope.ServiceProvider.GetRequiredService<EntitiesManagerService>().Init();
+await scope.ServiceProvider.GetRequiredService<DataContext>().Database.MigrateAsync();
+EntitiesManagerService entitiesManagerService = scope.ServiceProvider.GetRequiredService<EntitiesManagerService>();
+
+await entitiesManagerService.Init();
+
+IHaContext haContext = scope.ServiceProvider.GetRequiredService<IHaContext>();
+haContext.Events.Take(1).Subscribe(_ =>
+{
+    EntitiesManagerService.Entities.CamerasStillImage = haContext.GetAllEntities()
+        .Where(e => e.EntityId.EndsWith("_still_images")).ToList();
+});
 
 Console.WriteLine("Started");
 
-app.Run();
+await app.RunAsync();

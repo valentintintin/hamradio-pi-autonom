@@ -1,10 +1,16 @@
-namespace Monitor.Workers;
+using System.Reactive.Concurrency;
+using Monitor.WorkServices;
+using NetDaemon.AppModel;
+using NetDaemon.HassModel;
 
-public class SerialPortLogWorker : ASerialPortWorker
+namespace Monitor.Apps;
+
+[NetDaemonApp(Id = "serial_port_log_app")]
+public class SerialPortLogApp : ASerialPortApp
 {
-    public SerialPortLogWorker(ILogger<SerialPortLogWorker> logger, IConfiguration configuration, 
-        IServiceScopeFactory serviceScopeFactory) : 
-        base("SerialPortLog", logger, configuration, serviceScopeFactory, 
+    public SerialPortLogApp(IHaContext ha, ILogger<SerialPortLogApp> logger, EntitiesManagerService entitiesManagerService,
+        MonitorService monitorService, IConfiguration configuration, IScheduler scheduler) : 
+        base(ha, logger, entitiesManagerService, monitorService, configuration, scheduler, "SerialPortLog", 
             @"E: [MPPT] Charger error
 I: [WEATHER] Temperature 22.80C Humidity=60
 I: [LORA_TX] Start send : F4HVV-15>F4HVV-10,RFONLY:!/7V&-OstcI!!G Solaire camera + NPR70
@@ -23,10 +29,8 @@ I: [WEATHER] Temperature 22.80C Humidity=61")
     {
     }
 
-    protected override Task MessageReceived(string input)
+    protected override async Task MessageReceived(string input)
     {
-        MonitorService.AddLog(input);
-
-        return Task.CompletedTask;
+        await MonitorService.AddLog(input);
     }
 }

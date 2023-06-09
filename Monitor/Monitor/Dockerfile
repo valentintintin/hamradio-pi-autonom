@@ -1,4 +1,4 @@
 FROM mcr.microsoft.com/dotnet/aspnet:7.0
 WORKDIR /App
-COPY . .
+#COPY . .
 ENTRYPOINT ["dotnet", "Monitor.dll"]

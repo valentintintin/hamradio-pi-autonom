@@ -9,9 +9,4 @@ public class WeatherData : Message
 
     [JsonPropertyName("humidity")]
     public int Humidity { get; set; }
-
-    public override string ToString()
-    {
-        return $"{base.ToString()} is {Temperature}°C with {Humidity}% humidity";
-    }
 }

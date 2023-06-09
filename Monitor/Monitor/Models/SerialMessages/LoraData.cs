@@ -11,9 +11,4 @@ public class LoraData : Message
     public required string Payload { get; set; }
 
     public bool IsTx => State == "tx";
-
-    public override string ToString()
-    {
-        return $"{base.ToString()} {State} with payload {Payload}";
-    }
 }

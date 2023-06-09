@@ -1,5 +1,6 @@
 using System.Reactive.Linq;
 using Monitor.Extensions;
+using Monitor.Models.HomeAssistant;
 using Monitor.WorkServices;
 using NetDaemon.AppModel;
 using NetDaemon.HassModel;
@@ -15,20 +16,25 @@ public class MpptApp : AApp
     {
         MqttEntity powerOnVoltageEntity = EntitiesManagerService.Entities.MpptPowerOnVoltage;
         MqttEntity powerOffVoltageEntity = EntitiesManagerService.Entities.MpptPowerOffVoltage;
+
+        TimeSpan duration = TimeSpan.FromSeconds(40);
         
-        EntitiesManagerService.Entities.MpptAlert.TurnedOn(logger).Subscribe(_ =>
-        {
-            systemService.Shutdown();
-        });
+        EntitiesManagerService.Entities.MpptAlert.TurnedOn(logger)
+            .Do(_ => Logger.LogWarning("Alert so shutdown in {duration}", duration))
+            .Delay(duration)
+            .Subscribe(_ =>
+            {
+                systemService.Shutdown();
+            });
 
         powerOffVoltageEntity.StateChanges(logger)
             .Merge(powerOnVoltageEntity.StateChanges(logger))
             .Subscribe(_ =>
-        {
-            serialMessageService.SetPowerOnOffVoltage(
-                powerOnVoltageEntity.State.ToInt(),
-                powerOffVoltageEntity.State.ToInt()
-            );
-        });
+            {
+                serialMessageService.SetPowerOnOffVoltage(
+                    powerOnVoltageEntity.State.ToInt(),
+                    powerOffVoltageEntity.State.ToInt()
+                );
+            });
     }
 }

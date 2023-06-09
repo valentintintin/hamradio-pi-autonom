@@ -13,15 +13,16 @@ public class MpptLowBattery : AApp
     {
         EntitiesManagerService.Entities.MpptBatteryVoltage.StateChanges(logger)
             .Select(s => s.Entity.State.ToInt())
-            .Average()
-            .Sample(TimeSpan.FromMinutes(5))
+            .Buffer(TimeSpan.FromMinutes(2))
+            .Select(s => s.Average())
+            .Do(s => Logger.LogDebug("Average Battery Voltage : {averageVoltage}", s))
             .Where(s => s < EntitiesManagerService.Entities.MpptLowBatteryVoltage.State.ToInt())
-            .SubscribeAsync(async _ =>
+            .SubscribeAsync(async s =>
             {
-                Logger.LogInformation("Battery is too low so sleep");
+                Logger.LogWarning("Battery is too low so sleep. {batteryVoltage} < {lowVoltage}", s, EntitiesManagerService.Entities.MpptLowBatteryVoltage.State);
 
                 TimeSpan timeSleep = TimeSpan.FromMinutes(EntitiesManagerService.Entities.MpptLowBatteryTimeOff.State.ToInt(30));
-
+                
                 entitiesManagerService.Update(EntitiesManagerService.Entities.TimeSleep, timeSleep.TotalMinutes);
                 await entitiesManagerService.UpdateEntities();
             });

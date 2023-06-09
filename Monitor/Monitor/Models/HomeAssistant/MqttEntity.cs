@@ -2,7 +2,7 @@ using System.Globalization;
 using NetDaemon.HassModel;
 using NetDaemon.HassModel.Entities;
 
-namespace Monitor;
+namespace Monitor.Models.HomeAssistant;
 
 public record MqttEntity : Entity
 {

@@ -32,7 +32,6 @@ public class DataContext : DbContext
                     case EntityState.Added:
                         entity.CreatedAt = DateTime.UtcNow;
                         break;
-
                 }
             }
         }
