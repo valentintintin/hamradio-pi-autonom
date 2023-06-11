@@ -1,0 +1,69 @@
+
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+sensor: !include sensor.yaml
+
+config_editor:
+
+monitor_docker:
+  - name: Docker
+  
+recorder:
+  purge_keep_days: 2
+  commit_interval: 240 # 4 minutes
+  exclude:
+    domains:
+      - automation
+      - update
+      - camera
+      - input_boolean
+      - number
+      - person
+      - sun
+      - switch
+      - text
+      - zone
+    entity_globs:
+      - sensor.sun*
+      - weather.*
+      - sensor.date*
+      - sensor.time*
+      - sensor.docker*
+      - sensor.disk*
+      - sensor.energy*
+      - sensor.power*
+      - sensor.load*
+      - sensor.memory*
+      - sensor.swap*
+    entities:
+      - sensor.uptime
+    event_types:
+      - service_registered
+      - component_loaded
+      - panels_updated
+      - core_config_updated
+      - recorder_5min_statistics_generated
+      - lovelace_updated
+      - recorder_hourly_statistics_generated
+      - entity_registry_updated
+      - call_service
+      - homeassistant_final_write
+      - device_registry_updated
+      - motioneye.file_stored
+      - motioneye.motion_detected
+      - persistent_notifications_updated
+  include:
+    entity_globs:
+      - switch.gpio*
+    entities:
+      - sensor.sun_next_rising
+      - sensor.docker_motioneye_1
+      - sensor.docker_monitor_1

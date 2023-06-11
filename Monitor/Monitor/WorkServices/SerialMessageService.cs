@@ -85,9 +85,14 @@ public class SerialMessageService : AService
         SendCommand("telem");
     }
 
-    public void SendLora(string message)
+    public void SendLora(string? message)
     {
-        SendCommand($"lora {message}");
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+        
+        SendCommand($"lora \"{message}\"");
     }
 
     public void SetTime(DateTimeOffset dateTime)

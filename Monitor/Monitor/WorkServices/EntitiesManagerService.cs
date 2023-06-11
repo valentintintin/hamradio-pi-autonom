@@ -87,6 +87,8 @@ public class EntitiesManagerService : AService
         {
             GpioWifi = await Switch("gpio_wifi", "Wifi", true),
             GpioNpr = await Switch("gpio_npr", "NPR", true),
+            WifiShouldTurnOn = await Switch("gpio_wifi_should_turn_on", "Wifi should turn on"),
+            NprShouldTurnOn = await Switch("gpio_npr_should_turn_on", "Npr should turn on"),
             GpioBoxLdr = await Sensor("gpio_box_ldr", "Box LDR", SensorDeviceClass.ILLUMINANCE),
             SystemBoxOpened = await BinarySensor("system_box_opened", "Box opened", BinarySensorDeviceClass.LOCK),
             McuStatus = await Sensor("mcu_status", "MCU Status", SensorDeviceClass.ENUM),
@@ -348,6 +350,9 @@ public record MqttEntities
     public required MqttEntity LoraRxPayload { get; init; }
     
     public required MqttEntity TimeSleep { get; init; }
+    
+    public required MqttEntity WifiShouldTurnOn { get; init; }
+    public required MqttEntity NprShouldTurnOn { get; init; }
     
     public Entity? Uptime { get; init; }
     public Entity? LastBoot { get; init; }

@@ -1,3 +1,4 @@
+using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using Monitor.Extensions;
 using Monitor.WorkServices;
@@ -10,7 +11,7 @@ namespace Monitor.Apps;
 public class GpioApp : AApp
 {
     public GpioApp(IHaContext ha, ILogger<GpioApp> logger, EntitiesManagerService entitiesManagerService,
-        SerialMessageService serialMessageService) 
+        SerialMessageService serialMessageService, IScheduler scheduler) 
         : base(ha, logger, entitiesManagerService)
     {
         TimeSpan debunce = TimeSpan.FromSeconds(1);
@@ -28,5 +29,15 @@ public class GpioApp : AApp
             {
                 serialMessageService.SetNpr(s.New!.IsOn());
             });
+
+        scheduler.ScheduleAsync(TimeSpan.FromSeconds(5), async (_, _) =>
+        {
+            Logger.LogInformation("Switch GPIOs");
+            
+            entitiesManagerService.Update(EntitiesManagerService.Entities.GpioWifi, EntitiesManagerService.Entities.WifiShouldTurnOn.IsOn(logger));
+            entitiesManagerService.Update(EntitiesManagerService.Entities.GpioNpr, EntitiesManagerService.Entities.NprShouldTurnOn.IsOn(logger));
+
+            await entitiesManagerService.UpdateEntities();
+        });
     }
 }

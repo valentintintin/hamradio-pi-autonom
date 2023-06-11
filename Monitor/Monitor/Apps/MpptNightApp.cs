@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Reactive.Linq;
 using Monitor.Extensions;
 using Monitor.Models.HomeAssistant;
@@ -59,7 +60,7 @@ public class MpptNightApp : AApp, IAsyncInitializable
             turnOn = false;
         }
         
-        if (useSun && DateTime.TryParse(EntitiesManagerService.Entities.SunRising?.State, out DateTime sunRisingDateTime))
+        if (useSun && DateTime.TryParse(EntitiesManagerService.Entities.SunRising?.State, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal, out DateTime sunRisingDateTime))
         {
             TimeSpan durationBeforeSunRinsing = sunRisingDateTime - DateTime.UtcNow;
             Logger.LogDebug("Sun rising is in {duration} ==> {sunRisingDateTime}", durationBeforeSunRinsing, sunRisingDateTime);

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Monitor.Extensions;
 using Monitor.Models;
@@ -53,7 +54,7 @@ public class SystemService : AService
     {
         string? uptimeString = EntitiesManagerService.Entities.Uptime?.State;
         
-        if (!DateTime.TryParse(uptimeString, out DateTime uptime))
+        if (!DateTime.TryParse(uptimeString, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal, out DateTime uptime))
         {
             return TimeSpan.Zero;
         }

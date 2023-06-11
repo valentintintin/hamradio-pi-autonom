@@ -22,7 +22,6 @@ builder.Host
     .UseNetDaemonMqttEntityManagement();
 
 builder.Services
-    .AddAppsFromAssembly(Assembly.GetExecutingAssembly())
     .AddNetDaemonStateManager()
     .AddNetDaemonScheduler();
 
@@ -35,6 +34,17 @@ builder.Services.AddDbContext<DataContext>(option =>
         .Replace("{StoragePath}", builder.Configuration.GetValueOrThrow<string>("StoragePath"))
     );
 });
+
+builder.Services.AddNetDaemonApp<MpptApp>();
+builder.Services.AddNetDaemonApp<MpptNightApp>();
+builder.Services.AddNetDaemonApp<MpptWatchdogApp>();
+builder.Services.AddNetDaemonApp<MpptLowBattery>();
+builder.Services.AddNetDaemonApp<GpioApp>();
+builder.Services.AddNetDaemonApp<SleepApp>();
+builder.Services.AddNetDaemonApp<CameraCaptureApp>();
+builder.Services.AddNetDaemonApp<SerialPortMessageApp>();
+builder.Services.AddNetDaemonApp<SerialPortLogApp>();
+builder.Services.AddNetDaemonApp<LoraTxApp>();
 
 builder.Services.AddScoped<SerialMessageService>();
 builder.Services.AddScoped<MonitorService>();

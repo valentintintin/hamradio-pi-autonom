@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using Monitor.WorkServices;
 
@@ -12,8 +13,8 @@ public class DevController : AController
     }
 
     [Route("test")]
-    public void Test()
+    public TimeSpan Test()
     {
-        Logger.LogTrace("Test route accessed");
+        return DateTime.UtcNow - DateTime.Parse(EntitiesManagerService.Entities.SunRising!.State!, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal);
     }
 }

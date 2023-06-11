@@ -1,0 +1,46 @@
+- platform: systemmonitor
+  resources:
+   - type: memory_use_percent
+   - type: processor_use
+   - type: processor_temperature
+   - type: last_boot
+   - type: load_1m
+   - type: load_5m
+   - type: load_15m
+   - type: disk_use_percent
+   - type: swap_use_percent
+   - type: disk_use
+
+- platform: time_date
+  display_options:
+   - 'time'
+   - 'date'
+   - 'date_time'
+   - 'time_date'
+    
+- platform: template
+  sensors:
+    battery_power:
+      unique_id: battery_power
+      friendly_name: "Battery Power"
+      unit_of_measurement: "W"
+      device_class: "power"
+      value_template: "{{ (states('sensor.mppt_battery_voltage') | float / 1000) * (states('sensor.mppt_battery_current') | float / 1000) }}"
+    solar_power:
+      unique_id: solar_power
+      friendly_name: "Solar Power"
+      unit_of_measurement: "W"
+      device_class: "power"
+      value_template: "{{ (states('sensor.mppt_solar_voltage') | float / 1000) * (states('sensor.mppt_solar_current') | float / 1000) }}"
+      
+- platform: integration
+  unique_id: battery_power_consumption
+  source: sensor.battery_power
+  name: Battery Power Consumption
+  round: 2
+
+- platform: integration
+  unique_id: solar_power_production
+  source: sensor.solar_power
+  name: Solar Power Production
+  round: 2
