@@ -132,6 +132,7 @@ void Communication::send() {
 
 void Communication::sendMessage(const char* destination, const char* message, const char* ackToConfirm) {
     strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH_MESSAGE));
+    strcpy_P(aprsPacketTx.source, PSTR(APRS_CALLSIGN));
     strcpy(aprsPacketTx.message.destination, destination);
     strcpy(aprsPacketTx.message.message, message);
 
@@ -154,6 +155,8 @@ void Communication::sendMessage(const char* destination, const char* message, co
 
 void Communication::sendTelemetry() {
     strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH));
+    strcpy_P(aprsPacketTx.source, PSTR(APRS_CALLSIGN));
+    strcpy_P(aprsPacketTx.destination, PSTR(APRS_DESTINATION));
 
     sprintf_P(aprsPacketTx.comment, PSTR("Chg:%s Up:%lds"), mpptChg::getStatusAsString(system->mpptMonitor.getStatus()), millis() / 1000);
     aprsPacketTx.telemetries.telemetrySequenceNumber = telemetrySequenceNumber++;
@@ -169,7 +172,8 @@ void Communication::sendTelemetry() {
     aprsPacketTx.telemetries.telemetriesBoolean[4].value = system->mpptMonitor.isPowerEnabled();
     aprsPacketTx.telemetries.telemetriesBoolean[5].value = system->isBoxOpened();
 
-    if (aprsPacketTx.telemetries.telemetrySequenceNumber % APRS_TELEMETRY_PARAMS_SEQUENCE == 0)
+    if (aprsPacketTx.telemetries.telemetrySequenceNumber > 0
+        && aprsPacketTx.telemetries.telemetrySequenceNumber % APRS_TELEMETRY_PARAMS_SEQUENCE == 0)
     {
         aprsPacketTx.type = TelemetryLabel;
         send();
@@ -192,6 +196,8 @@ void Communication::sendTelemetry() {
 
 void Communication::sendPosition(const char* comment) {
     strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH));
+    strcpy_P(aprsPacketTx.source, PSTR(APRS_CALLSIGN));
+    strcpy_P(aprsPacketTx.destination, PSTR(APRS_DESTINATION));
     strcpy(aprsPacketTx.comment, comment);
 
     aprsPacketTx.type = Position;
@@ -236,9 +242,9 @@ void Communication::received(uint8_t * payload, uint16_t size, int16_t rssi, int
     if (!Aprs::decode(reinterpret_cast<const char *>(payload + sizeof(uint8_t) * 3), &aprsPacketRx)) {
         Log.errorln(F("[APRS] Error during decode"));
     } else {
-        Log.traceln(F("[APRS] Decoded from %s to %s"), aprsPacketRx.source, aprsPacketRx.destination);
+        Log.traceln(F("[APRS] Decoded from %s to %s via %s"), aprsPacketRx.source, aprsPacketRx.destination, aprsPacketRx.path);
 
-        if (strstr_P(reinterpret_cast<const char *>(payload), PSTR(APRS_CALLSIGN)) != nullptr) {
+        if (strstr_P(aprsPacketRx.destination, PSTR(APRS_CALLSIGN)) != nullptr) {
             Log.traceln(F("[APRS] Message for me : %s"), aprsPacketRx.content);
 
             system->displayText(PSTR("[APRS] Received for me"), aprsPacketRx.content);
@@ -250,6 +256,36 @@ void Communication::received(uint8_t * payload, uint16_t size, int16_t rssi, int
             bool processCommandResult = system->command.processCommand(aprsPacketRx.message.message);
             sprintf_P(bufferText, PSTR("Command %s"), processCommandResult, system->command.getResponse());
             sendMessage(PSTR(APRS_DESTINATION), bufferText);
+        } else {
+            // Digi only for WIDE1-1 or VIA Callsign
+            const char *hasWide = strstr_P(aprsPacketRx.path, PSTR("WIDE1-1"));
+            const char *hasCallsign = strstr_P(aprsPacketRx.path, PSTR(APRS_CALLSIGN));
+            bool shouldTx = hasWide != nullptr || hasCallsign != nullptr;
+
+            Log.traceln(F("[APRS] Message should TX : %d. hasWide : %d, hasCallsign : %d"), shouldTx,
+                        hasWide != nullptr, hasCallsign != nullptr);
+            if (shouldTx) {
+                if (hasCallsign != nullptr && *(hasCallsign + 1) != '*') { // Test if VIA callsign not consumed
+                    Log.traceln(F("[APRS] Message via callsign not consumed"));
+                    sprintf_P(aprsPacketTx.path, PSTR("%s*%s"), PSTR(APRS_CALLSIGN),
+                              hasWide != nullptr ? PSTR(",WIDE1-1") : PSTR(""));
+                } else if (hasWide != nullptr && *(hasWide + 1) != '*') { // Test if WIDE not consumed
+                    Log.traceln(F("[APRS] Message via WIDE not consumed"));
+                    sprintf_P(aprsPacketTx.path, PSTR("%s,WIDE1-1*"), PSTR(APRS_CALLSIGN));
+                } else { // We do not TX
+                    Log.traceln(F("[APRS] Message via not OK"));
+                    shouldTx = false;
+                }
+
+                if (shouldTx) {
+                    Log.infoln(F("[APRS] Message digipeated"));
+                    strcpy(aprsPacketTx.source, aprsPacketRx.source);
+                    strcpy(aprsPacketTx.destination, aprsPacketRx.destination);
+                    strcpy(aprsPacketTx.content, aprsPacketRx.content);
+                    aprsPacketTx.type = RawContent;
+                    send();
+                }
+            }
         }
     }
 }

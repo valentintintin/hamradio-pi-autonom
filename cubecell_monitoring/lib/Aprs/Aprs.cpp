@@ -40,6 +40,9 @@ uint8_t Aprs::encode(AprsPacket* aprsPacket, char* aprsResult) {
         case TelemetryBitSense:
             appendTelemetries(aprsPacket, aprsResult);
             break;
+        case RawContent:
+            strcpy(&aprsResult[strlen(aprsResult)], aprsPacket->content);
+            break;
         default:
             return 0;
     }

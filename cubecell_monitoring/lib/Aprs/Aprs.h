@@ -14,7 +14,7 @@
 
 #include <cstdint>
 
-enum AprsPacketType { Position, Message, Telemetry, TelemetryUnit, TelemetryLabel, TelemetryEquation, TelemetryBitSense };
+enum AprsPacketType { Position, Message, Telemetry, TelemetryUnit, TelemetryLabel, TelemetryEquation, TelemetryBitSense, RawContent };
 
 typedef struct {
     // a x value^2 + b x value + c

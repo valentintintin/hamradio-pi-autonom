@@ -44,7 +44,7 @@ void setup() {
         Serial1.begin(115200);
     }
 
-    Log.begin(LOG_LEVEL_INFO, &Serial);
+    Log.begin(LOG_LEVEL , &Serial);
 
     innerWdtEnable(true);
 

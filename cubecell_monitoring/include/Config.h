@@ -3,6 +3,7 @@
 
 #include <JsonWriter.h>
 
+#define LOG_LEVEL LOG_LEVEL_INFO
 #define WireUsed Wire
 #define SerialPiUsed Serial1
 
@@ -31,7 +32,7 @@
 #define INTERVAL_WEATHER 30000
 #define INTERVAL_MPPT 10000
 #define INTERVAL_TIME 30000
-#define INTERVAL_ALARM_BOX_OPENED 60000
+#define INTERVAL_ALARM_BOX_OPENED 120000
 #define DELAY_SCREEN_DISPLAYED 1500
 #define TIME_SCREEN_ON 20000
 
