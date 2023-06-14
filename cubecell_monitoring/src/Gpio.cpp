@@ -10,10 +10,14 @@ Gpio::Gpio(System *system) : system(system) {
     initialized = true;
 }
 
-void Gpio::setState(uint8_t pin, bool enabled, const char* name, bool &status) {
+void Gpio::setState(uint8_t pin, bool enabled, const char* name, bool &status, bool inverted) {
     pinMode(pin, OUTPUT);
 
-    digitalWrite(pin, enabled);
+    if (inverted) {
+        digitalWrite(pin, !enabled);
+    } else {
+        digitalWrite(pin, enabled);
+    }
 
     status = enabled;
 
@@ -29,11 +33,11 @@ void Gpio::setState(uint8_t pin, bool enabled, const char* name, bool &status) {
 }
 
 void Gpio::setWifi(bool enabled) {
-    setState(PIN_WIFI, enabled, PSTR("WIFI"), wifi);
+    setState(PIN_WIFI, enabled, PSTR("WIFI"), wifi, true);
 }
 
 void Gpio::setNpr(bool enabled) {
-    setState(PIN_NPR, enabled, PSTR("NPR"), npr);
+    setState(PIN_NPR, enabled, PSTR("NPR"), npr, true);
 }
 
 uint16_t Gpio::getLdr() {

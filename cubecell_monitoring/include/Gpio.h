@@ -31,7 +31,7 @@ private:
     bool wifi = false;
     bool npr = false;
 
-    void setState(uint8_t pin, bool enabled, const char* name, bool &status);
+    void setState(uint8_t pin, bool enabled, const char* name, bool &status, bool inverted = false);
     bool getState(uint8_t pin, const char* name);
     uint16_t getAdcState(uint8_t pin, const char* name) const;
 };
