@@ -1,4 +1,7 @@
+using FlashCap;
 using Monitor.Extensions;
+using NetDaemon.HassModel;
+using NetDaemon.HassModel.Entities;
 using SixLabors.Fonts;
 using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.Formats.Jpeg;
@@ -10,6 +13,7 @@ public class CameraService : AService
     private readonly string _storagePath;
     private readonly Font _fontTitle, _fontInfo, _fontFooter;
     private readonly JpegEncoder _jpegEncoder;
+    private readonly CaptureDevices _devices;
     
     private readonly int _widthData = 500;
     private readonly int _marginData = 10;
@@ -22,7 +26,8 @@ public class CameraService : AService
             configuration.GetSection("Cameras").GetValueOrThrow<string>("Path")
         );
 
-        Directory.CreateDirectory(_storagePath);
+        Directory.CreateDirectory($"{_storagePath}");
+        Directory.CreateDirectory($"{_storagePath}/final");
         
         Logger.LogInformation("Cameras capture are in {storagePath}", _storagePath);
         
@@ -32,13 +37,47 @@ public class CameraService : AService
         _fontInfo = family.CreateFont(20, FontStyle.Regular);
         _fontFooter = family.CreateFont(15, FontStyle.Regular);
         _jpegEncoder = new JpegEncoder();
+        _devices = new CaptureDevices();
 
         _widthMaxProgressBar = _widthData - _marginData * 2;
     }
 
     public string? GetFinalLast()
     {
-        return Directory.GetFiles($"{_storagePath}/final").LastOrDefault();
+        string path = $"{_storagePath}/final/last.jpg";
+        return File.Exists(path) ? path : null;
+    }
+
+    public async Task CaptureAllCameras()
+    {
+        List<CaptureDeviceDescriptor> cameras = _devices.EnumerateDescriptors().ToList();
+        
+        Logger.LogInformation("Captures images from {cameras}", cameras.Select(j => (string) j.Identity).JoinString());
+        
+        foreach (CaptureDeviceDescriptor camera in cameras)
+        {
+            string cameraName = ((string) camera.Identity).Replace("/dev/", string.Empty);
+            string path = $"{_storagePath}/{cameraName}/{DateTime.UtcNow:yyyy-MM-dd--HH-mm-ss}.jpg";
+            string lastPath = $"{_storagePath}/{cameraName}/last.jpg";
+
+            Logger.LogTrace("Capture image from {camera} to {path}", cameraName, path);
+
+            try
+            {
+                byte[] imageData = await camera.TakeOneShotAsync(camera.Characteristics.FirstOrDefault() ??
+                                    new VideoCharacteristics(PixelFormats.JPEG, 640, 480, 1));
+
+                Directory.CreateDirectory($"{_storagePath}/{cameraName}");
+
+                await File.WriteAllBytesAsync(path, imageData);
+                File.Delete(lastPath);
+                File.CreateSymbolicLink(lastPath, path);
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, "Capture image from {camera} KO", cameraName);
+            }
+        }
     }
 
     public MemoryStream CreateFinalImageFromLasts(bool save = true)
@@ -99,9 +138,14 @@ public class CameraService : AService
         if (save)
         {
             string filePath = $"{_storagePath}/final/{DateTime.UtcNow:yyyy-MM-dd--HH-mm-ss}.jpg";
+            string lastPath = $"{_storagePath}/final/last.jpg";
+            
+            Logger.LogTrace("Save final image to {path}", filePath);
+
             resultImage.Save(filePath, _jpegEncoder);
             
-            Logger.LogDebug("Save final image to {path}", filePath);
+            File.Delete(lastPath);
+            File.CreateSymbolicLink(lastPath, filePath);
         }
         
         Logger.LogInformation("Create final image OK");
@@ -113,7 +157,7 @@ public class CameraService : AService
     {
         return Directory.GetDirectories(_storagePath)
             .Where(d => !d.EndsWith("final"))
-            .Select(d => $"{d}/lastsnap.jpg")
+            .Select(d => $"{d}/last.jpg")
             .Where(File.Exists)
             .ToList();
     }

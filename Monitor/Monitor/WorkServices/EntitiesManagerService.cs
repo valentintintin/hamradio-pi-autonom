@@ -60,7 +60,7 @@ public class EntitiesManagerService : AService
     {
         if (_entitiesToUpdate.Any())
         {
-            Logger.LogInformation("Update {count} entities to MQTT if there is change", _entitiesToUpdate.Count);
+            Logger.LogTrace("Update {count} entities to MQTT if there is change", _entitiesToUpdate.Count);
 
             foreach (MqttEntity entity in _entitiesToUpdate)
             {
@@ -136,8 +136,7 @@ public class EntitiesManagerService : AService
             TimeSleep = await Number("will_turn_off", "System will turn off", null, "0", "min", 0, 1000),
             Uptime = _haContext.Entity("sensor.uptime"),
             LastBoot = _haContext.Entity("sensor.last_boot"),
-            SunRising = _haContext.Entity("sensor.sun_next_rising"),
-            MotionEye = _haContext.Entity("switch.docker_docker_motioneye_1")
+            SunRising = _haContext.Entity("sensor.sun_next_rising")
         };
     }
 
@@ -358,9 +357,6 @@ public record MqttEntities
     public Entity? LastBoot { get; init; }
 
     public Entity? SunRising { get; init; }
-    
-    public Entity? MotionEye { get; init; }
-    public List<Entity> CamerasStillImage { get; set; } = new();
 }
 
 public enum BinarySensorDeviceClass

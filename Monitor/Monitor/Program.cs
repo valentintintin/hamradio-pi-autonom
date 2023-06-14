@@ -80,13 +80,6 @@ EntitiesManagerService entitiesManagerService = scope.ServiceProvider.GetRequire
 
 await entitiesManagerService.Init();
 
-IHaContext haContext = scope.ServiceProvider.GetRequiredService<IHaContext>();
-haContext.Events.Take(1).Subscribe(_ =>
-{
-    EntitiesManagerService.Entities.CamerasStillImage = haContext.GetAllEntities()
-        .Where(e => e.EntityId.EndsWith("_still_images")).ToList();
-});
-
 Console.WriteLine("Started");
 
 await app.RunAsync();

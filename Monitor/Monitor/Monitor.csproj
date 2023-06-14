@@ -32,6 +32,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="FlashCap" Version="1.6.0" />
       <PackageReference Include="JoySoftware.NetDaemon.App" Version="22.1.12" />
       <PackageReference Include="JoySoftware.NetDaemon.Extensions.Mqtt" Version="23.19.0" />
       <PackageReference Include="JoySoftware.NetDaemon.Extensions.Scheduling" Version="23.19.0" />

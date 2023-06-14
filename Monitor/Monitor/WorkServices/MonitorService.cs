@@ -28,7 +28,7 @@ public class MonitorService : AService
         switch (message)
         {
             case McuSystemData systemData:
-                Logger.LogInformation("New system data received");
+                Logger.LogTrace("New system data received");
                 
                 State.McuSystem = systemData;
                 
@@ -36,7 +36,7 @@ public class MonitorService : AService
                 _entitiesManagerService.Update(EntitiesManagerService.Entities.SystemBoxOpened, systemData.BoxOpened);
                 break;
             case WeatherData weatherData:
-                Logger.LogInformation("New weather data received");
+                Logger.LogTrace("New weather data received");
 
                 State.Weather = weatherData;
                 
@@ -51,7 +51,7 @@ public class MonitorService : AService
                 await _context.SaveChangesAsync();
                 break;
             case MpptData mpptData:
-                Logger.LogInformation("New MPPT data received");
+                Logger.LogTrace("New MPPT data received");
 
                 State.Mppt = mpptData;
                 
@@ -87,7 +87,7 @@ public class MonitorService : AService
                 await _context.SaveChangesAsync();
                 break;
             case TimeData timeData:
-                Logger.LogInformation("New time data received");
+                Logger.LogTrace("New time data received");
 
                 State.Time = timeData;
                 
@@ -115,7 +115,7 @@ public class MonitorService : AService
                 await _context.SaveChangesAsync();
                 break;
             case LoraData loraData:
-                Logger.LogInformation("New LoRa data received");
+                Logger.LogTrace("New LoRa data received");
 
                 if (loraData.IsTx)
                 {

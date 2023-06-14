@@ -1,4 +1,5 @@
 using System.Reactive.Linq;
+using Monitor.Extensions;
 using Monitor.Models.HomeAssistant;
 using Monitor.WorkServices;
 using NetDaemon.AppModel;
@@ -16,7 +17,7 @@ public class LoraTxApp : AApp, IAsyncInitializable
     {
         _txPayload = EntitiesManagerService.Entities.LoraTxPayload;
 
-        _txPayload.StateChanges()
+        _txPayload.StateChanges(logger)
             .Where(s => !string.IsNullOrWhiteSpace(s.Entity.State))
             .Select(s => s.Entity.State)
             .SubscribeAsync(async s =>
