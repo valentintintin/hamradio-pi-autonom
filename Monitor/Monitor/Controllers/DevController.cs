@@ -1,6 +1,6 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
-using Monitor.WorkServices;
+using Monitor.Services;
 
 namespace Monitor.Controllers;
 
@@ -12,7 +12,7 @@ public class DevController : AController
     {
     }
 
-    [Route("test")]
+    [HttpGet("test")]
     public TimeSpan Test()
     {
         return DateTime.UtcNow - DateTime.Parse(EntitiesManagerService.Entities.SunRising!.State!, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal);

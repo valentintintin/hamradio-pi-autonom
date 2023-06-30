@@ -1,6 +1,6 @@
 using System.Reactive.Concurrency;
 using Monitor.Models.SerialMessages;
-using Monitor.WorkServices;
+using Monitor.Services;
 using NetDaemon.AppModel;
 using NetDaemon.HassModel;
 
@@ -33,11 +33,6 @@ public class SerialPortMessageApp : ASerialPortApp
     {
         SerialMessageService.SerialPort ??= SerialPort;
         
-        if (input.Contains("Copyright"))
-        {
-            return;
-        }
-
         Message message = _serialMessageService.ParseMessage(input);
         await MonitorService.UpdateStateFromMessage(message);
     }

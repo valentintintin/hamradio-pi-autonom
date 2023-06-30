@@ -7,22 +7,22 @@ using NetDaemon.HassModel;
 
 namespace Monitor.Apps;
 
-[NetDaemonApp(Id = "lora_tx_app")]
-public class LoraTxApp : AApp, IAsyncInitializable
+[NetDaemonApp(Id = "serial_tx_app")]
+public class SerialTxApp : AApp, IAsyncInitializable
 {
     private readonly MqttEntity _txPayload;
 
-    public LoraTxApp(IHaContext ha, ILogger<LoraTxApp> logger, EntitiesManagerService entitiesManagerService,
+    public SerialTxApp(IHaContext ha, ILogger<SerialTxApp> logger, EntitiesManagerService entitiesManagerService,
         SerialMessageService serialMessageService) : base(ha, logger, entitiesManagerService)
     {
-        _txPayload = EntitiesManagerService.Entities.LoraTxPayload;
+        _txPayload = EntitiesManagerService.Entities.SerialTxPayload;
 
         _txPayload.StateChanges(logger)
             .Where(s => !string.IsNullOrWhiteSpace(s.Entity.State))
             .Select(s => s.Entity.State)
             .SubscribeAsync(async s =>
             {
-                serialMessageService.SendLora(s);
+                serialMessageService.SendCommand(s);
                 
                 entitiesManagerService.Update(_txPayload, string.Empty);
                 await EntitiesManagerService.UpdateEntities();

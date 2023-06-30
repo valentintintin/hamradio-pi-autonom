@@ -1,7 +1,7 @@
 using System.Reactive.Linq;
 using Monitor.Extensions;
 using Monitor.Models.HomeAssistant;
-using Monitor.WorkServices;
+using Monitor.Services;
 using NetDaemon.AppModel;
 using NetDaemon.HassModel;
 

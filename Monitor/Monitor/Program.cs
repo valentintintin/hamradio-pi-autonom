@@ -1,15 +1,12 @@
-using System.Reactive.Linq;
-using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Monitor.Apps;
 using Monitor.Context;
 using Monitor.Extensions;
-using Monitor.WorkServices;
+using Monitor.Services;
 using NetDaemon.AppModel;
 using NetDaemon.Extensions.MqttEntityManager;
 using NetDaemon.Extensions.Scheduler;
-using NetDaemon.HassModel;
 using NetDaemon.Runtime;
 
 Console.WriteLine("Starting");
@@ -43,8 +40,8 @@ builder.Services.AddNetDaemonApp<GpioApp>();
 builder.Services.AddNetDaemonApp<SleepApp>();
 builder.Services.AddNetDaemonApp<CameraCaptureApp>();
 builder.Services.AddNetDaemonApp<SerialPortMessageApp>();
-builder.Services.AddNetDaemonApp<SerialPortLogApp>();
 builder.Services.AddNetDaemonApp<LoraTxApp>();
+builder.Services.AddNetDaemonApp<SerialTxApp>();
 
 builder.Services.AddScoped<SerialMessageService>();
 builder.Services.AddScoped<MonitorService>();
@@ -79,6 +76,17 @@ await scope.ServiceProvider.GetRequiredService<DataContext>().Database.MigrateAs
 EntitiesManagerService entitiesManagerService = scope.ServiceProvider.GetRequiredService<EntitiesManagerService>();
 
 await entitiesManagerService.Init();
+
+IConfigurationSection configurationSection = app.Configuration.GetSection("System");
+File.WriteAllText(configurationSection.GetValueOrThrow<string>("ShutdownFile"), "0");
+File.Delete(configurationSection.GetValueOrThrow<string>("TimeFile"));
+
+string storagePathCameras = Path.Combine(
+    storagePath, 
+    app.Configuration.GetSection("Cameras").GetValueOrThrow<string>("Path")
+);
+Directory.CreateDirectory($"{storagePathCameras}");
+Directory.CreateDirectory($"{storagePathCameras}/final");
 
 Console.WriteLine("Started");
 

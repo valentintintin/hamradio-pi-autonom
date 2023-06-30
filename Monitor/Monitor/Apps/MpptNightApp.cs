@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Reactive.Linq;
 using Monitor.Extensions;
 using Monitor.Models.HomeAssistant;
-using Monitor.WorkServices;
+using Monitor.Services;
 using NetDaemon.AppModel;
 using NetDaemon.HassModel;
 using NetDaemon.HassModel.Entities;
@@ -63,22 +63,32 @@ public class MpptNightApp : AApp, IAsyncInitializable
         if (useSun && DateTime.TryParse(EntitiesManagerService.Entities.SunRising?.State, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal, out DateTime sunRisingDateTime))
         {
             TimeSpan durationBeforeSunRinsing = sunRisingDateTime - DateTime.UtcNow;
-            Logger.LogDebug("Sun rising is in {duration} ==> {sunRisingDateTime}", durationBeforeSunRinsing, sunRisingDateTime);
+            Logger.LogDebug("Sun rising is in {duration} ==> {sunRisingDateTime}", durationBeforeSunRinsing,
+                sunRisingDateTime);
             
-            if (turnOn)
+            if (DateTime.UtcNow < sunRisingDateTime)
             {
-                if (timeSleep > durationBeforeSunRinsing)
+                if (turnOn)
                 {
-                    Logger.LogInformation("Sleep too long and we will miss sunrise so sleep to sunrise instead of {duration}", timeSleep);
+                    if (timeSleep > durationBeforeSunRinsing)
+                    {
+                        Logger.LogInformation(
+                            "Sleep too long and we will miss sunrise so sleep to sunrise instead of {duration}",
+                            timeSleep);
+
+                        timeSleep = durationBeforeSunRinsing;
+                    }
+                }
+                else
+                {
+                    Logger.LogDebug("We do not turn on during night so sleep to sun rising");
 
                     timeSleep = durationBeforeSunRinsing;
                 }
             }
             else
             {
-                Logger.LogDebug("We do not turn on during night so sleep to sun rising");
-                
-                timeSleep = durationBeforeSunRinsing;
+                Logger.LogDebug("We can't use sun rising because of false value");
             }
         }
         else

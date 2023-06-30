@@ -50,8 +50,10 @@ void setup() {
 
     systemControl.begin(&radioEvents);
 
-    pinMode(USER_KEY, INPUT);
-    attachInterrupt(USER_KEY, userButton, FALLING);
+    if (USE_BUTTON) {
+        pinMode(USER_KEY, INPUT);
+        attachInterrupt(USER_KEY, userButton, FALLING);
+    }
 }
 
 void loop() {

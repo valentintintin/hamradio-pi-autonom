@@ -8,6 +8,8 @@
 #define SerialPiUsed Serial1
 
 #define USE_RF true
+#define USE_RTC true
+#define USE_BUTTON false
 #define SET_RTC 0
 
 #define RF_FREQUENCY 433775000 // Hz
@@ -25,8 +27,8 @@
 #define LORA_FIX_LENGTH_PAYLOAD_ON false
 #define LORA_IQ_INVERSION_ON false
 #define TX_OUTPUT_POWER 20
-
 #define TRX_BUFFER 256
+
 #define INTERVAL_REFRESH_APRS 300000 // 5 minutes
 #define INTERVAL_POSITION 900000 // 15 minutes
 #define INTERVAL_WEATHER 30000
@@ -38,13 +40,13 @@
 
 #define APRS_CALLSIGN "F4HVV-15"
 #define APRS_PATH "WIDE1-1"
-#define APRS_PATH_MESSAGE "RFONLY"
-#define APRS_DESTINATION "F4HVV-10"
+#define APRS_PATH_MESSAGE "WIDE1-1"
+#define APRS_DESTINATION "F4HVV"
 #define APRS_SYMBOL 'I'
 #define APRS_SYMBOL_TABLE '/'
-#define APRS_LATITUDE 45.324863
-#define APRS_LONGITUDE 5.605224
-#define APRS_COMMENT "Solar cameras"
+#define APRS_LATITUDE 45.323423
+#define APRS_LONGITUDE 5.609752
+#define APRS_COMMENT "Solar NPR+Lora digi+Cam"
 #define APRS_TELEMETRY_PARAMS_SEQUENCE 55
 #define APRS_TELEMETRY_EQUATIONS_ENABLED false
 

@@ -1,7 +1,7 @@
 using System.IO.Ports;
 using System.Reactive.Concurrency;
 using Monitor.Extensions;
-using Monitor.WorkServices;
+using Monitor.Services;
 using NetDaemon.HassModel;
 
 namespace Monitor.Apps;

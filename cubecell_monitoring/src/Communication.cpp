@@ -9,6 +9,12 @@ Communication::Communication(System *system) : system(system) {
     strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH));
     strcpy_P(aprsPacketTx.destination, PSTR(APRS_DESTINATION));
 
+    aprsPacketTx.position.symbol = APRS_SYMBOL;
+    aprsPacketTx.position.overlay = APRS_SYMBOL_TABLE;
+    aprsPacketTx.position.latitude = APRS_LATITUDE;
+    aprsPacketTx.position.longitude = APRS_LONGITUDE;
+    aprsPacketTx.position.withTelemetry = true;
+
     strcpy_P(aprsPacketTx.telemetries.projectName, PSTR("Data"));
 
     // Voltage battery between 0 and 15000mV
@@ -41,7 +47,7 @@ Communication::Communication(System *system) : system(system) {
 
 bool Communication::begin(RadioEvents_t *radioEvents) {
     if (Radio.Init(radioEvents)) {
-        Log.errorln(F("[RADIO] Init error"));
+        system->serialError(PSTR("[RADIO] Init error"));
         system->displayText(PSTR("LoRa error"), PSTR("Init failed"));
 
         return false;
@@ -97,7 +103,7 @@ void Communication::send() {
     uint8_t size = Aprs::encode(&aprsPacketTx, bufferText);
 
     if (!size) {
-        Log.errorln(F("[APRS] Error during string encode"));
+        system->serialError(PSTR("[APRS] Error during string encode"));
         system->displayText("LoRa send error", "APRS encode error");
     } else {
         buffer[0] = '<';
@@ -201,10 +207,12 @@ void Communication::sendPosition(const char* comment) {
     strcpy(aprsPacketTx.comment, comment);
 
     aprsPacketTx.type = Position;
-    aprsPacketTx.position.symbol = APRS_SYMBOL;
-    aprsPacketTx.position.overlay = APRS_SYMBOL_TABLE;
-    aprsPacketTx.position.latitude = APRS_LATITUDE;
-    aprsPacketTx.position.longitude = APRS_LONGITUDE;
+
+    aprsPacketTx.telemetries.telemetriesAnalog[0].value = system->mpptMonitor.getVoltageBattery();
+    aprsPacketTx.telemetries.telemetriesAnalog[1].value = system->mpptMonitor.getCurrentCharge();
+    aprsPacketTx.telemetries.telemetriesAnalog[2].value = system->weatherSensors.getTemperature();
+    aprsPacketTx.telemetries.telemetriesAnalog[3].value = system->weatherSensors.getHumidity();
+    aprsPacketTx.telemetries.telemetriesAnalog[4].value = system->mpptMonitor.isWatchdogEnabled() ? system->mpptMonitor.getWatchdogPowerOffTime() : 0;
 
     send();
 }
@@ -240,7 +248,7 @@ void Communication::received(uint8_t * payload, uint16_t size, int16_t rssi, int
     system->turnOffRGB();
 
     if (!Aprs::decode(reinterpret_cast<const char *>(payload + sizeof(uint8_t) * 3), &aprsPacketRx)) {
-        Log.errorln(F("[APRS] Error during decode"));
+        system->serialError(PSTR("[APRS] Error during decode"));
     } else {
         Log.traceln(F("[APRS] Decoded from %s to %s via %s"), aprsPacketRx.source, aprsPacketRx.destination, aprsPacketRx.path);
 

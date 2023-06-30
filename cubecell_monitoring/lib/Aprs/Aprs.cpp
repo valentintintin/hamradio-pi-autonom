@@ -52,6 +52,9 @@ uint8_t Aprs::encode(AprsPacket* aprsPacket, char* aprsResult) {
     }
 
     if (aprsPacket->type == Position && aprsPacket->position.withTelemetry) {
+        if (strlen(aprsPacket->comment)) {
+            strcpy_P(&aprsResult[strlen(aprsResult)], PSTR(" "));
+        }
         appendTelemetries(aprsPacket, aprsResult);
     }
 

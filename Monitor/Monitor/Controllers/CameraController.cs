@@ -1,6 +1,6 @@
 using System.Net.Mime;
 using Microsoft.AspNetCore.Mvc;
-using Monitor.WorkServices;
+using Monitor.Services;
 
 namespace Monitor.Controllers;
 

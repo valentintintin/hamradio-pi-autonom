@@ -23,8 +23,6 @@
       <Content Include="Dockerfile">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
-      <Content Remove="obj\**" />
-      <None Remove="obj\**" />
       <None Remove="Arial.ttf" />
       <Content Include="Arial.ttf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -39,11 +37,11 @@
       <PackageReference Include="JoySoftware.NetDaemon.Fakes" Version="22.1.12" />
       <PackageReference Include="JoySoftware.NetDaemon.HassModel" Version="23.19.0" />
       <PackageReference Include="JoySoftware.NetDaemon.Runtime" Version="23.19.0" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.5">
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.8">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.5" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.8" />
       <PackageReference Include="SixLabors.ImageSharp" Version="3.0.1" />
       <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta15" />
       <PackageReference Include="System.IO.Ports" Version="7.0.0" />
@@ -51,20 +49,14 @@
 
     <ItemGroup>
       <Compile Remove="storage\**" />
-      <Compile Remove="obj\**" />
     </ItemGroup>
 
     <ItemGroup>
       <EmbeddedResource Remove="storage\**" />
-      <EmbeddedResource Remove="obj\**" />
     </ItemGroup>
 
     <ItemGroup>
       <None Remove="storage\**" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="obj\Debug\net7.0\" />
     </ItemGroup>
 
     <ItemGroup>

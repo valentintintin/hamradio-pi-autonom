@@ -1,10 +1,9 @@
-using System.Reactive.Linq;
 using Monitor.Models.HomeAssistant;
 using NetDaemon.Extensions.MqttEntityManager;
 using NetDaemon.HassModel;
 using NetDaemon.HassModel.Entities;
 
-namespace Monitor.WorkServices;
+namespace Monitor.Services;
 
 public class EntitiesManagerService : AService
 {
@@ -133,6 +132,7 @@ public class EntitiesManagerService : AService
             MpptNightUseSun = await Switch("mppt_night_use_sun", "MPPT Night Use Sun"),
             LoraTxPayload = await Text("lora_tx_payload", "LoRa TX Payload"),
             LoraRxPayload = await Sensor("lora_rx_payload", "LoRa RX Payload"),
+            SerialTxPayload = await Text("serial_tx_payload", "Serial TX Payload"),
             TimeSleep = await Number("will_turn_off", "System will turn off", null, "0", "min", 0, 1000),
             Uptime = _haContext.Entity("sensor.uptime"),
             LastBoot = _haContext.Entity("sensor.last_boot"),
@@ -220,7 +220,6 @@ public class EntitiesManagerService : AService
         }
         
         (await _mqttEntityManager.PrepareCommandSubscriptionAsync(entity.EntityId))
-            .Distinct()
             .SubscribeAsync(async state =>
             {
                 Logger.LogInformation("Change of entity {entityId} to {state}", entity.EntityId, state);
@@ -352,6 +351,8 @@ public record MqttEntities
     
     public required MqttEntity WifiShouldTurnOn { get; init; }
     public required MqttEntity NprShouldTurnOn { get; init; }
+    
+    public required MqttEntity SerialTxPayload { get; init; }
     
     public Entity? Uptime { get; init; }
     public Entity? LastBoot { get; init; }

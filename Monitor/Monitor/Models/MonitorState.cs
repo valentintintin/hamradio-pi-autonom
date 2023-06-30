@@ -4,7 +4,7 @@ namespace Monitor.Models;
 
 public class MonitorState
 {
-    public GpioData Gpio = new()
+    public GpioData Gpio { get; set; } = new()
     {
         Type = "gpio"
     };
@@ -19,7 +19,7 @@ public class MonitorState
         Type = "time"
     };
 
-    public McuSystemData McuSystem = new()
+    public McuSystemData McuSystem { get; set; } = new()
     {
         State = "no data",
         Type = "system"
@@ -31,8 +31,10 @@ public class MonitorState
     };
 
     public LoraState Lora { get; } = new();
+
+    public SystemState? System { get; set; }
     
-    public readonly LimitedList<Message> LastMessagesReceived = new(20);
+    public LimitedList<Message> LastMessagesReceived { get; } = new(15);
     
-    public readonly LimitedList<string> LastLogReceived = new(50);
+    public LimitedList<string> LastLogReceived { get; }= new(30);
 }

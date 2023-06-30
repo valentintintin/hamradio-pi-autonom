@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Monitor.Models.Views;
-using Monitor.WorkServices;
+using Monitor.Services;
 using NetDaemon.HassModel;
 using NetDaemon.HassModel.Entities;
 

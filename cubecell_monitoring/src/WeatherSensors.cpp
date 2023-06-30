@@ -19,7 +19,7 @@ bool WeatherSensors::update() {
     Log.traceln(F("Fetch weather sensors data"));
 
     if (!readDht()) {
-        Log.warningln(F("[WEATHER] Fetch DHT sensor error"));
+        system->serialError(PSTR("[WEATHER] Fetch DHT sensor error"));
         system->displayText(PSTR("Weather error"), PSTR("Failed to fetch DHT sensor"));
         return false;
     }
@@ -44,7 +44,7 @@ bool WeatherSensors::readDht() {
     dht.temperature().getEvent(&event);
 
     if (isnan(event.temperature)) {
-        Log.warningln(F("[WEATHER] Error reading temperature"));
+        system->serialError(PSTR("[WEATHER] Error reading temperature"));
         return false;
     } else {
         temperature = event.temperature;
@@ -53,7 +53,7 @@ bool WeatherSensors::readDht() {
     dht.humidity().getEvent(&event);
 
     if (isnan(event.relative_humidity)) {
-        Log.warningln(F("[WEATHER] Error reading humidity"));
+        system->serialError(PSTR("[WEATHER] Error reading humidity"));
         return false;
     } else {
         humidity = (u_int8_t) event.relative_humidity;

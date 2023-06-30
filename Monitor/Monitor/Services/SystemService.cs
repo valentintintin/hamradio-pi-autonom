@@ -2,9 +2,8 @@ using System.Globalization;
 using System.Text.Json;
 using Monitor.Extensions;
 using Monitor.Models;
-using NetDaemon.HassModel.Entities;
 
-namespace Monitor.WorkServices;
+namespace Monitor.Services;
 
 public class SystemService : AService
 {
@@ -19,13 +18,6 @@ public class SystemService : AService
         _shutdownFilePath = configurationSection.GetValueOrThrow<string>("ShutdownFile");
         _infoFilePath = configurationSection.GetValue<string>("InfoFile");
         _timeFilePath = configurationSection.GetValueOrThrow<string>("TimeFile");
-
-        Logger.LogInformation("Shutdown file is in {path}", _shutdownFilePath);
-        Logger.LogInformation("Info file is in {path}", _infoFilePath);
-        Logger.LogInformation("Time file is in {path}", _timeFilePath);
-
-        File.WriteAllText(_shutdownFilePath, "0");
-        File.Delete(_timeFilePath);
     }
 
     public SystemState? GetInfo()
@@ -84,7 +76,7 @@ public class SystemService : AService
 
     public void SetTime(DateTime dateTime)
     {
-        if ((DateTime.UtcNow - dateTime).TotalSeconds <= 10)
+        if (Math.Abs((DateTime.UtcNow - dateTime).TotalSeconds) <= 10)
         {
             Logger.LogDebug("Change dateTime not done because difference is < 10 second : {now} and {new}", DateTime.UtcNow, dateTime);
             return;

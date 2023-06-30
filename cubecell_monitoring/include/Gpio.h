@@ -9,12 +9,12 @@ class Gpio {
 public:
     explicit Gpio(System *system);
 
-    void printJson();
+    void printJson() const;
 
     void setWifi(bool enabled);
     void setNpr(bool enabled);
 
-    uint16_t getLdr();
+    uint16_t getLdr() const;
 
     inline bool isWifiEnabled() const {
         return wifi;

@@ -22,11 +22,12 @@ public:
     void update();
     void userButton();
     void setTimeFromRTcToInternalRtc(uint64_t epoch);
-    bool isBoxOpened();
+    bool isBoxOpened() const;
 
     void turnOnRGB(uint32_t color);
     void turnOffRGB();
     void displayText(const char* title, const char* content, uint16_t pause = DELAY_SCREEN_DISPLAYED) const;
+    void serialError(const char* content) const;
 
     static DateTime nowToString(char *result);
 

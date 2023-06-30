@@ -1,7 +1,7 @@
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using Monitor.Extensions;
-using Monitor.WorkServices;
+using Monitor.Services;
 using NetDaemon.Common;
 using NetDaemon.HassModel;
 
@@ -16,14 +16,14 @@ public class GpioApp : AApp
     {
         TimeSpan debunce = TimeSpan.FromSeconds(1);
         
-        EntitiesManagerService.Entities.GpioWifi.StateChanges(logger)
+        EntitiesManagerService.Entities.GpioWifi.StateChanges(logger, true)
             .Sample(debunce)
             .Subscribe(s =>
             {
                 serialMessageService.SetWifi(s.New!.IsOn());
             });
         
-        EntitiesManagerService.Entities.GpioNpr.StateChanges(logger)
+        EntitiesManagerService.Entities.GpioNpr.StateChanges(logger, true)
             .Sample(debunce)
             .Subscribe(s =>
             {

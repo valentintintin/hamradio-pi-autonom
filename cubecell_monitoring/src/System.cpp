@@ -28,7 +28,7 @@ bool System::begin(RadioEvents_t *radioEvents) {
     pixels->clear();
 
     if (!display->init()) {
-        Log.warningln(F("[SYSTEM] Display error"));
+        serialError(PSTR("[SYSTEM] Display error"));
     }
 
     turnScreenOn();
@@ -37,16 +37,20 @@ bool System::begin(RadioEvents_t *radioEvents) {
     mpptMonitor.begin();
     communication->begin(radioEvents);
 
-    if (SET_RTC > 0) {
-        Log.warningln(F("[TIME] Set clock to %l"), SET_RTC + 60);
-        RTC.setEpoch(SET_RTC + 60);
+    if (USE_RTC) {
+        if (SET_RTC > 0) {
+            Log.warningln(F("[TIME] Set clock to %l"), SET_RTC + 60);
+            RTC.setEpoch(SET_RTC + 60);
+        }
+
+        setTimeFromRTcToInternalRtc(RTClib::now().unixtime());
+
+        nowToString(bufferText);
+        Log.infoln(F("[SYSTEM] Started at %s"), bufferText);
+    } else {
+        Log.infoln(F("[SYSTEM] Started"));
     }
 
-    setTimeFromRTcToInternalRtc(RTClib::now().unixtime());
-
-    nowToString(bufferText);
-
-    Log.infoln(F("[SYSTEM] Started at %s"), bufferText);
     serialJsonWriter
             .beginObject()
             .property(F("type"), PSTR("system"))
@@ -94,6 +98,7 @@ void System::update() {
 
         if (forceSendTelemetry || timerTime.hasExpired()) {
             showTime();
+
             gpio.printJson();
 
             serialJsonWriter
@@ -216,6 +221,11 @@ DateTime System::nowToString(char *result) {
 
 void System::showTime() {
     DateTime now = nowToString(bufferText);
+
+    if (now.year() != 2023) {
+        return;
+    }
+
     serialJsonWriter
             .beginObject()
             .property(F("type"), PSTR("time"))
@@ -233,6 +243,16 @@ void System::setTimeFromRTcToInternalRtc(uint64_t epoch) {
     TimerSetSysTime(currentTime);
 }
 
-bool System::isBoxOpened() {
+bool System::isBoxOpened() const {
     return millis() >= 60000 && gpio.getLdr() >= LDR_ALARM_LEVEL;
+}
+
+void System::serialError(const char *content) const {
+    Log.errorln(content);
+    serialJsonWriter
+            .beginObject()
+            .property(F("type"), PSTR("system"))
+            .property(F("state"), content)
+            .property(F("boxOpened"), isBoxOpened())
+            .endObject(); SerialPiUsed.println();
 }

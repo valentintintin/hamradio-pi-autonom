@@ -65,7 +65,7 @@ int main() {
 
     packet.position.withTelemetry = true;
     size = Aprs::encode(&packet, encoded_packet);
-    printf("\nAPRS Position with telemtry Size : %d\n%s\n", size, encoded_packet);
+    printf("\nAPRS Position with telemetry Size : %d\n%s\n", size, encoded_packet);
 
     packet.type = Message;
     size = Aprs::encode(&packet, encoded_packet);
@@ -107,6 +107,11 @@ int main() {
     packet.type = TelemetryBitSense;
     size = Aprs::encode(&packet, encoded_packet);
     printf("\nAPRS Telemetry bits Size : %d\n%s\n", size, encoded_packet);
+
+    packet.type = RawContent;
+    strcpy(packet.content, "Test test test");
+    size = Aprs::encode(&packet, encoded_packet);
+    printf("\nAPRS Raw Content : %d\n%s\n", size, encoded_packet);
 
     printf("\n");
 

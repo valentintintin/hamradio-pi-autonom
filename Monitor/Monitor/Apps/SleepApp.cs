@@ -1,6 +1,6 @@
 using System.Reactive.Linq;
 using Monitor.Extensions;
-using Monitor.WorkServices;
+using Monitor.Services;
 using NetDaemon.Common;
 using NetDaemon.HassModel;
 

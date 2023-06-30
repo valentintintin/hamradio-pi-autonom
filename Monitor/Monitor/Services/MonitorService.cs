@@ -3,7 +3,7 @@ using Monitor.Context.Entities;
 using Monitor.Models;
 using Monitor.Models.SerialMessages;
 
-namespace Monitor.WorkServices;
+namespace Monitor.Services;
 
 public class MonitorService : AService
 {
@@ -96,7 +96,7 @@ public class MonitorService : AService
                 _systemService.SetTime(State.Time.DateTime.DateTime);
                 break;
             case GpioData gpioData:
-                Logger.LogInformation("New GPIO data received");
+                Logger.LogTrace("New GPIO data received");
 
                 State.Gpio = gpioData;
                 
@@ -137,10 +137,10 @@ public class MonitorService : AService
 
     public async Task AddLog(string log)
     {
-        State.LastLogReceived.Add(log);
-
         if (log.StartsWith("E") || log.StartsWith("W") || log.ToLower().Contains("error"))
         {
+            State.LastLogReceived.Add(log);
+
             Logger.LogWarning("Error system received : {message}", log);
 
             _entitiesManagerService.Update(EntitiesManagerService.Entities.McuStatus, log);

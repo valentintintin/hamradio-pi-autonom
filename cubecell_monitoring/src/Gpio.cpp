@@ -40,7 +40,7 @@ void Gpio::setNpr(bool enabled) {
     setState(PIN_NPR, enabled, PSTR("NPR"), npr, true);
 }
 
-uint16_t Gpio::getLdr() {
+uint16_t Gpio::getLdr() const {
     return getAdcState(PIN_LDR, PSTR("LDR"));
 }
 
@@ -55,7 +55,7 @@ uint16_t Gpio::getAdcState(uint8_t pin, const char *name) const {
     return analogRead(pin);
 }
 
-void Gpio::printJson() {
+void Gpio::printJson() const {
     Log.infoln(F("[GPIO] Wifi: %d NPR: %d Box LDR: %d"), isWifiEnabled(), isNprEnabled(), getLdr());
 
     serialJsonWriter

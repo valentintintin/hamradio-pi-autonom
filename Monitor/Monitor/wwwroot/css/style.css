@@ -156,10 +156,6 @@ section {
     justify-content: space-around;
 }
 
-.photo {
-    max-width: 480px;
-}
-
 article {
     margin: 10px;
 }

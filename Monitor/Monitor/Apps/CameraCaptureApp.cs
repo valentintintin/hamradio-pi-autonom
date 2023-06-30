@@ -1,6 +1,6 @@
 using System.Reactive.Concurrency;
 using Monitor.Extensions;
-using Monitor.WorkServices;
+using Monitor.Services;
 using NetDaemon.AppModel;
 using NetDaemon.HassModel;
 

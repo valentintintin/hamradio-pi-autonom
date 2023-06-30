@@ -3,7 +3,7 @@ using System.Text.Json;
 using Monitor.Exceptions;
 using Monitor.Models.SerialMessages;
 
-namespace Monitor.WorkServices;
+namespace Monitor.Services;
 
 public class SerialMessageService : AService
 {
@@ -23,14 +23,14 @@ public class SerialMessageService : AService
         }
         catch (Exception e)
         {
-            Logger.LogError(e, "Received serial message : {input} KO. Deserialize impossible", input);
+            Logger.LogError(e, "Received serial message KO. Deserialize impossible : {input}", input);
 
             throw new MessageParseException(e, input);
         }
 
         if (message == null)
         {
-            Logger.LogError("Received serial message : {input} KO. Message null", input);
+            Logger.LogError("Received serial message KO. Message null : {input}", input);
 
             throw new MessageParseException(input);
         }
@@ -50,12 +50,12 @@ public class SerialMessageService : AService
         }
         catch (Exception e)
         {
-            Logger.LogError(e, "Received serial message : {input} KO. Sub Deserialize impossible", input);
+            Logger.LogError(e, "Received serial message KO. Sub Deserialize impossible : {input}", input);
 
             throw new MessageParseException(e, input);
         }
 
-        Logger.LogInformation("Received serial message : {input} OK. {message}", input, messageTyped ?? message);
+        Logger.LogInformation("Received serial message OK : {input}", input);
 
         return messageTyped ?? message;
     }
@@ -100,7 +100,7 @@ public class SerialMessageService : AService
         SendCommand($"time {dateTime.ToUnixTimeSeconds()}");
     }
 
-    private void SendCommand(string command)
+    public void SendCommand(string command)
     {
         if (SerialPort == null)
         {

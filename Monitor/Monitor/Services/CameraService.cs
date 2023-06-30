@@ -1,12 +1,10 @@
 using FlashCap;
 using Monitor.Extensions;
-using NetDaemon.HassModel;
-using NetDaemon.HassModel.Entities;
 using SixLabors.Fonts;
 using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.Formats.Jpeg;
 
-namespace Monitor.WorkServices;
+namespace Monitor.Services;
 
 public class CameraService : AService
 {
@@ -14,9 +12,9 @@ public class CameraService : AService
     private readonly Font _fontTitle, _fontInfo, _fontFooter;
     private readonly JpegEncoder _jpegEncoder;
     private readonly CaptureDevices _devices;
-    
-    private readonly int _widthData = 500;
-    private readonly int _marginData = 10;
+
+    private const int WidthData = 500;
+    private const int MarginData = 10;
     private readonly int _widthMaxProgressBar;
     
     public CameraService(ILogger<CameraService> logger, IConfiguration configuration) : base(logger)
@@ -26,11 +24,6 @@ public class CameraService : AService
             configuration.GetSection("Cameras").GetValueOrThrow<string>("Path")
         );
 
-        Directory.CreateDirectory($"{_storagePath}");
-        Directory.CreateDirectory($"{_storagePath}/final");
-        
-        Logger.LogInformation("Cameras capture are in {storagePath}", _storagePath);
-        
         FontCollection collection = new();
         FontFamily family = collection.Add("Arial.ttf");
         _fontTitle = family.CreateFont(30, FontStyle.Bold);
@@ -39,13 +32,22 @@ public class CameraService : AService
         _jpegEncoder = new JpegEncoder();
         _devices = new CaptureDevices();
 
-        _widthMaxProgressBar = _widthData - _marginData * 2;
+        _widthMaxProgressBar = WidthData - MarginData * 2;
     }
 
     public string? GetFinalLast()
     {
         string path = $"{_storagePath}/final/last.jpg";
-        return File.Exists(path) ? path : null;
+
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+        
+        FileSystemInfo? resolveLinkTarget = File.ResolveLinkTarget(path, true);
+
+        return resolveLinkTarget?.Exists == true ? resolveLinkTarget.FullName : null;
+
     }
 
     public async Task CaptureAllCameras()
@@ -57,7 +59,7 @@ public class CameraService : AService
         foreach (CaptureDeviceDescriptor camera in cameras)
         {
             string cameraName = ((string) camera.Identity).Replace("/dev/", string.Empty);
-            string path = $"{_storagePath}/{cameraName}/{DateTime.UtcNow:yyyy-MM-dd--HH-mm-ss}.jpg";
+            string path = $"{_storagePath}/{cameraName}/{DateTime.UtcNow:yyyy-MM-dd--HH-mm-ss}-{Random.Shared.NextInt64()}.jpg";
             string lastPath = $"{_storagePath}/{cameraName}/last.jpg";
 
             Logger.LogTrace("Capture image from {camera} to {path}", cameraName, path);
@@ -93,16 +95,16 @@ public class CameraService : AService
         int width = imagesCamera.Sum(i => i.Width);
         int height = imagesCamera.Max(i => i.Height);
         
-        using Image resultImage = new Image<Rgb24>(width + _widthData, height);
-        using Image dataImage = new Image<Rgb24>(_widthData, height);
+        using Image resultImage = new Image<Rgb24>(width + WidthData, height);
+        using Image dataImage = new Image<Rgb24>(WidthData, height);
 
         dataImage.Mutate(ctx =>
         {
             ctx.DrawText(
-                DateTime.Now.ToString("G"),
+                $"{DateTime.UtcNow:G} UTC",
                 _fontTitle,
                 Color.White,
-                new PointF(_marginData + 100, 10));
+                new PointF(MarginData + 100, 10));
 
             DrawProgressBarwithInfo(ctx, 0, "Battery voltage", "mV", MonitorService.State.Mppt.BatteryVoltage, 11000, 13000, Color.Red, Color.Black);
             DrawProgressBarwithInfo(ctx, 1, "Battery current", "mA", MonitorService.State.Mppt.BatteryCurrent, 0, 2000, Color.Yellow, Color.Black);
@@ -115,7 +117,7 @@ public class CameraService : AService
                 "Valentin F4HVV",
                 _fontFooter,
                 Color.White,
-                new PointF(_widthData - _marginData - 100, height - 30)); 
+                new PointF(WidthData - MarginData - 100, height - 30)); 
         });
         
         resultImage.Mutate(ctx =>
@@ -137,7 +139,7 @@ public class CameraService : AService
 
         if (save)
         {
-            string filePath = $"{_storagePath}/final/{DateTime.UtcNow:yyyy-MM-dd--HH-mm-ss}.jpg";
+            string filePath = $"{_storagePath}/final/{DateTime.UtcNow:yyyy-MM-dd--HH-mm-ss}-{Random.Shared.NextInt64()}.jpg";
             string lastPath = $"{_storagePath}/final/last.jpg";
             
             Logger.LogTrace("Save final image to {path}", filePath);
@@ -166,15 +168,15 @@ public class CameraService : AService
     {
         int y = indexValue * 50 + 50;
         
-        ctx.Fill(Color.LightGray, new Rectangle(_marginData, y, _widthMaxProgressBar, 24));
-        ctx.Fill(colorBar, new Rectangle(_marginData, y, 
+        ctx.Fill(Color.LightGray, new Rectangle(MarginData, y, _widthMaxProgressBar, 24));
+        ctx.Fill(colorBar, new Rectangle(MarginData, y, 
             MapValue(value, min, max, 0, _widthMaxProgressBar),
             24));
         ctx.DrawText(
             $"{label}: {value}{unit}",
             _fontInfo,
             colorText,
-            new PointF(_marginData + 50, y));
+            new PointF(MarginData + 50, y));
     }
     
     private int MapValue(double value, double inMin, double inMax, double outMin, double outMax)
