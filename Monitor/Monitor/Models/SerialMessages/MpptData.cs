@@ -35,7 +35,7 @@ public class MpptData : Message
     public bool WatchdogEnabled { get; set; }
 
     [JsonPropertyName("watchdogPowerOffTime")]
-    public long WatchdogPowerOffTime { get; set; }
+    public int WatchdogPowerOffTime { get; set; }
 
     [JsonPropertyName("watchdogCounter")]
     public int WatchdogCounter { get; set; }

@@ -14,11 +14,20 @@ public class DataContext : DbContext
     
     public DataContext(DbContextOptions<DataContext> options) : base(options) {}
 
-    public override int SaveChanges()
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         ComputeEntitiesBeforeSaveChanges();
         
-        return base.SaveChanges();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+    
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        ComputeEntitiesBeforeSaveChanges();
+        
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
     }
 
     private void ComputeEntitiesBeforeSaveChanges()

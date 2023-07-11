@@ -13,8 +13,8 @@ public class DevController : AController
     }
 
     [HttpGet("test")]
-    public TimeSpan Test()
+    public object? Test()
     {
-        return DateTime.UtcNow - DateTime.Parse(EntitiesManagerService.Entities.SunRising!.State!, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal);
+        return default;
     }
 }

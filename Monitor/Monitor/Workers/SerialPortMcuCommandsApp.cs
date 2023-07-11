@@ -1,19 +1,15 @@
-using System.Reactive.Concurrency;
 using Monitor.Models.SerialMessages;
 using Monitor.Services;
-using NetDaemon.AppModel;
-using NetDaemon.HassModel;
 
-namespace Monitor.Apps;
+namespace Monitor.Workers;
 
-[NetDaemonApp(Id = "serial_port_message_app")]
-public class SerialPortMessageApp : ASerialPortApp
+public class SerialPortMcuCommandsApp : ASerialPortApp
 {
     private readonly SerialMessageService _serialMessageService;
 
-    public SerialPortMessageApp(IHaContext ha, ILogger<SerialPortMessageApp> logger, EntitiesManagerService entitiesManagerService,
-        MonitorService monitorService, IConfiguration configuration, IScheduler scheduler, SerialMessageService serialMessageService) : 
-        base(ha, logger, entitiesManagerService, monitorService, configuration, scheduler, "SerialPortMessage",
+    public SerialPortMcuCommandsApp(ILogger<SerialPortMcuCommandsApp> logger, IServiceProvider serviceProvider,
+        IConfiguration configuration) : 
+        base(logger, serviceProvider, configuration, "SerialPortMessage",
             @"{""type"":""system"",""state"":""started"",""boxOpened"":false}
      {""type"":""time"",""state"":2313942038,""uptime"":2}
      {""type"":""mppt"",""batteryVoltage"":12268,""batteryCurrent"":2,""solarVoltage"":163,""solarCurrent"":2,""currentCharge"":0,""status"":136,""night"":true,""alert"":false,""watchdogEnabled"":false,""watchdogPowerOffTime"":10,""watchdogCounter"":0,""powerEnabled"":true,""powerOnVoltage"":11500,""powerOffVoltage"":11300,""statusString"":""NIGHT""}
@@ -26,7 +22,7 @@ public class SerialPortMessageApp : ASerialPortApp
      {""type"":""weather"",""temperature"":20.0,""humidity"":50}
      {""type"":""mppt"",""batteryVoltage"":12100,""batteryCurrent"":20,""solarVoltage"":1630,""solarCurrent"":20,""currentCharge"":220,""status"":136,""night"":true,""alert"":false,""watchdogEnabled"":false,""watchdogPowerOffTime"":10,""watchdogCounter"":0,""powerEnabled"":true,""powerOnVoltage"":11500,""powerOffVoltage"":11300,""statusString"":""NIGHT""}")
     {
-        _serialMessageService = serialMessageService;
+        _serialMessageService = Services.GetRequiredService<SerialMessageService>();
     }
 
     protected override async Task MessageReceived(string input)

@@ -85,7 +85,7 @@ public class SerialMessageService : AService
         SendCommand("telem");
     }
 
-    public void SendLora(string? message)
+    public void SendLora(string message)
     {
         if (string.IsNullOrWhiteSpace(message))
         {

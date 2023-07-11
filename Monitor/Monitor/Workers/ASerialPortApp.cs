@@ -2,32 +2,43 @@ using System.IO.Ports;
 using System.Reactive.Concurrency;
 using Monitor.Extensions;
 using Monitor.Services;
-using NetDaemon.HassModel;
 
-namespace Monitor.Apps;
+namespace Monitor.Workers;
 
-public abstract class ASerialPortApp : AApp, IAsyncDisposable
+public abstract class ASerialPortApp : AWorker
 {
     protected readonly MonitorService MonitorService;
-    protected readonly SerialPort? SerialPort;
+    private readonly string _fakeInput;
+    protected SerialPort? SerialPort;
 
-    protected ASerialPortApp(IHaContext ha, ILogger<ASerialPortApp> logger, EntitiesManagerService entitiesManagerService,
-        MonitorService monitorService, IConfiguration configuration, IScheduler scheduler,
-        string configSectionName, string fakeInput = "")
-        : base(ha, logger, entitiesManagerService)
+    private readonly string _path;
+    private readonly int _speed;
+    private readonly bool _simulate;
+
+    protected ASerialPortApp(ILogger<ASerialPortApp> logger, IServiceProvider serviceProvider
+        , IConfiguration configuration, string configSectionName, string fakeInput = "")
+        : base(logger, serviceProvider)
     {
-        MonitorService = monitorService;
+        MonitorService = Services.GetRequiredService<MonitorService>();
+        _fakeInput = fakeInput;
+        
         IConfigurationSection configurationSection = configuration.GetSection(configSectionName);
 
-        string path = configurationSection.GetValueOrThrow<string>("Path");
-        int speed = configurationSection.GetValueOrThrow<int>("Speed");
-        
-        if (configurationSection.GetValue<bool?>("Simulate") == true)
+        _path = configurationSection.GetValueOrThrow<string>("Path");
+        _speed = configurationSection.GetValueOrThrow<int>("Speed");
+        _simulate = configurationSection.GetValue<bool>("Simulate", false);
+    }
+
+    protected abstract Task MessageReceived(string input);
+
+    protected override Task Start()
+    {
+        if (_simulate)
         {
-            string[] lines = fakeInput.Split('\n');
+            string[] lines = _fakeInput.Split('\n');
             int currentLine = 0;
 
-            scheduler.SchedulePeriodic(TimeSpan.FromMilliseconds(1500), () => 
+            AddDisposable(Scheduler.SchedulePeriodic(TimeSpan.FromMilliseconds(2500), () => 
             {
                 string input = lines[currentLine++];
                 
@@ -39,11 +50,11 @@ public abstract class ASerialPortApp : AApp, IAsyncDisposable
                 {
                     currentLine = 0;
                 }
-            });
+            }));
         }
         else
         {
-            SerialPort = new SerialPort(path, speed);
+            SerialPort = new SerialPort(_path, _speed);
             SerialPort.NewLine = "\n";
             SerialPort.DataReceived += (_, _) =>
             {
@@ -65,23 +76,21 @@ public abstract class ASerialPortApp : AApp, IAsyncDisposable
             {
                 SerialPort.Open();
                 
-                Logger.LogInformation("SerialPort {path}:{speed} opened OK", path, speed);
+                Logger.LogInformation("SerialPort {path}:{speed} opened OK", _path, _speed);
             }
             catch (Exception e)
             {
-                Logger.LogCritical(e, "SerialPort {path}:{speed} opened KO", path, speed);
+                Logger.LogCritical(e, "SerialPort {path}:{speed} opened KO", _path, _speed);
             }
         }
+        
+        return Task.CompletedTask;
     }
 
-    protected abstract Task MessageReceived(string input);
-    
-    public ValueTask DisposeAsync()
+    protected override Task Stop()
     {
         SerialPort?.Close();
 
-        GC.SuppressFinalize(this);
-
-        return ValueTask.CompletedTask;
+        return base.Stop();
     }
 }

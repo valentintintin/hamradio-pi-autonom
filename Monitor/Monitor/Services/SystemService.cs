@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reactive.Subjects;
 using System.Text.Json;
 using Monitor.Extensions;
 using Monitor.Models;
@@ -7,17 +8,21 @@ namespace Monitor.Services;
 
 public class SystemService : AService
 {
-    private readonly string? _shutdownFilePath;
+    private readonly SerialMessageService _serialMessageService;
+    private readonly string _shutdownFilePath;
+    private readonly string _timeFilePath;
     private readonly string? _infoFilePath;
-    private readonly string? _timeFilePath;
+    private TimeSpan? WillSleep { get; set; }
 
-    public SystemService(ILogger<SystemService> logger, IConfiguration configuration) : base(logger)
+    public SystemService(ILogger<SystemService> logger, IConfiguration configuration, SerialMessageService serialMessageService) : base(logger)
     {
+        _serialMessageService = serialMessageService;
+        
         IConfigurationSection configurationSection = configuration.GetSection("System");
         
         _shutdownFilePath = configurationSection.GetValueOrThrow<string>("ShutdownFile");
-        _infoFilePath = configurationSection.GetValue<string>("InfoFile");
         _timeFilePath = configurationSection.GetValueOrThrow<string>("TimeFile");
+        _infoFilePath = configurationSection.GetValue<string>("InfoFile");
     }
 
     public SystemState? GetInfo()
@@ -42,31 +47,38 @@ public class SystemService : AService
         }
     }
 
-    public TimeSpan GetUptime()
+    public void AskForShutdown(TimeSpan sleepTime)
     {
-        string? uptimeString = EntitiesManagerService.Entities.Uptime?.State;
+        Logger.LogInformation("Ask for shutdown during {time}", sleepTime);
         
-        if (!DateTime.TryParse(uptimeString, CultureInfo.CurrentCulture, DateTimeStyles.AdjustToUniversal, out DateTime uptime))
+        if (IsShutdownOrderGiven())
         {
-            return TimeSpan.Zero;
+            Logger.LogWarning("Ask for shutdown during {time} KO because already shutdown order given", sleepTime);
+            
+            return;
         }
         
-        return DateTime.UtcNow - uptime;
+        WillSleep = sleepTime;
+
+        if (WillSleep.HasValue)
+        {
+            _serialMessageService.SetWatchdog(WillSleep.Value);
+        }
     }
 
     public void Shutdown()
     {
         Logger.LogInformation("Send shutdown command");
 
-        if (WillShutdown())
+        if (IsShutdownOrderGiven())
         {
             Logger.LogWarning("Will already shutdown");
             return;
         }
-         
+        
         try
         {
-            File.WriteAllText(_shutdownFilePath!, "1");
+            File.WriteAllText(_shutdownFilePath, "1");
         }
         catch (Exception e)
         {
@@ -92,7 +104,7 @@ public class SystemService : AService
 
         try
         {
-            File.WriteAllText(_timeFilePath!, dateTime.ToString("s"));
+            File.WriteAllText(_timeFilePath, dateTime.ToString("s"));
         }
         catch (Exception e)
         {
@@ -100,11 +112,16 @@ public class SystemService : AService
         }
     }
 
-    private bool WillShutdown()
+    public bool IsShutdownAsked()
+    {
+        return WillSleep.HasValue || IsShutdownOrderGiven();
+    }
+
+    public bool IsShutdownOrderGiven()
     {
         try
         {
-            return File.ReadAllText(_shutdownFilePath!) == "1";
+            return File.ReadAllText(_shutdownFilePath) == "1";
         }
         catch (Exception e)
         {

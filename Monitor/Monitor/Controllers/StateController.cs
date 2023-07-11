@@ -8,17 +8,13 @@ namespace Monitor.Controllers;
 [Route("state")]
 public class StateController : AController
 {
-    private readonly SystemService _systemService;
-
-    public StateController(ILogger<StateController> logger, SystemService systemService) : base(logger)
+    public StateController(ILogger<StateController> logger) : base(logger)
     {
-        _systemService = systemService;
     }
 
     [HttpGet]
     public MonitorState Index()
     {
-        MonitorService.State.System = _systemService.GetInfo();
         return MonitorService.State;
     }
 }

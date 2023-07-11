@@ -8,7 +8,7 @@ public class Weather : IEntity
     public long Id { get; set; }
     public DateTime CreatedAt { get; set; }
     
-    public double Temperature { get; set; }
+    public float Temperature { get; set; }
     
     public int Humidity { get; set; } 
 }

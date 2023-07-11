@@ -6,5 +6,5 @@ public class HomeModel
     
     public string? LastPhoto { get; set; }
     
-    public TimeSpan Uptime { get; set; }
+    public TimeSpan? Uptime { get; set; }
 }

@@ -1,0 +1,23 @@
+@using Monitor.Extensions
+
+<TimePicker Value="Value" OnChange="OnChange" AllowClear="false" ShowToday="false" />
+
+@code {
+    [Parameter]
+    public TimeSpan Model { get; set; }
+    
+    [Parameter]
+    public EventCallback<TimeSpan> ModelChanged { get; set; }
+    
+    private DateTime Value
+    {
+        get => Model.ToDateTime();
+        set => Model = value.TimeOfDay;
+    }
+
+    private async Task OnChange(DateTimeChangedEventArgs arg)
+    {
+        Value = arg.Date ?? DateTime.MinValue;
+        await ModelChanged.InvokeAsync(Model);
+    }
+}

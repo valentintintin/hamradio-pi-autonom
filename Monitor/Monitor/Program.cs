@@ -1,30 +1,31 @@
+using System.Globalization;
+using AntDesign;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
-using Monitor.Apps;
 using Monitor.Context;
 using Monitor.Extensions;
+using Monitor.Models.SerialMessages;
 using Monitor.Services;
-using NetDaemon.AppModel;
-using NetDaemon.Extensions.MqttEntityManager;
+using Monitor.Workers;
 using NetDaemon.Extensions.Scheduler;
-using NetDaemon.Runtime;
 
 Console.WriteLine("Starting");
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-builder.Host
-    .UseNetDaemonAppSettings()
-    .UseNetDaemonRuntime()
-    .UseNetDaemonMqttEntityManagement();
+builder.Services.AddRazorPages();
+builder.Services.AddServerSideBlazor();
+builder.Services.AddAntDesign();
+builder.Services.AddResponseCompression();
 
-builder.Services
-    .AddNetDaemonStateManager()
-    .AddNetDaemonScheduler();
+builder.Services.AddNetDaemonScheduler();
 
-builder.Services.AddControllersWithViews();
+builder.Services.Configure<HostOptions>(options =>
+{
+    options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
+});
 
-builder.Services.AddDbContext<DataContext>(option =>
+builder.Services.AddDbContextFactory<DataContext>(option =>
 {
     option.UseSqlite(
         builder.Configuration.GetConnectionString("Default")!
@@ -32,26 +33,41 @@ builder.Services.AddDbContext<DataContext>(option =>
     );
 });
 
-builder.Services.AddNetDaemonApp<MpptApp>();
-builder.Services.AddNetDaemonApp<MpptNightApp>();
-builder.Services.AddNetDaemonApp<MpptWatchdogApp>();
-builder.Services.AddNetDaemonApp<MpptLowBattery>();
-builder.Services.AddNetDaemonApp<GpioApp>();
-builder.Services.AddNetDaemonApp<SleepApp>();
-builder.Services.AddNetDaemonApp<CameraCaptureApp>();
-builder.Services.AddNetDaemonApp<SerialPortMessageApp>();
-builder.Services.AddNetDaemonApp<LoraTxApp>();
-builder.Services.AddNetDaemonApp<SerialTxApp>();
+builder.Services.AddSingleton<MpptApp>();
+builder.Services.AddSingleton<PowerNightApp>();
+builder.Services.AddSingleton<WatchdogApp>();
+builder.Services.AddSingleton<LowBatteryApp>();
+builder.Services.AddSingleton<GpioApp>();
+builder.Services.AddSingleton<CameraCaptureApp>();
+builder.Services.AddSingleton<SerialPortMcuCommandsApp>();
+builder.Services.AddSingleton<SystemInfoApp>();
 
-builder.Services.AddScoped<SerialMessageService>();
-builder.Services.AddScoped<MonitorService>();
-builder.Services.AddScoped<SystemService>();
-builder.Services.AddScoped<CameraService>();
-builder.Services.AddScoped<EntitiesManagerService>();
+builder.Services.AddHostedService<MpptApp>();
+builder.Services.AddHostedService<PowerNightApp>();
+builder.Services.AddHostedService<WatchdogApp>();
+builder.Services.AddHostedService<LowBatteryApp>();
+builder.Services.AddHostedService<GpioApp>();
+builder.Services.AddHostedService<CameraCaptureApp>();
+builder.Services.AddHostedService<SerialPortMcuCommandsApp>();
+builder.Services.AddHostedService<SystemInfoApp>();
+
+builder.Services.AddSingleton<MonitorService>();
+builder.Services.AddSingleton<SerialMessageService>();
+builder.Services.AddSingleton<SystemService>();
+builder.Services.AddSingleton<CameraService>();
+builder.Services.AddSingleton<EntitiesManagerService>();
 
 WebApplication app = builder.Build();
 
+app.UseResponseCompression();
+
 app.UseStaticFiles();
+
+app.UseRouting();
+
+app.MapControllers();
+app.MapBlazorHub();
+app.MapFallbackToPage("/_Host");
 
 string storagePath = app.Configuration.GetValueOrThrow<string>("StoragePath");
 
@@ -63,31 +79,39 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/storage"
 });
 
-app.UseRouting();
-
-app.UseAuthorization();
-
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
-
 using IServiceScope scope = app.Services.GetService<IServiceScopeFactory>()!.CreateScope();
 await scope.ServiceProvider.GetRequiredService<DataContext>().Database.MigrateAsync();
-EntitiesManagerService entitiesManagerService = scope.ServiceProvider.GetRequiredService<EntitiesManagerService>();
-
-await entitiesManagerService.Init();
 
 IConfigurationSection configurationSection = app.Configuration.GetSection("System");
 File.WriteAllText(configurationSection.GetValueOrThrow<string>("ShutdownFile"), "0");
 File.Delete(configurationSection.GetValueOrThrow<string>("TimeFile"));
 
-string storagePathCameras = Path.Combine(
-    storagePath, 
-    app.Configuration.GetSection("Cameras").GetValueOrThrow<string>("Path")
-);
-Directory.CreateDirectory($"{storagePathCameras}");
-Directory.CreateDirectory($"{storagePathCameras}/final");
+LocaleProvider.DefaultLanguage = "fr-FR";
+LocaleProvider.SetLocale(LocaleProvider.DefaultLanguage);
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.GetCultureInfo(LocaleProvider.DefaultLanguage);
 
 Console.WriteLine("Started");
 
+MonitorService.State.Lora.LastRx.Add(("RX 1", DateTime.UtcNow));
+MonitorService.State.Lora.LastRx.Add(("RX 2", DateTime.UtcNow.AddHours(1)));
+MonitorService.State.Lora.LastTx.Add(("TX 1", DateTime.UtcNow));
+MonitorService.State.Lora.LastTx.Add(("TX 2", DateTime.UtcNow.AddMinutes(2)));
+MonitorService.State.Lora.LastTx.Add(("TX 3", DateTime.UtcNow.AddHours(2)));
+
+MonitorService.State.LastMessagesReceived.Add(new GpioData
+{
+    Type = "gpio",
+    Ldr = 123,
+    Npr = true,
+    Wifi = false
+});
+MonitorService.State.LastMessagesReceived.Add(new WeatherData
+{
+    Type = "weaher",
+    Temperature = 12.34f,
+    Humidity = 56
+});
+
 await app.RunAsync();
+
+Console.WriteLine("Stopped");

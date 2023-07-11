@@ -34,7 +34,5 @@ public class MonitorState
 
     public SystemState? System { get; set; }
     
-    public LimitedList<Message> LastMessagesReceived { get; } = new(15);
-    
-    public LimitedList<string> LastLogReceived { get; }= new(30);
+    public LimitedList<Message> LastMessagesReceived { get; } = new(20);
 }
