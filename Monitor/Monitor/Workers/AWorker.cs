@@ -15,7 +15,8 @@ public abstract class AWorker : IHostedService, IAsyncDisposable
     protected readonly EntitiesManagerService EntitiesManagerService;
 
     private readonly List<IDisposable> _disposables = new();
-    
+    private static readonly TimeSpan RetryDuration = TimeSpan.FromSeconds(2);
+
     private bool Started { get; set; } 
 
     protected AWorker(ILogger<AWorker> logger, IServiceProvider serviceProvider)
@@ -31,44 +32,54 @@ public abstract class AWorker : IHostedService, IAsyncDisposable
     
     public Task StartAsync(CancellationToken cancellationToken)
     {
-            AddDisposable(
-                Observable.Return(false).Delay(TimeSpan.FromSeconds(5)).Select(_ => Enabled.Value)
-                    .Merge(Enabled.ValueChanges().Select(v => v.value))
-                    .SubscribeAsync(async state =>
+        AddDisposable(
+            Observable.Interval(RetryDuration).Select(_ => Enabled.Value)
+                .Merge(Enabled.ValueChanges().Select(v => v.value))
+                .SubscribeAsync(async state =>
+                {
+                    try
+                    {
+                        await DoState(state);
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.LogCritical(e, "Crash of {worker}, retry in {duration}", Enabled.Id, RetryDuration);
+                    }
+                }));
+
+        return Task.CompletedTask;
+    }
+
+    private async Task DoState(bool state)
+    {
+        if (state)
+        {
+            if (Started)
             {
-                Logger.LogDebug("{app} {state} {started}", Enabled.Id, state, Started);
-                
-                if (state)
-                {
-                    if (Started)
-                    {
-                        return;
-                    }
-                    
-                    Logger.LogInformation("Starting {worker}", Enabled.Id);
+                return;
+            }
 
-                    Started = true;
-                    await Start();
-                
-                    Logger.LogInformation("Started {worker}", Enabled.Id);
-                }
-                else
-                {
-                    if (!Started)
-                    {
-                        return;
-                    }
-                    
-                    Logger.LogInformation("Stopping {worker}", Enabled.Id);
+            Logger.LogInformation("Starting {worker}", Enabled.Id);
 
-                    await Stop();
-                    Started = false;
-                
-                    Logger.LogInformation("Stopped {worker}", Enabled.Id);
-                }
-            }));
+            await Start();
+            Started = true;
 
-            return Task.CompletedTask;
+            Logger.LogInformation("Started {worker}", Enabled.Id);
+        }
+        else
+        {
+            if (!Started)
+            {
+                return;
+            }
+
+            Logger.LogInformation("Stopping {worker}", Enabled.Id);
+
+            await Stop();
+            Started = false;
+
+            Logger.LogInformation("Stopped {worker}", Enabled.Id);
+        }
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)

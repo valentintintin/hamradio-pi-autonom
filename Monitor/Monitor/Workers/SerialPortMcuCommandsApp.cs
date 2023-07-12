@@ -28,6 +28,11 @@ public class SerialPortMcuCommandsApp : ASerialPortApp
     protected override async Task MessageReceived(string input)
     {
         SerialMessageService.SerialPort ??= SerialPort;
+
+        if (!input.StartsWith('{') && !input.EndsWith('}'))
+        {
+            return;
+        }
         
         Message message = _serialMessageService.ParseMessage(input);
         await MonitorService.UpdateStateFromMessage(message);

@@ -23,6 +23,9 @@ public class SystemService : AService
         _shutdownFilePath = configurationSection.GetValueOrThrow<string>("ShutdownFile");
         _timeFilePath = configurationSection.GetValueOrThrow<string>("TimeFile");
         _infoFilePath = configurationSection.GetValue<string>("InfoFile");
+        
+        File.WriteAllText(_shutdownFilePath, "0");
+        File.Delete(_timeFilePath);
     }
 
     public SystemState? GetInfo()

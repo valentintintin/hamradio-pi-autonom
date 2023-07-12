@@ -4,13 +4,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Monitor", "Monitor\Monitor.
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|Any CPU = Debug|Any CPU
-		Release|Any CPU = Release|Any CPU
+		Release|arm32 = Release|arm32
+		Debug|x64 = Debug|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Release|arm32.ActiveCfg = Debug|x64
+		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Release|arm32.Build.0 = Debug|x64
+		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Debug|x64.ActiveCfg = Debug|x64
+		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Debug|x64.Build.0 = Debug|x64
 	EndGlobalSection
 EndGlobal

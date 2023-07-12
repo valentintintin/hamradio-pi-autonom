@@ -82,35 +82,34 @@ app.UseStaticFiles(new StaticFileOptions
 using IServiceScope scope = app.Services.GetService<IServiceScopeFactory>()!.CreateScope();
 await scope.ServiceProvider.GetRequiredService<DataContext>().Database.MigrateAsync();
 
-IConfigurationSection configurationSection = app.Configuration.GetSection("System");
-File.WriteAllText(configurationSection.GetValueOrThrow<string>("ShutdownFile"), "0");
-File.Delete(configurationSection.GetValueOrThrow<string>("TimeFile"));
-
 LocaleProvider.DefaultLanguage = "fr-FR";
 LocaleProvider.SetLocale(LocaleProvider.DefaultLanguage);
 CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.GetCultureInfo(LocaleProvider.DefaultLanguage);
 
 Console.WriteLine("Started");
 
-MonitorService.State.Lora.LastRx.Add(("RX 1", DateTime.UtcNow));
-MonitorService.State.Lora.LastRx.Add(("RX 2", DateTime.UtcNow.AddHours(1)));
-MonitorService.State.Lora.LastTx.Add(("TX 1", DateTime.UtcNow));
-MonitorService.State.Lora.LastTx.Add(("TX 2", DateTime.UtcNow.AddMinutes(2)));
-MonitorService.State.Lora.LastTx.Add(("TX 3", DateTime.UtcNow.AddHours(2)));
+if (app.Configuration.GetSection("SerialPortMessage").GetValue<bool?>("Simulate") == true)
+{
+    MonitorService.State.Lora.LastRx.Add(("RX 1", DateTime.UtcNow));
+    MonitorService.State.Lora.LastRx.Add(("RX 2", DateTime.UtcNow.AddHours(1)));
+    MonitorService.State.Lora.LastTx.Add(("TX 1", DateTime.UtcNow));
+    MonitorService.State.Lora.LastTx.Add(("TX 2", DateTime.UtcNow.AddMinutes(2)));
+    MonitorService.State.Lora.LastTx.Add(("TX 3", DateTime.UtcNow.AddHours(2)));
 
-MonitorService.State.LastMessagesReceived.Add(new GpioData
-{
-    Type = "gpio",
-    Ldr = 123,
-    Npr = true,
-    Wifi = false
-});
-MonitorService.State.LastMessagesReceived.Add(new WeatherData
-{
-    Type = "weaher",
-    Temperature = 12.34f,
-    Humidity = 56
-});
+    MonitorService.State.LastMessagesReceived.Add(new GpioData
+    {
+        Type = "gpio",
+        Ldr = 123,
+        Npr = true,
+        Wifi = false
+    });
+    MonitorService.State.LastMessagesReceived.Add(new WeatherData
+    {
+        Type = "weaher",
+        Temperature = 12.34f,
+        Humidity = 56
+    });
+}
 
 await app.RunAsync();
 

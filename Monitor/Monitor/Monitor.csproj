@@ -8,17 +8,14 @@
         <RuntimeIdentifiers>linux-arm;linux-x64</RuntimeIdentifiers>
         <AssemblyName>Monitor</AssemblyName>
         <RootNamespace>Monitor</RootNamespace>
-        <PackageId>Monitor</PackageId>
-        <Authors>Monitor</Authors>
-        <Company>Monitor</Company>
-        <Product>Monitor</Product>
+        <Configurations>Debug;Release</Configurations>
+        <Platforms>x64;arm32</Platforms>
     </PropertyGroup>
 
     <ItemGroup>
       <Content Update="appsettings.Development.json">
         <DependentUpon>appsettings.json</DependentUpon>
       </Content>
-      <Content Remove="storage\**" />
       <None Remove="Dockerfile" />
       <Content Include="Dockerfile">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -28,37 +25,22 @@
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
     </ItemGroup>
-    
-    <ItemGroup>
-        <None Update="Pages\Components\Card.razor.css">
-            <DependentUpon>Card.razor.razor</DependentUpon>
-        </None>
-    </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="AntDesign" Version="0.15.2" />
       <PackageReference Include="FlashCap" Version="1.6.0" />
       <PackageReference Include="JoySoftware.NetDaemon.Extensions.Scheduling" Version="23.26.0" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.8">
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.9">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.8" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.9" />
       <PackageReference Include="MQTTnet" Version="4.2.1.781" />
       <PackageReference Include="SixLabors.ImageSharp" Version="3.0.1" />
       <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta15" />
       <PackageReference Include="SunCalcNet" Version="1.2.2" />
       <PackageReference Include="System.IO.Ports" Version="7.0.0" />
       <PackageReference Include="System.Reactive" Version="6.0.0" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <_ContentIncludedByDefault Remove="NetDaemonCodegen\EntityMetaData.json" />
-      <_ContentIncludedByDefault Remove="NetDaemonCodegen\ServicesMetaData.json" />
-      <_ContentIncludedByDefault Remove="wwwroot\vendor\dygraph.min.css" />
-      <_ContentIncludedByDefault Remove="wwwroot\vendor\dygraph.min.js" />
-      <_ContentIncludedByDefault Remove="wwwroot\vendor\jquery.min.js" />
-      <_ContentIncludedByDefault Remove="wwwroot\vendor\moment-with-locales.min.js" />
     </ItemGroup>
 
 </Project>

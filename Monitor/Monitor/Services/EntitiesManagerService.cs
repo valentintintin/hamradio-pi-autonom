@@ -80,6 +80,7 @@ public class EntitiesManagerService : AService
         _entities.Add(entity);
         
         entity.ValueMqttAsync()
+            .Where(_ => _mqttClient.IsConnected)
             .Where(v => !entity.HasReceivedInitialValueFromMqtt || v.old != v.value)
             .SubscribeAsync(async value =>
             {

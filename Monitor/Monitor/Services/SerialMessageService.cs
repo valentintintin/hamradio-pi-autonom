@@ -50,9 +50,21 @@ public class SerialMessageService : AService
         }
         catch (Exception e)
         {
-            Logger.LogError(e, "Received serial message KO. Sub Deserialize impossible : {input}", input);
+            if (input.Contains("lora")) // because APRS can have char " in string and we do not escape it in C++
+            {
+                messageTyped = message = new LoraData
+                {
+                    Type = "lora",
+                    State = input.Contains("tx") ? "tx" : "rx",
+                    Payload = input.Split("payload\":\"").First()
+                };
+            }
+            else
+            {
+                Logger.LogError(e, "Received serial message KO. Sub Deserialize impossible : {input}", input);
 
-            throw new MessageParseException(e, input);
+                throw new MessageParseException(e, input);
+            }
         }
 
         Logger.LogInformation("Received serial message OK : {input}", input);

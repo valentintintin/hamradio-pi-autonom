@@ -25,7 +25,7 @@ public class LowBatteryApp : AWorker
         AddDisposable(EntitiesManagerService.Entities.BatteryVoltage.ValueChanges()
             .Select(v => v.value)
             .Buffer(TimeSpan.FromMinutes(2))
-            .Select(s => s.Average())
+            .Select(s => s.Any() ? s.Average() : int.MaxValue)
             .Do(s => Logger.LogDebug("Average Battery Voltage : {averageVoltage}", s))
             .Where(s => s < Voltage.Value)
             .Subscribe(s =>

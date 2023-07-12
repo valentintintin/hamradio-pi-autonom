@@ -27,22 +27,21 @@ public class GpioApp : AWorker
         AddDisposable(EntitiesManagerService.Entities.GpioWifi.ValueChanges().Skip(1)
             .Sample(_debunce)
             .Select(v => v.value)
+            .DistinctUntilChanged()
             .Subscribe(_serialMessageService.SetWifi)
         );
         
         AddDisposable(EntitiesManagerService.Entities.GpioNpr.ValueChanges().Skip(1)
             .Sample(_debunce)
             .Select(v => v.value)
+            .DistinctUntilChanged()
             .Subscribe(_serialMessageService.SetNpr)
         );
 
-        AddDisposable(Scheduler.Schedule(TimeSpan.FromSeconds(5), _ =>
-        {
-            Logger.LogInformation("Switch GPIOs");
-            
-            EntitiesManagerService.Entities.GpioWifi.SetValue(StartWifiTurnOn.Value);
-            EntitiesManagerService.Entities.GpioNpr.SetValue(StartNprTurnOn.Value);
-        }));
+        Logger.LogInformation("Switch GPIOs");
+        
+        EntitiesManagerService.Entities.GpioWifi.SetValue(StartWifiTurnOn.Value);
+        EntitiesManagerService.Entities.GpioNpr.SetValue(StartNprTurnOn.Value);
         
         return Task.CompletedTask;
     }

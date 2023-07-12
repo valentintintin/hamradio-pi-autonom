@@ -47,9 +47,9 @@ public class MqttEntity<T> : IMqttEntity
         }
     }
 
-    public IObservable<(T? old, T? value)> ValueChanges()
+    public IObservable<(T? old, T? value)> ValueChanges(bool onlyIfDifferent = true)
     {
-        return _valueLocal.AsObservable();
+        return _valueLocal.AsObservable().Where(v => !onlyIfDifferent || v.old?.Equals(v.value) != true);
     }
 
     public IObservable<(string? old, string value)> ValueMqttAsync()
