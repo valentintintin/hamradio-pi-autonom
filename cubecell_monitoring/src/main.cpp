@@ -40,13 +40,13 @@ void setup() {
 
     Serial.begin(115200);
 
-    if (&SerialPiUsed == &Serial1) {
-        Serial1.begin(115200);
+    if (&SerialPiUsed != &Serial) {
+        SerialPiUsed.begin(115200);
     }
 
     Log.begin(LOG_LEVEL , &Serial);
 
-    innerWdtEnable(true);
+//    innerWdtEnable(true);
 
     systemControl.begin(&radioEvents);
 

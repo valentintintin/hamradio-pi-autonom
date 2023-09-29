@@ -1,13 +1,12 @@
 #!/bin/bash
 
-filename="/tmp/shutdown.txt"
+if [ ! -e "/tmp/shutdown.txt" ]; then
+    exit 1
+fi;
 
-while true; do
-    if grep -q "1" "$filename"; then
-        echo "Stop system in a minute"
-        shutdown -P
-	exit 0
-    fi
+if grep -q "1" "/tmp/shutdown.txt"; then
+    echo "Stop system"
+    /sbin/halt
+fi
 
-    sleep 5
-done
+exit 0

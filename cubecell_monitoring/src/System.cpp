@@ -1,4 +1,5 @@
 #include <radio/radio.h>
+#include <innerWdt.h>
 #include "System.h"
 #include "ArduinoLog.h"
 
@@ -8,6 +9,8 @@ System::System(SH1107Wire *display, CubeCell_NeoPixel *pixels) :
 }
 
 bool System::begin(RadioEvents_t *radioEvents) {
+    feedDog();
+
     bool boxOpened = isBoxOpened();
 
     Log.infoln(F("[SYSTEM] Starting"));
@@ -20,8 +23,8 @@ bool System::begin(RadioEvents_t *radioEvents) {
 
     Wire.begin(SDA, SCL, 500000);
 
-    if (&WireUsed == &Wire1) {
-        Wire1.begin(SDA1, SCL1);
+    if (&WireUsed != &Wire) {
+        WireUsed.begin(SDA1, SCL1);
     }
 
     pixels->begin();
@@ -252,7 +255,11 @@ void System::serialError(const char *content) const {
     serialJsonWriter
             .beginObject()
             .property(F("type"), PSTR("system"))
-            .property(F("state"), content)
+            .property(F("state"), (char*) content)
             .property(F("boxOpened"), isBoxOpened())
             .endObject(); SerialPiUsed.println();
+}
+
+void System::feedDog() {
+//    innerWdtEnable(true);
 }

@@ -16,4 +16,6 @@ uptime_seconds=$(awk '{printf "%.0f", $1}' /proc/uptime)
 json="{ \"cpu\": $cpu_percentage, \"ram\": $ram_percentage, \"disk\": $disk_percentage, \"uptime\": $uptime_seconds }"
 
 # Output the JSON
-echo "$json" > /tmp/system_info.json
+echo "$json"
+
+curl -X POST -H "Content-Type: application/json" -d "$json" http://localhost:$1/system_info

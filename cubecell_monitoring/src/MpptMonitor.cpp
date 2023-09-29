@@ -23,8 +23,9 @@ bool MpptMonitor::update() {
         return false;
     }
 
+    timer.restart();
+
     if (!init && !begin()) {
-        timer.restart();
         return false;
     }
 

@@ -16,11 +16,14 @@ bool WeatherSensors::update() {
         return false;
     }
 
+    timer.restart();
+
     Log.traceln(F("Fetch weather sensors data"));
 
     if (!readDht()) {
         system->serialError(PSTR("[WEATHER] Fetch DHT sensor error"));
         system->displayText(PSTR("Weather error"), PSTR("Failed to fetch DHT sensor"));
+        begin();
         return false;
     }
 

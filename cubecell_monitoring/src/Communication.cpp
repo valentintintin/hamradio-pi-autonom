@@ -90,10 +90,11 @@ void Communication::send() {
 
     system->turnOnRGB(COLOR_SEND);
 
-    while (USE_RF && Radio.GetStatus() != RF_RX_RUNNING) {
+    while (USE_RF && !(Radio.GetStatus() == RF_RX_RUNNING || Radio.GetStatus() == RF_IDLE)) {
         Log.warningln(F("[LORA_TX] Locked. Radio Status : %d"), Radio.GetStatus());
         delay(2500);
         Radio.IrqProcess();
+        system->feedDog();
     }
 
     Log.traceln(F("[LORA_TX] Radio ready, status : %d"), Radio.GetStatus());
@@ -223,7 +224,7 @@ void Communication::sent() {
 
     system->turnOffRGB();
 
-    Log.traceln(F("[LORA_TX] Done"));
+    Log.infoln(F("[LORA_TX] Done"));
 }
 
 void Communication::received(uint8_t * payload, uint16_t size, int16_t rssi, int8_t snr) {
@@ -252,18 +253,16 @@ void Communication::received(uint8_t * payload, uint16_t size, int16_t rssi, int
     } else {
         Log.traceln(F("[APRS] Decoded from %s to %s via %s"), aprsPacketRx.source, aprsPacketRx.destination, aprsPacketRx.path);
 
-        if (strstr_P(aprsPacketRx.destination, PSTR(APRS_CALLSIGN)) != nullptr) {
+        if (strstr_P(aprsPacketRx.message.destination, PSTR(APRS_CALLSIGN)) != nullptr) {
             Log.traceln(F("[APRS] Message for me : %s"), aprsPacketRx.content);
 
             system->displayText(PSTR("[APRS] Received for me"), aprsPacketRx.content);
 
             if (strlen(aprsPacketRx.message.message) > 0) {
-                sendMessage(PSTR(APRS_DESTINATION), PSTR(""), aprsPacketRx.message.ackToConfirm);
+                sendMessage(aprsPacketRx.source, PSTR(""), aprsPacketRx.message.ackToConfirm);
             }
 
-            bool processCommandResult = system->command.processCommand(aprsPacketRx.message.message);
-            sprintf_P(bufferText, PSTR("Command %s"), processCommandResult, system->command.getResponse());
-            sendMessage(PSTR(APRS_DESTINATION), bufferText);
+            system->command.processCommand(aprsPacketRx.message.message);
         } else {
             // Digi only for WIDE1-1 or VIA Callsign
             const char *hasWide = strstr_P(aprsPacketRx.path, PSTR("WIDE1-1"));
