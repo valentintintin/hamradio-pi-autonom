@@ -126,10 +126,20 @@ int main() {
     if (!Aprs::decode("F4HVV-10>APDR16,WIDE1-1::F4HVV-15 :ack1 coucou{2", &packet2)) {
         printf("Decode error for %s\n\n", encoded_packet);
     } else {
-        printf("Received from %s to %s by %s --> %s\nMessage length %ld to %s with ack %s and confirmed %s --> %s\n\n",
+        printf("Received type %d from %s to %s by %s --> %s\nMessage length %ld to %s with ack %s and confirmed %s --> %s\n\n",
+               packet2.type,
                packet2.source, packet2.destination, packet2.path, packet2.content,
                strlen(packet2.message.message), packet2.message.destination, packet2.message.ackToConfirm, packet2.message.ackConfirmed,
                packet2.message.message);
+    }
+
+    AprsPacket packet3;
+    if (!Aprs::decode("F4HVV-9>APDR16,WIDE1-1:=4519.92N/00537.15E[", &packet3)) {
+        printf("Decode error for %s\n\n", encoded_packet);
+    } else {
+        printf("Received type %d from %s to %s by %s --> %s\n\n",
+               packet3.type,
+               packet3.source, packet3.destination, packet3.path, packet3.content);
     }
 
     return 0;

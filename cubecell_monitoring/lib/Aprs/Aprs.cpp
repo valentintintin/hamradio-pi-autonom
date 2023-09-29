@@ -5,6 +5,7 @@
 #include "Aprs.h"
 
 #ifdef NATIVE
+#define strcpy_P     strcpy
 #define sprintf_P     sprintf
 #define sscanf_P     sscanf
 #define strstr_P     strstr
@@ -74,17 +75,21 @@ bool Aprs::decode(const char* aprs, AprsPacket* aprsPacket) {
 
         trim(aprsPacket->content);
 
-        if (aprsPacket->content[0] == ':') {
+        if (aprsPacket->content[0] == '=') {
+            aprsPacket->type = Position;
+        } else if (aprsPacket->content[0] == ':') {
             strcpy(aprsPacket->message.message, aprsPacket->content + 1);
 
             char* find = strchr(aprsPacket->message.message, ':');
             if (find != nullptr) {
+                aprsPacket->type = Message;
                 strncpy(aprsPacket->message.destination, aprsPacket->message.message, find - aprsPacket->message.message);
                 strcpy(aprsPacket->message.message, find + 1);
             }
 
             find = strstr_P(aprsPacket->message.message, PSTR("ack"));
             if (find != nullptr) {
+                aprsPacket->type = Message;
                 strcpy(aprsPacket->message.ackConfirmed, find + 3);
                 trimFirstSpace(aprsPacket->message.ackConfirmed);
                 strcpy(aprsPacket->message.message, find + 3 + strlen(aprsPacket->message.ackConfirmed));
@@ -92,6 +97,7 @@ bool Aprs::decode(const char* aprs, AprsPacket* aprsPacket) {
 
             find = strstr_P(aprsPacket->message.message, PSTR("rej"));
             if (find != nullptr) {
+                aprsPacket->type = Message;
                 strcpy(aprsPacket->message.ackRejected, find + 3);
                 trimFirstSpace(aprsPacket->message.ackRejected);
                 strcpy(aprsPacket->message.message, find + 3 + strlen(aprsPacket->message.ackRejected));
@@ -99,6 +105,7 @@ bool Aprs::decode(const char* aprs, AprsPacket* aprsPacket) {
 
             find = strchr(aprsPacket->message.message, '{');
             if (find != nullptr) {
+                aprsPacket->type = Message;
                 strcpy(aprsPacket->message.ackToConfirm, find + 1);
                 aprsPacket->message.message[find - aprsPacket->message.message] = '\0'; // remove '{'
             }
