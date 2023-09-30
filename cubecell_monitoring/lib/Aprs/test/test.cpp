@@ -1,5 +1,6 @@
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>
 #include "../Aprs.h"
 
 int main() {
@@ -21,25 +22,33 @@ int main() {
             45,
             678
     };
-    packet.telemetries.telemetrySequenceNumber = 789;
+    packet.telemetries.telemetrySequenceNumber = 7544;
     strcpy(packet.telemetries.projectName, "Test project");
     packet.telemetries.telemetriesAnalog[0] = {
-            "Battery",
-            123,
+            "A1",
+            1472,
             "VS"
     };
     packet.telemetries.telemetriesAnalog[1] = {
-            "T2",
-            45,
+            "A2",
+            1564,
             ""
     };
     packet.telemetries.telemetriesAnalog[2] = {
             "",
-            67,
+            1656,
             "",
             {
                 1, -2.0987, 34.5
             }
+    };
+    packet.telemetries.telemetriesAnalog[3] = {
+            "",
+            1748,
+    };
+    packet.telemetries.telemetriesAnalog[4] = {
+            "",
+            1840,
     };
     packet.telemetries.telemetriesBoolean[0] = {
             "Bool1",
@@ -53,15 +62,46 @@ int main() {
     };
     packet.telemetries.telemetriesBoolean[2] = {
             "",
-            123,
+            0,
             "",
             {},
             false
+    };
+    packet.telemetries.telemetriesBoolean[2] = {
+            "",
+            0,
+            "",
+            {},
+            false
+    };
+    packet.telemetries.telemetriesBoolean[3] = {
+            "",
+            0,
+    };
+    packet.telemetries.telemetriesBoolean[4] = {
+            "",
+            0,
+    };
+    packet.telemetries.telemetriesBoolean[5] = {
+            "",
+            0,
+    };
+    packet.telemetries.telemetriesBoolean[6] = {
+            "",
+            0,
+    };
+    packet.telemetries.telemetriesBoolean[7] = {
+            "",
+            0,
     };
 
     packet.type = Position;
     uint8_t size = Aprs::encode(&packet, encoded_packet);
     printf("\nAPRS Position Size : %d\n%s\n", size, encoded_packet);
+
+    packet.position.altitudeInComment = false;
+    size = Aprs::encode(&packet, encoded_packet);
+    printf("\nAPRS Position with altitude compressed Size : %d\n%s\n", size, encoded_packet);
 
     packet.position.withTelemetry = true;
     size = Aprs::encode(&packet, encoded_packet);
@@ -108,6 +148,27 @@ int main() {
     size = Aprs::encode(&packet, encoded_packet);
     printf("\nAPRS Telemetry bits Size : %d\n%s\n", size, encoded_packet);
 
+    packet.type = Weather;
+    packet.weather.windSpeedMph = 5.2;
+    packet.weather.windDirectionDegress = 123;
+    packet.weather.gustSpeedMph = 20.2;
+    packet.weather.temperatureFahrenheit = 23.56;
+    packet.weather.humidity = 45.78;
+    packet.weather.rain1HourHundredthsOfAnInch = 1.23;
+    packet.weather.rain24HourHundredthsOfAnInch = 12.23;
+    packet.weather.rainSinceMidnightHundredthsOfAnInch = 6.32;
+    packet.weather.pressure = 1123;
+    packet.position.withWeather = true;
+    packet.position.withTelemetry = false;
+    strcpy(packet.weather.device, "Test");
+    size = Aprs::encode(&packet, encoded_packet);
+    printf("\nAPRS Weather Size : %d\n%s\n", size, encoded_packet);
+
+    packet.type = Status;
+    strcpy(packet.comment, "I'm good !");
+    size = Aprs::encode(&packet, encoded_packet);
+    printf("\nAPRS Status size : %d\n%s\n", size, encoded_packet);
+
     packet.type = RawContent;
     strcpy(packet.content, "Test test test");
     size = Aprs::encode(&packet, encoded_packet);
@@ -123,7 +184,7 @@ int main() {
     Aprs::encode(&packet, encoded_packet);
 
     AprsPacket packet2;
-    if (!Aprs::decode("F4HVV-10>APDR16,WIDE1-1::F4HVV-15 :ack1 coucou{2", &packet2)) {
+    if (!Aprs::decode("F4HVV-10>APDR16,WIDE1-1::F4HVV-15 :ack1 hello{2", &packet2)) {
         printf("Decode error for %s\n\n", encoded_packet);
     } else {
         printf("Received type %d from %s to %s by %s --> %s\nMessage length %ld to %s with ack %s and confirmed %s --> %s\n\n",

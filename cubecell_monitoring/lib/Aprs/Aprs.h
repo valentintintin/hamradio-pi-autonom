@@ -11,10 +11,24 @@
 #define TELEMETRY_PROJECT_NAME_LENGTH 24
 #define MESSAGE_LENGTH 68
 #define ACK_MESSAGE_LENGTH 4
+#define WEATHER_DEVICE_LENGTH 4
 
 #include <cstdint>
 
-enum AprsPacketType { Unknown, Position, Message, Telemetry, TelemetryUnit, TelemetryLabel, TelemetryEquation, TelemetryBitSense, RawContent };
+enum AprsPacketType { Unknown, Position, Message, Telemetry, TelemetryUnit, TelemetryLabel, TelemetryEquation, TelemetryBitSense, Weather, Item, Object, Status, RawContent };
+
+typedef struct {
+    double windDirectionDegress = 0;
+    double windSpeedMph = 0;
+    double gustSpeedMph = 0;
+    double temperatureFahrenheit = 0;
+    double rain1HourHundredthsOfAnInch = 0;
+    double rain24HourHundredthsOfAnInch = 0;
+    double rainSinceMidnightHundredthsOfAnInch = 0;
+    double humidity = 0;
+    double pressure = 0;
+    char device[WEATHER_DEVICE_LENGTH]{};
+} AprsWeather;
 
 typedef struct {
     // a x value^2 + b x value + c
@@ -46,6 +60,8 @@ typedef struct {
     double courseDeg = 0;
     double speedKnots = 0;
     double altitudeFeet = 0;
+    bool altitudeInComment = true;
+    bool withWeather = false;
     bool withTelemetry = false;
 } AprsPosition;
 
@@ -68,6 +84,7 @@ typedef struct {
     AprsPosition position;
     AprsMessage message;
     AprsTelemetries telemetries;
+    AprsWeather weather;
     AprsPacketType type = Unknown;
 } AprsPacket;
 
@@ -79,6 +96,7 @@ private:
     static void appendPosition(AprsPosition* position, char* aprsResult);
     static void appendTelemetries(AprsPacket *aprsPacket, char* aprsResult);
     static void appendMessage(AprsMessage *message, char* aprsResult);
+    static void appendWeather(AprsWeather *weather, char* aprsResult);
     static char *ax25Base91Enc(char *destination, uint8_t width, uint32_t value);
     static const char *formatDouble(double value);
     static void trim(char *string);
