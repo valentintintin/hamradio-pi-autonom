@@ -2,55 +2,56 @@
 
 @using Monitor.Extensions
 @using Monitor.Services
-@using System.Text.Json
 @using Message = Monitor.Models.SerialMessages.Message
+@using System.Globalization
+@using Monitor.Models.SerialMessages
 
 @implements IDisposable
 
 <PageTitle>Tableau de bord</PageTitle>
 
-<h1>Tableau de bord</h1>
+<PageHeader Title="Tableau de bord" Subtitle="@MonitorService.State.LastMessagesReceived.LastOrDefault()?.ReceivedAt.ToFrench().ToString(CultureInfo.CurrentCulture)" />
 
 <GridRow Gutter="(16, 16)" Justify="center">
-    <GridCol Span=8>
+    <GridCol Xs="24" Md="12" Lg="8">
         <Card Title="Système">
             <Body>
             <Row>
-                <Col Span=12>
+                <Col Xs="12">
                     <Statistic Title="CPU" Value="EntitiesManagerService.Entities.SystemCpu.Value" Suffix="%" />
                 </Col>
-                <Col Span=12>
+                <Col Span="12">
                     <Statistic Title="Uptime" Value="EntitiesManagerService.Entities.SystemUptime.Value.ToString()" />
                 </Col>
-                <Col Span=12>
+                <Col Span="12">
                     <Statistic Title="RAM" Value="EntitiesManagerService.Entities.SystemRam.Value" Suffix="%" />
                 </Col>
-                <Col Span=12>
+                <Col Span="12">
                     <Statistic Title="Disque" Value="EntitiesManagerService.Entities.SystemDisk.Value" Suffix="%" />
                 </Col>
             </Row>
             </Body>
         </Card>
     </GridCol>
-    <GridCol Span=8>
+    <GridCol Xs="24" Md="12" Lg="8">
         <BadgeRibbon Text="@(EntitiesManagerService.Entities.MpptChargeCurrent.Value > 0 ? "En charge" : "En décharge")" 
                      Color="@(EntitiesManagerService.Entities.MpptChargeCurrent.Value > 0 ? "green" : "red")">
             <Card Title="Énergie">
                 <Body>
                 <Row>
-                    <Col Span=12>
+                    <Col Span="12">
                         <Statistic Title="Tension batterie" Value="@(EntitiesManagerService.Entities.BatteryVoltage.Value / 1000.0)" Suffix="V" />
                     </Col>
-                    <Col Span=12>
-                        <Statistic Title="Tension Panneau" Value="@(EntitiesManagerService.Entities.SolarVoltage.Value / 1000.0)" Suffix="V" />
+                    <Col Span="12">
+                        <Statistic Title="Tension panneau" Value="@(EntitiesManagerService.Entities.SolarVoltage.Value / 1000.0)" Suffix="V" />
                     </Col>
-                    <Col Span=12>
+                    <Col Span="12">
                         <Statistic Title="Courant batterie" Value="EntitiesManagerService.Entities.BatteryCurrent.Value" Suffix="mA" />
                     </Col>
-                    <Col Span=12>
+                    <Col Span="12">
                         <Statistic Title="Courant panneau" Value="EntitiesManagerService.Entities.SolarCurrent.Value" Suffix="mA" />
                     </Col>
-                    <Col Offset=8 Span=12>
+                    <Col Offset="8" Span="12">
                         <Statistic Title="Courant de charge" Value="EntitiesManagerService.Entities.MpptChargeCurrent.Value" Suffix="mA" />
                     </Col>
                 </Row>
@@ -58,39 +59,44 @@
             </Card>
         </BadgeRibbon>
     </GridCol>
-    <GridCol Span=8>
+    <GridCol Xs="24" Md="12" Lg="8">
         <BadgeRibbon Text="@($"Il fait {(EntitiesManagerService.Entities.SolarIsDay.Value ? "jour" : "nuit")}")" 
                      Color="@(EntitiesManagerService.Entities.SolarIsDay.Value ? "orange" : "darkblue")">
             <Card Title="Météo">
                 <Body>
-                <Row>
-                    <Col Span=12>
-                        <Statistic Title="Température" Value="EntitiesManagerService.Entities.WeatherTemperature.Value" Suffix="°C" />
-                    </Col>
-                    <Col Span=12>
-                        <Statistic Title="Humidité" Value="EntitiesManagerService.Entities.WeatherHumidity.Value" Suffix="%" />
-                    </Col>
-                </Row>
+                <Result
+                    Status="error"
+                    Title="Capteur HS"
+                    SubTitle="Commande AliExpress en cours"
+                ></Result>
+                @* <Row> *@
+                @*     <Col Span="12"> *@
+                @*         <Statistic Title="Température" Value="EntitiesManagerService.Entities.WeatherTemperature.Value" Suffix="°C" /> *@
+                @*     </Col> *@
+                @*     <Col Span="12"> *@
+                @*         <Statistic Title="Humidité" Value="EntitiesManagerService.Entities.WeatherHumidity.Value" Suffix="%" /> *@
+                @*     </Col> *@
+                @* </Row> *@
                 </Body>
             </Card>
         </BadgeRibbon>
     </GridCol>
-    <GridCol Span=8>
+    <GridCol Xs="24" Md="12" Lg="8">
         <BadgeRibbon Text="@(EntitiesManagerService.Entities.StatusBoxOpened.Value ? "Boîte ouverte !" : "OK")" 
                      Color="@(EntitiesManagerService.Entities.StatusBoxOpened.Value ? "red" : "")">
             <Card Title="MCU">
                 <Body>
                 <Row>
-                    <Col Span=12>
+                    <Col Span="12">
                         <Statistic Title="État" Value="EntitiesManagerService.Entities.McuStatus.Value" />
                     </Col>
-                    <Col Span=12>
+                    <Col Span="12">
                         <Statistic Title="Uptime" Value="EntitiesManagerService.Entities.McuUptime.Value.ToString()" />
                     </Col>
-                    <Col Span=12>
+                    <Col Span="12">
                         <Statistic Title="Wifi" Value="EntitiesManagerService.Entities.GpioWifi.Value.ToFrench()" />
                     </Col>
-                    <Col Span=12>
+                    <Col Span="12">
                         <Statistic Title="NPR" Value="EntitiesManagerService.Entities.GpioNpr.Value.ToFrench()" />
                     </Col>
                 </Row>
@@ -98,7 +104,7 @@
             </Card>
         </BadgeRibbon>
     </GridCol>
-    <GridCol Span=8>
+    <GridCol Xs="24" Md="12" Lg="8">
         <BadgeRibbon Text="@(EntitiesManagerService.Entities.WatchdogEnabled.Value ? "Activé" : "Désactivé")" 
                      Color="@(EntitiesManagerService.Entities.WatchdogEnabled.Value ? 
                                 EntitiesManagerService.Entities.MpptAlertShutdown.Value ? "red" : "green"
@@ -106,10 +112,10 @@
             <Card Title="Watchdog">
                 <Body>
                 <Row>
-                    <Col Span=12>
+                    <Col Span="12">
                         <Statistic Title="Décompte" Value="EntitiesManagerService.Entities.WatchdogCounter.Value.ToString()" Suffix="s" />
                     </Col>
-                    <Col Span=12>
+                    <Col Span="12">
                         <Statistic Title="Veille" Value="EntitiesManagerService.Entities.WatchdogPowerOffTime.Value.ToString()" Suffix="s" />
                     </Col>
                 </Row>
@@ -117,44 +123,42 @@
             </Card>
         </BadgeRibbon>
     </GridCol>
-    <GridCol Span=8>
-        <BadgeRibbon Text="@DateTime.UtcNow.ToString("G")">
-            <Card Title="Caméras">
-                <Body>
-                <Row Justify="center">
-                    <Image Height="150px"
-                           Src="/camera/last.webp"
-                           Fallback="data:image/png;base64,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"/>
-                </Row>
-                </Body>
-            </Card>
-        </BadgeRibbon>
+    <GridCol Xs="24" Md="12" Lg="8">
+        <Card Title="Caméras">
+            <Body>
+            <Row Justify="center">
+                <Image Height="150px"
+                       Src="@($"/camera/last.webp?{DateTime.UtcNow:yyyy-MM-dd-HH-mm}")"
+                       Fallback="data:image/png;base64,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"/>
+            </Row>
+            </Body>
+        </Card>
     </GridCol>
     
-    <GridCol Span="12">
+    <GridCol Xs="24" Md="12">
         <Card Title="LoRa">
             <Body>
-            <Timeline>
-                @foreach ((string payload, DateTime date, bool isTx) message in MonitorService.State.Lora.All)
+            <Timeline Reverse="true">
+                @foreach (LoraData message in MonitorService.State.Lora.All)
                 {
-                    <TimelineItem  Color="@(message.isTx ? "red" : "green")">
-                        <div>@message.payload</div>
-                        <div>@message.date.ToString("G")</div>
+                    <TimelineItem  Color="@(message.IsTx ? "red" : "green")">
+                        <strong>@message.ReceivedAt.ToFrench().ToString(CultureInfo.CurrentCulture) - @(message.IsTx ? "TX" : "RX")</strong>
+                        <pre>@message.Payload</pre>
                     </TimelineItem>
                 }
             </Timeline>
             </Body>
         </Card>
     </GridCol>
-    <GridCol Span="12">
+    <GridCol Xs="24" Md="12">
         <Card Title="Message serie">
             <Body>
-            <Timeline>
+            <Timeline Reverse="true">
                 @foreach (Message message in MonitorService.State.LastMessagesReceived)
                 {
                     <TimelineItem>
-                        <div>@JsonSerializer.Serialize(message)</div>
-                        <div>@message.ReceivedAt.ToString("G")</div>
+                        <strong>@message.ReceivedAt.ToFrench().ToString(CultureInfo.CurrentCulture) - @message.Type.ToUpper()</strong>
+                        <pre>@message.ToString()</pre>
                     </TimelineItem>
                 }
             </Timeline>
@@ -166,23 +170,19 @@
 @code {
     protected override async Task OnInitializedAsync()
     {
+        _timer = new Timer(async _ => await UpdateData(), null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
         await base.OnInitializedAsync();
-        
-        _timer = new Timer(async _ => await UpdateData(), null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
     }
 
     private async Task UpdateData()
     {
-        await InvokeAsync(async () =>
-        {
-            StateHasChanged();
-        });
+        await InvokeAsync(StateHasChanged);
     }
 
     public void Dispose()
     {
         _timer?.Dispose();
     }
-
+    
     private Timer? _timer;
 }

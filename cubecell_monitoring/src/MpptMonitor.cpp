@@ -37,7 +37,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.traceln(F("[MPPT] Charger status : %s"), mpptChg::getStatusAsString(status));
+        Log.verboseln(F("[MPPT] Charger status : %s"), mpptChg::getStatusAsString(status));
     }
 
     if (!charger.getIndexedValue(VAL_VS, &vs)) {
@@ -46,7 +46,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.traceln(F("[MPPT] Charger VS : %d"), vs);
+        Log.verboseln(F("[MPPT] Charger VS : %d"), vs);
     }
 
     if (!charger.getIndexedValue(VAL_IS, &is)) {
@@ -55,7 +55,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.traceln(F("[MPPT] Charger IS : %d"), is);
+        Log.verboseln(F("[MPPT] Charger IS : %d"), is);
     }
 
     if (!charger.getIndexedValue(VAL_VB, &vb)) {
@@ -64,7 +64,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.traceln(F("[MPPT] Charger VB : %d"), vb);
+        Log.verboseln(F("[MPPT] Charger VB : %d"), vb);
     }
 
     if (!charger.getIndexedValue(VAL_IB, &ib)) {
@@ -73,7 +73,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.traceln(F("[MPPT] Charger IB : %d"), ib);
+        Log.verboseln(F("[MPPT] Charger IB : %d"), ib);
     }
 
     if (!charger.isNight(&night)) {
@@ -82,7 +82,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.traceln(F("[MPPT] Charger night : %d"), night);
+        Log.verboseln(F("[MPPT] Charger night : %d"), night);
     }
 
     if (!charger.isAlert(&alert)) {
@@ -91,7 +91,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.traceln(F("[MPPT] Charger alert : %d"), alert);
+        Log.verboseln(F("[MPPT] Charger alert : %d"), alert);
     }
 
     if (!charger.isPowerEnabled(&powerEnabled)) {
@@ -100,7 +100,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.traceln(F("[MPPT] Charger power enabled : %d"), powerEnabled);
+        Log.verboseln(F("[MPPT] Charger power enabled : %d"), powerEnabled);
     }
 
     if (!charger.getWatchdogEnable(&watchdogEnabled)) {
@@ -109,7 +109,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.traceln(F("[MPPT] Charger watchdog : %d"), watchdogEnabled);
+        Log.verboseln(F("[MPPT] Charger watchdog : %d"), watchdogEnabled);
     }
 
     if (!charger.getWatchdogPoweroff(&watchdogPowerOffTime)) {
@@ -118,7 +118,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.traceln(F("Charger watchdog poweroff : %d"), watchdogPowerOffTime);
+        Log.verboseln(F("[MPPT] Charger watchdog poweroff : %d"), watchdogPowerOffTime);
     }
 
     if (!charger.getWatchdogTimeout(&watchdogCounter)) {
@@ -127,7 +127,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.traceln(F("[MPPT] Charger watchdog counter : %d"), watchdogCounter);
+        Log.verboseln(F("[MPPT] Charger watchdog counter : %d"), watchdogCounter);
     }
 
     if (!charger.getConfigurationValue(CFG_PWR_OFF_TH, &powerOffVoltage)) {
@@ -136,7 +136,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.traceln(F("[MPPT] Charger watchdog counter : %d"), watchdogCounter);
+        Log.verboseln(F("[MPPT] Charger watchdog counter : %d"), watchdogCounter);
     }
 
     if (!charger.getConfigurationValue(CFG_PWR_ON_TH, &powerOnVoltage)) {
@@ -145,7 +145,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.traceln(F("[MPPT] Charger watchdog counter : %d"), watchdogCounter);
+        Log.verboseln(F("[MPPT] Charger watchdog counter : %d"), watchdogCounter);
     }
 
     serialJsonWriter
@@ -176,28 +176,9 @@ bool MpptMonitor::update() {
     sprintf_P(bufferText, PSTR("Night:%d Alert:%d WD:%d WDOff:%ds WDCnt:%ds 5V:%d PowOffVolt: %d"), night, alert, watchdogEnabled, watchdogPowerOffTime, watchdogCounter, powerEnabled, powerOffVoltage);
     system->displayText(PSTR("MPPT"), bufferText);
 
-//    updateWatchdog();
-//    checkAnormalCase();
-
     timer.restart();
 
     return true;
-}
-
-void MpptMonitor::updateWatchdog() {
-    if (!init) return;
-
-    if (timer.hasExpired() && watchdogEnabled) {
-        Log.verboseln(F("[MPPT_WATCHDOG] counter set to %d"), WATCHDOG_TIMEOUT);
-
-        if (!charger.setWatchdogTimeout(WATCHDOG_TIMEOUT)) {
-            system->serialError(PSTR("[MPPT_WATCHDOG]Change watchdog counter error"));
-            system->displayText(PSTR("Mttp error"), PSTR("Failed to set watchdog counter"));
-            init = false;
-        } else {
-            timer.restart();
-        }
-    }
 }
 
 bool MpptMonitor::setWatchdog(uint32_t powerOffTime) {
@@ -258,14 +239,6 @@ bool MpptMonitor::setWatchdog(uint32_t powerOffTime) {
     timer.setExpired();
 
     return true;
-}
-
-void MpptMonitor::checkAnormalCase() {
-    if (!alert && !night && !watchdogEnabled && powerEnabled && vb > LOW_VOLTAGE) {
-        Log.warningln(F("[MPPT_BRAIN] Strange state : all green but watchdog not running"));
-        system->displayText(PSTR("WatchDog"), PSTR("Strange state : all green but watchdog not running"));
-        setWatchdog(1);
-    }
 }
 
 bool MpptMonitor::setPowerOnOff(uint16_t powerOnVoltage, uint16_t powerOffVoltage) {

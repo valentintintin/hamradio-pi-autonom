@@ -7,6 +7,10 @@ Timer::Timer(unsigned long interval, bool hasExpired) : interval(interval) {
     } else {
         restart();
     }
+
+    if (interval == 0) {
+        pause();
+    }
 }
 
 bool Timer::hasExpired() const {

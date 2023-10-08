@@ -10,5 +10,6 @@ public class LoraData : Message
     [JsonPropertyName("payload")]
     public required string Payload { get; set; }
 
+    [JsonIgnore]
     public bool IsTx => State == "tx";
 }

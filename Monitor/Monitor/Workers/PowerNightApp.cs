@@ -6,14 +6,14 @@ using SunCalcNet.Model;
 
 namespace Monitor.Workers;
 
-public class PowerNightApp : AWorker
+public class PowerNightApp : AEnabledWorker
 {
     public static readonly MqttEntity<bool> TurnOn = new("night/turn_on", true);
     public static readonly MqttEntity<int> LimitVoltage = new("night/limit_voltage", true, 11600);
     public static readonly MqttEntity<TimeSpan> TimeOff = new("night/time_off", true, TimeSpan.FromMinutes(60));
     public static readonly MqttEntity<bool> UseSun = new("night/use_sun", true);
     
-    private readonly (double latitude, double longitude) _position;
+    private readonly (double latitude, double longitude, int altitude) _position;
     private readonly SystemService _systemService;
 
     public PowerNightApp(ILogger<PowerNightApp> logger, IServiceProvider serviceProvider, IConfiguration configuration)
@@ -23,7 +23,8 @@ public class PowerNightApp : AWorker
 
         _position = (
             configurationSection.GetValueOrThrow<double>("Latitude"),
-            configurationSection.GetValueOrThrow<double>("Longitude")
+            configurationSection.GetValueOrThrow<double>("Longitude"),
+            configurationSection.GetValueOrThrow<int>("Altitude")
         );
 
         EntitiesManagerService.Add(TurnOn);
@@ -47,7 +48,7 @@ public class PowerNightApp : AWorker
         bool turnOn = TurnOn.IsTrue();
         int batteryVoltage = EntitiesManagerService.Entities.BatteryVoltage.Value;
         int limitVoltage = LimitVoltage.Value;
-        DateTime sunRisingDateTime = SunCalc.GetSunPhases(DateTime.UtcNow, _position.latitude, _position.longitude, 300).First(e => e.Name.Value == SunPhaseName.Sunrise.Value).PhaseTime;
+        DateTime sunRisingDateTime = SunCalc.GetSunPhases(DateTime.UtcNow, _position.latitude, _position.longitude, _position.altitude).First(e => e.Name.Value == SunPhaseName.Sunrise.Value).PhaseTime;
 
         if (sunRisingDateTime < DateTime.UtcNow)
         {
@@ -94,11 +95,11 @@ public class PowerNightApp : AWorker
         }
         else
         {
-            Logger.LogDebug("We do not use sun");
+            Logger.LogTrace("We do not use sun");
             
             if (!turnOn)
             {
-                Logger.LogDebug("We do not turn on during night");
+                Logger.LogTrace("We do not turn on during night");
                 
                 timeSleep = TimeSpan.FromHours(10);
             }

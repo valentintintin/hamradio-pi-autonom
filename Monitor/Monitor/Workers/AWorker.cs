@@ -8,16 +8,15 @@ namespace Monitor.Workers;
 
 public abstract class AWorker : IHostedService, IAsyncDisposable
 {
-    public readonly MqttEntity<bool> Enabled;
+    protected bool Started { get; set; } 
+
     protected readonly ILogger<AWorker> Logger;
     protected readonly IServiceProvider Services;
     protected readonly IScheduler Scheduler;
     protected readonly EntitiesManagerService EntitiesManagerService;
-
     private readonly List<IDisposable> _disposables = new();
-    private static readonly TimeSpan RetryDuration = TimeSpan.FromSeconds(2);
-
-    private bool Started { get; set; } 
+    
+    protected static readonly TimeSpan RetryDuration = TimeSpan.FromSeconds(5);
 
     protected AWorker(ILogger<AWorker> logger, IServiceProvider serviceProvider)
     {
@@ -25,61 +24,24 @@ public abstract class AWorker : IHostedService, IAsyncDisposable
         Services = serviceProvider.CreateScope().ServiceProvider;
         Scheduler = Services.GetRequiredService<IScheduler>();
         EntitiesManagerService = Services.GetRequiredService<EntitiesManagerService>();
-        
-        Enabled = new MqttEntity<bool>($"worker/{GetType().Name.ToLower().Replace("app", "")}", true, true);
-        EntitiesManagerService.Add(Enabled);
     }
     
-    public Task StartAsync(CancellationToken cancellationToken)
+    public virtual Task StartAsync(CancellationToken cancellationToken)
     {
-        AddDisposable(
-            Observable.Interval(RetryDuration).Select(_ => Enabled.Value)
-                .Merge(Enabled.ValueChanges().Select(v => v.value))
-                .SubscribeAsync(async state =>
-                {
-                    try
-                    {
-                        await DoState(state);
-                    }
-                    catch (Exception e)
-                    {
-                        Logger.LogCritical(e, "Crash of {worker}, retry in {duration}", Enabled.Id, RetryDuration);
-                    }
-                }));
-
+        AddDisposable(Observable.Interval(RetryDuration).Where(_ => !Started).SubscribeAsync(async _ =>
+        {
+            try
+            {
+                await Start();
+                Started = true;
+            }
+            catch (Exception e)
+            {
+                Logger.LogCritical(e, "Crash of worker, retry in {duration}", RetryDuration);
+            }
+        }));
+        
         return Task.CompletedTask;
-    }
-
-    private async Task DoState(bool state)
-    {
-        if (state)
-        {
-            if (Started)
-            {
-                return;
-            }
-
-            Logger.LogInformation("Starting {worker}", Enabled.Id);
-
-            await Start();
-            Started = true;
-
-            Logger.LogInformation("Started {worker}", Enabled.Id);
-        }
-        else
-        {
-            if (!Started)
-            {
-                return;
-            }
-
-            Logger.LogInformation("Stopping {worker}", Enabled.Id);
-
-            await Stop();
-            Started = false;
-
-            Logger.LogInformation("Stopped {worker}", Enabled.Id);
-        }
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -87,7 +49,6 @@ public abstract class AWorker : IHostedService, IAsyncDisposable
         if (Started)
         {
             await Stop();
-            Started = false;
         }
     }
 
@@ -114,6 +75,9 @@ public abstract class AWorker : IHostedService, IAsyncDisposable
         {
             disposable.Dispose();
         }
+
+        Started = false;
+        
         return Task.CompletedTask;
     }
 }

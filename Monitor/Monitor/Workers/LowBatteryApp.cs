@@ -4,7 +4,7 @@ using Monitor.Services;
 
 namespace Monitor.Workers;
 
-public class LowBatteryApp : AWorker
+public class LowBatteryApp : AEnabledWorker
 {
     public static readonly MqttEntity<int> Voltage = new("low_battery/voltage", true, 11600);
     public static readonly MqttEntity<TimeSpan> TimeOff = new("low_battery/time_off", true, TimeSpan.FromMinutes(30));

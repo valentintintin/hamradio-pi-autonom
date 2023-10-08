@@ -18,9 +18,9 @@ public class CameraController : AController
     [HttpGet("last.webp")]
     public ActionResult GetLast()
     {
-        string? fileStream = _cameraService.GetFinalLast();
+        string? lastFullPath = _cameraService.GetFinalLast();
 
-        if (string.IsNullOrWhiteSpace(fileStream))
+        if (string.IsNullOrWhiteSpace(lastFullPath))
         {
             return new NotFoundResult();
         }
@@ -31,11 +31,11 @@ public class CameraController : AController
             Inline = true
         }.ToString());
 
-        return new PhysicalFileResult(fileStream, "image/webp");
+        return new PhysicalFileResult(lastFullPath, "image/webp");
     }
 
     [HttpGet("current.webp")]
-    public async Task<FileStreamResult> GetCurrent()
+    public async Task<FileStreamResult> GetCurrent([FromQuery] bool save = false)
     {
         Response.Headers.Add("Content-Disposition", new ContentDisposition
         {
@@ -43,6 +43,6 @@ public class CameraController : AController
             Inline = true
         }.ToString());
         
-        return new FileStreamResult(await _cameraService.CreateFinalImageFromLasts(false), "image/webp");
+        return new FileStreamResult(await _cameraService.CreateFinalImageFromLasts(save), "image/webp");
     }
 }

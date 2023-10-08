@@ -8,70 +8,63 @@ public interface IMqttEntity
 {
     string Id { get; }
     bool Retain { get; }
-    bool HasReceivedInitialValueFromMqtt { get; }
+    bool HasReceivedFromMqtt { get; }
 
-    IObservable<(string? old, string value)> ValueMqttAsync();
-
+    IObservable<string> ValueMqttAsync();
     bool SetFromMqttPayload(string? payload);
-
-    void EmitToMqtt();
+    void SetValueToInitialValue();
 }
 
 public class MqttEntity<T> : IMqttEntity
 {
     public string Id { get; }
     public bool Retain { get; }
+    public bool HasReceivedFromMqtt { get; private set; }
 
-    public bool HasReceivedInitialValueFromMqtt { get; private  set; }
-    
     public T? Value
     {
-        get => _value;
+        get => ValuePrivate;
         set => SetValue(value);
     }
-    private T? _value { get; set; } 
-    private T? _oldValue { get; set; } 
-        
-    private readonly Subject<(T? old, T? value)> _valueLocal = new();
-    private readonly Subject<(string? old, string? value)> _valueMqtt = new();
+    private T? ValuePrivate { get; set; }
+    private T? OldValue { get; set; }
+    
+    private readonly Subject<(T? old, T? value)> _valueSubject = new();
+    private readonly T? _initialValue;
 
     public MqttEntity(string id, bool retain = false, T? initialValue = default)
     {
         Retain = retain;
         Id = id;
-
-        if (retain && initialValue != null)
-        {
-            _value = initialValue;
-            _valueLocal.OnNext((default, _value));
-        }
+        OldValue = ValuePrivate = _initialValue = initialValue;
+        SetValue(initialValue);
     }
 
     public IObservable<(T? old, T? value)> ValueChanges(bool onlyIfDifferent = true)
     {
-        return _valueLocal.AsObservable().Where(v => !onlyIfDifferent || v.old?.Equals(v.value) != true);
+        return _valueSubject.AsObservable().Where(v => !onlyIfDifferent || v.old?.Equals(v.value) != true);
     }
 
-    public IObservable<(string? old, string value)> ValueMqttAsync()
+    public IObservable<string> ValueMqttAsync()
     {
-        return _valueMqtt.AsObservable().Select(s => (s.old, s.value ?? string.Empty));
+        return _valueSubject.AsObservable().Skip(1).Select(v => JsonSerializer.Serialize(v.value));
     }
 
     public void SetValue(T? state)
     {
-        _oldValue = _value;
-        _value = state;
-        _valueLocal.OnNext((_oldValue, _value));
-        EmitToMqtt();
+        OldValue = ValuePrivate;
+        ValuePrivate = state;
+        
+        _valueSubject.OnNext((OldValue, ValuePrivate));
     }
 
     public bool SetFromMqttPayload(string? payload)
     {
-        HasReceivedInitialValueFromMqtt = true;
-
+        HasReceivedFromMqtt = true;
+        
         T? newValue = string.IsNullOrWhiteSpace(payload) ? default : JsonSerializer.Deserialize<T?>(payload);
 
-        if (newValue?.Equals(_value) != true)
+        if (newValue?.Equals(ValuePrivate) != true)
         {
             SetValue(newValue);
 
@@ -81,19 +74,19 @@ public class MqttEntity<T> : IMqttEntity
         return false;
     }
 
-    public void EmitToMqtt()
+    public void SetValueToInitialValue()
     {
-        _valueMqtt.OnNext((JsonSerializer.Serialize(_oldValue), JsonSerializer.Serialize(_value)));
+        Value = _initialValue;
     }
 
     public bool IsTrue()
     {
-        return _value?.ToString() == bool.TrueString;
+        return ValuePrivate?.ToString() == bool.TrueString;
     }
 
     public bool IsFalse()
     {
-        return _value?.ToString() == bool.FalseString;
+        return ValuePrivate?.ToString() == bool.FalseString;
     }
 
     public IObservable<bool> IsTrueAsync()
@@ -104,5 +97,10 @@ public class MqttEntity<T> : IMqttEntity
     public IObservable<bool> IsFalseAsync()
     {
         return ValueChanges().Select(v => v.value?.ToString() == bool.FalseString).Where(v => v);
+    }
+
+    public override string ToString()
+    {
+        return $"{Id} => {Value}";
     }
 }

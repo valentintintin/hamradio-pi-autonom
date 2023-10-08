@@ -20,15 +20,14 @@ public class SerialPortMcuCommandsApp : ASerialPortApp
      {""type"":""gpio"",""wifi"":false,""npr"":true,""ldr"":300}
      {""type"":""time"",""state"":2313942055,""uptime"":20}
      {""type"":""weather"",""temperature"":20.0,""humidity"":50}
-     {""type"":""mppt"",""batteryVoltage"":12100,""batteryCurrent"":20,""solarVoltage"":1630,""solarCurrent"":20,""currentCharge"":220,""status"":136,""night"":true,""alert"":false,""watchdogEnabled"":false,""watchdogPowerOffTime"":10,""watchdogCounter"":0,""powerEnabled"":true,""powerOnVoltage"":11500,""powerOffVoltage"":11300,""statusString"":""NIGHT""}")
+     {""type"":""mppt"",""batteryVoltage"":12100,""batteryCurrent"":20,""solarVoltage"":1630,""solarCurrent"":20,""currentCharge"":220,""status"":136,""night"":true,""alert"":false,""watchdogEnabled"":false,""watchdogPowerOffTime"":10,""watchdogCounter"":0,""powerEnabled"":true,""powerOnVoltage"":11500,""powerOffVoltage"":11300,""statusString"":""NIGHT""}
+     {""type"":""lora"",""state"":""tx"",""payload"":""F4HVV-15>F4HVV,WIDE1-1:!/7V,.Ot#4I!!G Solar NPR+Lora digi+Cam |!!!i!""!>!W!!|""}")
     {
         _serialMessageService = Services.GetRequiredService<SerialMessageService>();
     }
 
     protected override async Task MessageReceived(string input)
     {
-        SerialMessageService.SerialPort ??= SerialPort;
-
         if (!input.StartsWith('{') && !input.EndsWith('}'))
         {
             return;

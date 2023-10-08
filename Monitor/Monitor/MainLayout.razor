@@ -1,10 +1,20 @@
 ﻿@inherits LayoutComponentBase
 
 <Layout Class="layout">
-    <Header>
+    <Header Style="height: auto; min-height: 64px; display: flex; flex-wrap: wrap; align-items: center; color: white;">
+        <span style="margin-right: 60px">Station F4HVV</span>
         <Menu Theme="MenuTheme.Dark" Mode="MenuMode.Horizontal">
             <MenuItem RouterLink="/" RouterMatch="NavLinkMatch.All">Tableau de bord</MenuItem>
-            <MenuItem RouterLink="/settings" RouterMatch="NavLinkMatch.All">Paramètres</MenuItem>
+            <MenuItem RouterLink="/history" RouterMatch="NavLinkMatch.All">Historique</MenuItem>
+            <SubMenu Title="Outils">
+                <MenuItemGroup Title="">
+                    <MenuItem RouterLink="/settings" RouterMatch="NavLinkMatch.All">Paramètres</MenuItem>
+                </MenuItemGroup>
+                <MenuItemGroup Title="Dev">
+                    <MenuItem RouterLink="/states">État JSON</MenuItem>
+                    <MenuItem RouterLink="/camera/current.webp">Caméras</MenuItem>
+                </MenuItemGroup>
+            </SubMenu>
         </Menu>
     </Header>
     

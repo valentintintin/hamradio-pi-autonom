@@ -6,7 +6,7 @@ WeatherSensors::WeatherSensors(System *system) : system(system) {
 }
 
 bool WeatherSensors::begin() {
-    dht.begin();
+    dht.setup(PIN_DHT, DHT::DHT22);
 
     return true;
 }
@@ -20,12 +20,22 @@ bool WeatherSensors::update() {
 
     Log.traceln(F("Fetch weather sensors data"));
 
-    if (!readDht()) {
+    delay(dht.getMinimumSamplingPeriod());
+
+    dht.getTemperature();
+
+    hasError = dht.getStatus() != DHT::ERROR_NONE;
+
+    if (hasError) {
         system->serialError(PSTR("[WEATHER] Fetch DHT sensor error"));
+        system->serialError(dht.getStatusString());
         system->displayText(PSTR("Weather error"), PSTR("Failed to fetch DHT sensor"));
         begin();
         return false;
     }
+
+    temperature = dht.getTemperature();
+    humidity = dht.getHumidity();
 
     serialJsonWriter
             .beginObject()
@@ -39,28 +49,6 @@ bool WeatherSensors::update() {
     system->displayText(PSTR("Weather"), bufferText);
 
     timer.restart();
-
-    return true;
-}
-
-bool WeatherSensors::readDht() {
-    dht.temperature().getEvent(&event);
-
-    if (isnan(event.temperature)) {
-        system->serialError(PSTR("[WEATHER] Error reading temperature"));
-        return false;
-    } else {
-        temperature = event.temperature;
-    }
-
-    dht.humidity().getEvent(&event);
-
-    if (isnan(event.relative_humidity)) {
-        system->serialError(PSTR("[WEATHER] Error reading humidity"));
-        return false;
-    } else {
-        humidity = (u_int8_t) event.relative_humidity;
-    }
 
     return true;
 }

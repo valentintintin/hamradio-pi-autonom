@@ -76,15 +76,12 @@ private:
     mpptChg charger;
     Timer timer = Timer(INTERVAL_MPPT, true);
 
-    char bufferText[256]{};
+    char bufferText[100]{};
 
     bool init = false, night = false, alert = false, watchdogEnabled = false, powerEnabled = false;
     uint8_t watchdogCounter = 0;
     uint16_t status = 0, watchdogPowerOffTime = 0, powerOffVoltage, powerOnVoltage;
     int16_t vs = 0, is = 0, vb = 0, ib = 0;
-
-    void updateWatchdog();
-    void checkAnormalCase();
 };
 
 #endif //CUBECELL_MONITORING_MPPTMONITOR_H

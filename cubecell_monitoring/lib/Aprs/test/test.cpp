@@ -32,7 +32,10 @@ int main() {
     packet.telemetries.telemetriesAnalog[1] = {
             "A2",
             1564,
-            ""
+            "",
+            {
+                0, 0.001, 0
+            }
     };
     packet.telemetries.telemetriesAnalog[2] = {
             "",

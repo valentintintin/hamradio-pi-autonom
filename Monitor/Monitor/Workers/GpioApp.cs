@@ -7,11 +7,10 @@ namespace Monitor.Workers;
 
 public class GpioApp : AWorker
 {
-    public static readonly MqttEntity<bool> StartWifiTurnOn = new("gpio/start_wifi_turn_on", true);
-    public static readonly MqttEntity<bool> StartNprTurnOn = new("gpio/start_npr_turn_on", true);
+    public readonly MqttEntity<bool> StartWifiTurnOn = new("gpio/start_wifi_turn_on", true);
+    public readonly MqttEntity<bool> StartNprTurnOn = new("gpio/start_npr_turn_on", true);
     
     private readonly SerialMessageService _serialMessageService;
-    private readonly TimeSpan _debunce = TimeSpan.FromSeconds(1);
 
     public GpioApp(ILogger<GpioApp> logger, IServiceProvider serviceProvider) 
         : base(logger, serviceProvider)
@@ -24,25 +23,46 @@ public class GpioApp : AWorker
 
     protected override Task Start()
     {
-        AddDisposable(EntitiesManagerService.Entities.GpioWifi.ValueChanges().Skip(1)
-            .Sample(_debunce)
+        AddDisposable(EntitiesManagerService.Entities.GpioWifi.ValueChanges()
+            .Sample(TimeSpan.FromSeconds(1))
+            .Do(v => Logger.LogDebug("GPIO wifi => {value}", v))
             .Select(v => v.value)
-            .DistinctUntilChanged()
             .Subscribe(_serialMessageService.SetWifi)
         );
         
-        AddDisposable(EntitiesManagerService.Entities.GpioNpr.ValueChanges().Skip(1)
-            .Sample(_debunce)
+        AddDisposable(EntitiesManagerService.Entities.GpioNpr.ValueChanges()
+            .Sample(TimeSpan.FromSeconds(1))
+            .Do(v => Logger.LogDebug("GPIO npr => {value}", v))
             .Select(v => v.value)
-            .DistinctUntilChanged()
             .Subscribe(_serialMessageService.SetNpr)
         );
 
-        Logger.LogInformation("Switch GPIOs");
+        Observable.Timer(TimeSpan.FromSeconds(2)).Select(_ => true)
+            .Merge(
+                EntitiesManagerService.Entities.McuStatus.ValueChanges()
+                .Select(v => v.value)
+                .Where(v => v is "starting" or "started")
+                .Select(_ => true)
+                .Do(v => Logger.LogInformation("Will switch GPIO because MCU in state {state}", v))
+                .Delay(TimeSpan.FromSeconds(30)) // Wait init done
+            )
+            .Merge(StartWifiTurnOn.ValueChanges().Where(s => s.value).Select(v => v.value))
+            .Merge(StartNprTurnOn.ValueChanges().Where(s => s.value).Select(v => v.value))
+            .Subscribe(_ => 
+        {
+            Logger.LogInformation("Switch GPIO with start values");
         
-        EntitiesManagerService.Entities.GpioWifi.SetValue(StartWifiTurnOn.Value);
-        EntitiesManagerService.Entities.GpioNpr.SetValue(StartNprTurnOn.Value);
+            if (StartWifiTurnOn.Value != EntitiesManagerService.Entities.GpioWifi.Value)
+            {
+                EntitiesManagerService.Entities.GpioWifi.SetValue(StartWifiTurnOn.Value);
+            }
         
+            if (StartNprTurnOn.Value != EntitiesManagerService.Entities.GpioNpr.Value)
+            {
+                EntitiesManagerService.Entities.GpioNpr.SetValue(StartNprTurnOn.Value);
+            }
+        });
+
         return Task.CompletedTask;
     }
 }

@@ -9,13 +9,14 @@ System* Command::system;
 Command::Command(System *system) {
     Command::system = system;
 
-    parser.registerCommand(PSTR("wifi"), PSTR("s"), doWifi);
-    parser.registerCommand(PSTR("npr"), PSTR("s"), doNpr);
+    parser.registerCommand(PSTR("wifi"), PSTR("u"), doWifi);
+    parser.registerCommand(PSTR("npr"), PSTR("u"), doNpr);
     parser.registerCommand(PSTR("telem"), PSTR(""), doTelemetry);
+    parser.registerCommand(PSTR("telemParams"), PSTR(""), doTelemetry);
     parser.registerCommand(PSTR("dog"), PSTR("u"), doWatchdog);
     parser.registerCommand(PSTR("pow"), PSTR("uu"), doMpptPower);
     parser.registerCommand(PSTR("lora"), PSTR("s"), doLora);
-    parser.registerCommand(PSTR("time"), PSTR("u"), doSetTime);
+//    parser.registerCommand(PSTR("time"), PSTR("u"), doSetTime);
 }
 
 bool Command::processCommand(const char *command) {
@@ -36,23 +37,29 @@ bool Command::processCommand(const char *command) {
 }
 
 void Command::doWifi(MyCommandParser::Argument *args, char *response) {
-    bool state = strstr_P(args[0].asString, PSTR("on"));
+    bool state = args[0].asInt64 > 0;
 
     system->gpio.setWifi(state);
 
-    sprintf_P(response, PSTR("OK"));
+    sprintf_P(response, PSTR("OK with state %d"), state);
 }
 
 void Command::doNpr(MyCommandParser::Argument *args, char *response) {
-    bool state = strstr_P(args[0].asString, PSTR("on"));
+    bool state = args[0].asInt64 > 0;
 
     system->gpio.setNpr(state);
 
-    sprintf_P(response, PSTR("OK"));
+    sprintf_P(response, PSTR("OK with state %d"), state);
 }
 
 void Command::doTelemetry(MyCommandParser::Argument *args, char *response) {
     system->forceSendTelemetry = true;
+
+    sprintf_P(response, PSTR("OK"));
+}
+
+void Command::doTelemetryParams(MyCommandParser::Argument *args, char *response) {
+    system->communication->shouldSendTelemetryParams = true;
 
     sprintf_P(response, PSTR("OK"));
 }
@@ -73,15 +80,6 @@ void Command::doLora(MyCommandParser::Argument *args, char *response) {
     sprintf_P(response, PSTR("OK"));
 }
 
-void Command::doSetTime(MyCommandParser::Argument *args, char *response) {
-    uint64_t epoch = args[0].asUInt64;
-
-    system->RTC.setEpoch((long long) epoch, true);
-    system->setTimeFromRTcToInternalRtc(epoch);
-
-    System::nowToString(response);
-}
-
 void Command::doMpptPower(MyCommandParser::Argument *args, char *response) {
     uint64_t powerOnVoltage = args[0].asUInt64;
     uint64_t powerOffVoltage = args[1].asUInt64;
@@ -90,3 +88,13 @@ void Command::doMpptPower(MyCommandParser::Argument *args, char *response) {
 
     sprintf_P(response, ok ? PSTR("OK") : PSTR("KO"));
 }
+
+//void Command::doSetTime(MyCommandParser::Argument *args, char *response) {
+//    uint64_t epoch = args[0].asUInt64;
+//
+//    system->RTC.setEpoch((long long) epoch, true);
+//    system->setTimeFromRTcToInternalRtc(epoch);
+//
+//    System::nowToString(response);
+//}
+

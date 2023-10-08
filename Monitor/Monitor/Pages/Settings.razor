@@ -3,24 +3,30 @@
 @using Monitor.Workers
 @using Monitor.Components
 @using Monitor.Services
+@using System.Globalization
+@using Monitor.Extensions
 
 @inject SerialMessageService SerialMessageService
-@inject PowerNightApp PowerNightApp
+
 @inject CameraCaptureApp CameraCaptureApp
-@inject LowBatteryApp LowBatteryApp
-@inject WatchdogApp WatchdogApp
 @inject GpioApp GpioApp
+@inject LowBatteryApp LowBatteryApp
 @inject MpptApp MpptApp
+@inject PowerNightApp PowerNightApp
+@inject WatchdogApp WatchdogApp
+@inject AprsIsApp AprsIsApp
+
+@implements IDisposable
 
 <PageTitle>Paramètres</PageTitle>
 
-<h1>Paramètres</h1>
+<PageHeader Title="Paramètres" Subtitle="@MonitorService.State.LastMessagesReceived.LastOrDefault()?.ReceivedAt.ToFrench().ToString(CultureInfo.CurrentCulture)" />
 
 <GridRow Gutter="(16, 16)" Justify="center">
-    <GridCol Span="12">
+    <GridCol Md="24" Lg="12">
         <Card Title="Nuit">
             <Body>
-            <Descriptions Bordered="true" Column=2>
+            <Descriptions Bordered="true" Column="1">
                 <DescriptionsItem Title="Activé">
                     <Switch @bind-Checked="PowerNightApp.Enabled.Value"></Switch>
                 </DescriptionsItem>
@@ -40,10 +46,10 @@
             </Body>
         </Card>
     </GridCol>
-    <GridCol Span="12">
+    <GridCol Md="24" Lg="12">
         <Card Title="Batterie faible">
             <Body>
-            <Descriptions Bordered="true" Column=2>
+            <Descriptions Bordered="true" Column="1">
                 <DescriptionsItem Title="Activé">
                     <Switch @bind-Checked="LowBatteryApp.Enabled.Value"></Switch>
                 </DescriptionsItem>
@@ -57,10 +63,10 @@
             </Body>
         </Card>
     </GridCol>
-    <GridCol Span="12">
+    <GridCol Md="24" Lg="12">
         <Card Title="MPPT">
             <Body>
-            <Descriptions Bordered="true" Column=2>
+            <Descriptions Bordered="true" Column="1">
                 <DescriptionsItem Title="Tension basse">
                     <AntDesign.InputNumber @bind-Value="EntitiesManagerService.Entities.MpptPowerOffVoltage.Value" Min="11000" Max="12000"></AntDesign.InputNumber>
                 </DescriptionsItem>
@@ -71,10 +77,10 @@
             </Body>
         </Card>
     </GridCol>
-    <GridCol Span="12">
+    <GridCol Md="24" Lg="12">
         <Card Title="Watchdog">
             <Body>
-            <Descriptions Bordered="true" Column=2>
+            <Descriptions Bordered="true" Column="1">
                 <DescriptionsItem Title="Activé">
                     <Switch @bind-Checked="WatchdogApp.Enabled.Value"></Switch>
                 </DescriptionsItem>
@@ -88,10 +94,10 @@
             </Body>
         </Card>
     </GridCol>
-    <GridCol Span="12">
+    <GridCol Md="24" Lg="12">
         <Card Title="Caméras">
             <Body>
-            <Descriptions Bordered="true" Column=2>
+            <Descriptions Bordered="true" Column="1">
                 <DescriptionsItem Title="Activé">
                     <Switch @bind-Checked="CameraCaptureApp.Enabled.Value"></Switch>
                 </DescriptionsItem>
@@ -102,10 +108,10 @@
             </Body>
         </Card>
     </GridCol>
-    <GridCol Span="12">
+    <GridCol Md="24" Lg="12">
         <Card Title="GPIO">
             <Body>
-            <Descriptions Bordered="true" Column=2>
+            <Descriptions Bordered="true" Column="1">
                 <DescriptionsItem Title="Wifi">
                     <Switch @bind-Checked="EntitiesManagerService.Entities.GpioWifi.Value"></Switch>
                 </DescriptionsItem>
@@ -122,9 +128,10 @@
             </Body>
         </Card>
     </GridCol>
-    <GridCol Span="12">
+    <GridCol Md="24" Lg="12">
         <Card Title="LoRa TX">
             <Body>
+            <Switch @bind-Checked="AprsIsApp.Enabled.Value"></Switch>
             <Input @bind-Value="LoRaTxPayload" Placeholder="Payload" />
             <Button Type="@ButtonType.Primary" HtmlType="button" OnClick="SendLoRa">
                 Envoyer
@@ -132,7 +139,7 @@
             </Body>
         </Card>
     </GridCol>
-    <GridCol Span="12">
+    <GridCol Md="24" Lg="12">
         <Card Title="Commande série TX">
             <Body>
             <Input @bind-Value="SerialTxPayload" Placeholder="Payload" />
@@ -145,9 +152,27 @@
 </GridRow>
 
 @code {
-    private string? LoRaTxPayload { get; set; }
-    private string? SerialTxPayload { get; set; }
+    protected override async Task OnInitializedAsync()
+    {
+        _timer = new Timer(async _ => await UpdateData(), null, TimeSpan.Zero, TimeSpan.FromSeconds(5));
+        await base.OnInitializedAsync();
+    }
 
+    private async Task UpdateData()
+    {
+        await InvokeAsync(() =>
+        {
+            try
+            {
+                StateHasChanged();
+            }
+            catch (Exception)
+            {
+    // to prevent app crash when bug appear
+            }
+        });
+    }
+    
     private void SendLoRa()
     {
         if (!string.IsNullOrWhiteSpace(LoRaTxPayload))
@@ -165,4 +190,13 @@
             SerialTxPayload = null;
         }
     }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+
+    private Timer? _timer;
+    private string? LoRaTxPayload { get; set; }
+    private string? SerialTxPayload { get; set; }
 }

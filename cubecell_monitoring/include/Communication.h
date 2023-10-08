@@ -19,6 +19,9 @@ public:
     void sendMessage(const char* destination, const char* message, const char* ackToConfirm = nullptr);
     void sendPosition(const char* comment);
     void sendTelemetry();
+    void sendTelemetryParams();
+
+    bool shouldSendTelemetryParams = false;
 private:
     System* system;
 

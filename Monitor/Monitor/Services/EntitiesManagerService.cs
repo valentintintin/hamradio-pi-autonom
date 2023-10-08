@@ -1,137 +1,160 @@
+using System.Collections;
+using System.Globalization;
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using System.Reflection;
 using System.Text;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Monitor.Exceptions;
 using Monitor.Extensions;
 using Monitor.Models;
 using MQTTnet;
 using MQTTnet.Client;
-using MQTTnet.Protocol;
+using MQTTnet.Formatter;
 
 namespace Monitor.Services;
 
-public class EntitiesManagerService : AService
+public class EntitiesManagerService : AService, IAsyncDisposable
 {
-    private readonly IScheduler _scheduler;
     public static MqttEntities Entities { get; } = new();
 
     private readonly string _topicBase;
+    private readonly string _clientId;
     private readonly IMqttClient _mqttClient;
     private readonly List<IMqttEntity> _entities = new();
-    private readonly TimeSpan _durationBeforeMqtt = TimeSpan.FromSeconds(5);
-
+    private readonly IConfigurationSection _configurationSection;
+    private readonly IScheduler _scheduler;
+    
     public EntitiesManagerService(ILogger<EntitiesManagerService> logger, 
         IConfiguration configuration, IServiceProvider serviceProvider) : base(logger)
     {
+        _configurationSection = configuration.GetSection("Mqtt");
+        _topicBase = _configurationSection.GetValueOrThrow<string>("TopicBase");
+        _clientId = _configurationSection.GetValueOrThrow<string>("ClientId");
+        _mqttClient = new MqttFactory().CreateMqttClient();
         _scheduler = serviceProvider.CreateScope().ServiceProvider.GetRequiredService<IScheduler>();
-
-        IConfigurationSection configurationSection = configuration.GetSection("Mqtt");
-        _topicBase = configurationSection.GetValueOrThrow<string>("TopicBase");
-
         
-        MqttFactory mqttFactory = new();
-        _mqttClient = mqttFactory.CreateMqttClient();
-
         foreach (PropertyInfo property in typeof(MqttEntities).GetProperties())
         {
             IMqttEntity? entity = (IMqttEntity?)property.GetValue(Entities);
             Add(entity ?? throw new InvalidOperationException());
         }
-        
-        MqttClientOptions mqttClientOptions = new MqttClientOptionsBuilder()
-            .WithTcpServer(configurationSection.GetValueOrThrow<string>("Host"), configurationSection.GetValue("Port", 1883))
-            .WithKeepAlivePeriod(TimeSpan.FromMinutes(1))
-            .WithClientId("station")
-            .Build();
 
         _mqttClient.ConnectedAsync += async _ =>
         {
-            Logger.LogTrace("Connection successful to MQTT");
+            Logger.LogInformation("Connection successful to MQTT");
             
             await _mqttClient.SubscribeAsync(
                 new MqttTopicFilterBuilder()
                     .WithTopic($"{_topicBase}/#")
+                    .WithNoLocal()
                     .Build()
             );
         };
 
         _mqttClient.DisconnectedAsync += async args => 
         {
-            logger.LogWarning(args.Exception, "MQTT disconnected");
+            logger.LogError(args.Exception, "MQTT disconnected");
+            
             await Task.Delay(TimeSpan.FromSeconds(5));
-
-            try
-            {
-                await _mqttClient.ConnectAsync(mqttClientOptions, CancellationToken.None);
-            }
-            catch (Exception e)
-            {
-                logger.LogWarning(e, "MQTT reconnecting failed");
-            }
+            await ConnectMqtt();
         };
+        
+        Observable.FromEvent<Func<MqttApplicationMessageReceivedEventArgs, Task>, MqttApplicationMessageReceivedEventArgs>(
+                handler => args =>
+                {
+                    handler(args);
+                    return Task.CompletedTask;
+                },
+                h => _mqttClient.ApplicationMessageReceivedAsync += h,
+                h => _mqttClient.ApplicationMessageReceivedAsync -= h
+            )
+            .Select(m =>
+            {
+                string id = m.ApplicationMessage.Topic.Replace($"{_topicBase}/", "");
+            
+                IMqttEntity? entity = _entities.FirstOrDefault(entity => entity.Id == id);
+                string payload = Encoding.UTF8.GetString(m.ApplicationMessage.PayloadSegment);
 
-        _mqttClient.ApplicationMessageReceivedAsync += MqttMessageReceived;
+                if (entity != null)
+                {
+                    return new
+                    {
+                        entity,
+                        payload
+                    };
+                }
 
-        _mqttClient.ConnectAsync(mqttClientOptions);
+                Logger.LogError("From MQTT topic {topicId} not found with payload {payload}", id, payload);
+                return null;
+            })
+            .Where(m => m != null)
+            .Subscribe(m =>
+            {
+                try
+                {
+                    if (m!.entity.SetFromMqttPayload(m.payload))
+                    {
+                        Logger.LogInformation("Change from MQTT entity {entityId} to {payload}", m.entity.Id, m.payload);
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.LogError(e, "Change from MQTT error entity {entityId} to {payload}", m!.entity.Id, m.payload);
+                }
+            });
+    }
+
+    public async Task ConnectMqtt()
+    {
+        Logger.LogInformation("Run connection to MQTT");
+        
+        await _mqttClient.ConnectAsync(new MqttClientOptionsBuilder()
+            .WithTcpServer(_configurationSection.GetValueOrThrow<string>("Host"), _configurationSection.GetValue("Port", 1883))
+            .WithKeepAlivePeriod(TimeSpan.FromMinutes(1))
+            .WithClientId(_clientId)
+            .WithProtocolVersion(MqttProtocolVersion.V500)
+            .Build());
+
+        foreach (IMqttEntity entity in _entities.Where(e => e is { Retain: true, HasReceivedFromMqtt: false }))
+        {
+            _scheduler.Schedule(TimeSpan.FromSeconds(5), () =>
+            {
+                if (!entity.HasReceivedFromMqtt)
+                {
+                    Logger.LogInformation("No MQTT data received for entity {entity} so we set to its initial value", entity.Id);
+                    entity.SetValueToInitialValue();
+                }
+            });
+        }
     }
 
     public void Add(IMqttEntity entity)
     {
+        Logger.LogTrace("Add MQTT entity {entity}", entity.Id);
         _entities.Add(entity);
         
         entity.ValueMqttAsync()
             .Where(_ => _mqttClient.IsConnected)
-            .Where(v => !entity.HasReceivedInitialValueFromMqtt || v.old != v.value)
             .SubscribeAsync(async value =>
             {
-                Logger.LogTrace("Update MQTT {entityId} from {oldState} to {state}", entity.Id, value.old, value.value);
+                Logger.LogTrace("Update MQTT {entityId} to {state}", entity.Id, value);
 
-            MqttApplicationMessageBuilder mqttApplicationMessage = new MqttApplicationMessageBuilder()
-                .WithTopic($"{_topicBase}/{entity.Id}")
-                .WithPayload(value.value)
-                .WithRetainFlag(entity.Retain);
-            
-            await _mqttClient.PublishAsync(
-                mqttApplicationMessage.Build(),
-                CancellationToken.None);
-        });
-
-        _scheduler.Schedule(_durationBeforeMqtt, () =>
-        {
-            if (!entity.HasReceivedInitialValueFromMqtt)
-            {
-                entity.EmitToMqtt();
-            }
+                MqttApplicationMessageBuilder mqttApplicationMessage = new MqttApplicationMessageBuilder()
+                    .WithTopic($"{_topicBase}/{entity.Id}")
+                    .WithPayload(value)
+                    .WithRetainFlag(entity.Retain);
+                
+                await _mqttClient.PublishAsync(mqttApplicationMessage.Build());
         });
     }
 
-    private Task MqttMessageReceived(MqttApplicationMessageReceivedEventArgs message)
+    public async ValueTask DisposeAsync()
     {
-        string id = message.ApplicationMessage.Topic.Replace($"{_topicBase}/", "");
-            
-        IMqttEntity? entity = _entities.FirstOrDefault(entity => entity.Id == id);
-        string payload = Encoding.UTF8.GetString(message.ApplicationMessage.PayloadSegment);
-
-        if (entity != null)
+        if (_mqttClient.IsConnected)
         {
-            try
-            {
-                if (entity.SetFromMqttPayload(payload))
-                {
-                    Logger.LogInformation("Change from MQTT entity {entityId} to {payload}", entity.Id, payload);
-                }
-            }
-            catch (Exception e)
-            {
-                Logger.LogWarning(e, "Change from MQTT error entity {entityId} to {payload}", entity.Id, payload);
-            }
+            await _mqttClient.DisconnectAsync();
         }
-        else
-        {
-            Logger.LogInformation("From MQTT topic {topicId} and payload {payload} not found", id, payload);
-        }
-            
-        return Task.CompletedTask;
     }
 }
 

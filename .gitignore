@@ -7,3 +7,4 @@ assets/config-pi.ts
 assets/config-pi-test.ts
 data.db
 id_rsa*
+Monitor/published

@@ -20,15 +20,13 @@ public:
 
     bool begin(RadioEvents_t *radioEvents);
     void update();
-    void userButton();
     void setTimeFromRTcToInternalRtc(uint64_t epoch);
     bool isBoxOpened() const;
 
     void turnOnRGB(uint32_t color);
     void turnOffRGB();
-    void displayText(const char* title, const char* content, uint16_t pause = DELAY_SCREEN_DISPLAYED) const;
+    void displayText(const char* title, const char* content, uint16_t pause = TIME_PAUSE_SCREEN) const;
     void serialError(const char* content) const;
-    void feedDog();
 
     static DateTime nowToString(char *result);
 
@@ -41,11 +39,12 @@ public:
 
     bool forceSendTelemetry = false;
 private:
-    char bufferText[256]{};
+    char bufferText[160]{};
     bool screenOn = false;
+    uint32_t ledColor = 0;
 
     Timer timerPosition = Timer(INTERVAL_POSITION_APRS, true);
-    Timer timerTelemetry = Timer(INTERVAL_REFRESH_APRS, false);
+    Timer timerTelemetry = Timer(INTERVAL_TELEMETRY_APRS, false);
     Timer timerTime = Timer(INTERVAL_TIME, true);
     Timer timerScreen = Timer(TIME_SCREEN_ON);
     Timer timerBoxOpened = Timer(INTERVAL_ALARM_BOX_OPENED_APRS, true);

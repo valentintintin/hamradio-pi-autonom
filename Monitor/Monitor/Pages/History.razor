@@ -1,0 +1,226 @@
+@page "/History"
+
+@using Microsoft.EntityFrameworkCore
+@using Monitor.Context
+@using Monitor.Context.Entities
+@using Monitor.Models
+@using System.Globalization
+@using Monitor.Extensions
+@using Tooltip = AntDesign.Charts.Tooltip
+
+@inject IDbContextFactory<DataContext> DbContextFactory
+
+<PageTitle>Historique</PageTitle>
+
+<PageHeader Title="Historique" Subtitle="@DataVoltageBattery.LastOrDefault()?.date" />
+
+<Spin Spinning="Loading">
+    <AntDesign.Charts.Line Data="DataVoltageBattery" Config="_configVoltageBattery" />
+    <AntDesign.Charts.Line Data="DataVoltageSolar" Config="_configVoltageSolar" />
+    <AntDesign.Charts.Line Data="DataCurrent" Config="_configCurrent" />
+    @* <AntDesign.Charts.Line Data="DataWeather" Config="_configTemperature" /> *@
+</Spin>
+
+@code
+{
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdateData();
+        await base.OnInitializedAsync();
+    }
+
+    private async Task UpdateData()
+    {
+        Loading = true;
+        
+        DataContext context = await DbContextFactory.CreateDbContextAsync();
+
+        List<Mppt> mpptData = await context.Mppts.OrderByDescending(m => m.Id)
+            .Take(500)
+            .Reverse()
+            .ToListAsync();
+        List<Weather> weatherData = await context.Weathers.OrderByDescending(m => m.Id)
+            .Take(500)
+            .Reverse()
+            .ToListAsync();
+        
+        DataVoltageBattery = mpptData.SelectMany(m => new List<LineChartData<float>>
+        {
+            new()
+            {
+                date = m.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Tension batterie",
+                value = m.BatteryVoltage / 1000.0f
+            }
+        }).ToList();
+        
+        DataVoltageSolar = mpptData.SelectMany(m => new List<LineChartData<float>>
+        {
+            new()
+            {
+                date = m.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Tension panneau",
+                value = m.SolarVoltage / 1000.0f
+            }
+        }).ToList();
+        
+        DataCurrent = mpptData.SelectMany(m => new List<LineChartData<int>>
+        {
+            new()
+            {
+                date = m.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Intensité batterie",
+                value = m.BatteryCurrent
+            },
+            new()
+            {
+                date = m.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Intensité panneau",
+                value = m.SolarCurrent
+            }
+        }).ToList();
+        
+        DataWeather = weatherData.SelectMany(m => new List<LineChartData<float>>
+        {
+            new()
+            {
+                date = m.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Humidité",
+                value = m.Humidity
+            },
+            new()
+            {
+                date = m.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Température",
+                value = m.Temperature
+            },
+        }).ToList();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        Loading = false;
+        
+        await InvokeAsync(StateHasChanged);
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    List<LineChartData<float>> DataVoltageBattery { get; set; } = new();
+    List<LineChartData<float>> DataVoltageSolar { get; set; } = new();
+    List<LineChartData<int>> DataCurrent { get; set; } = new();
+    List<LineChartData<float>> DataWeather { get; set; } = new();
+
+    readonly LineConfig _configVoltageBattery = new()
+    {
+        Padding = "auto",
+        AutoFit = true,
+        XField = nameof(LineChartData<object>.date),
+        YField = nameof(LineChartData<object>.value),
+        YAxis = new ValueAxis
+        {
+            Label = new BaseAxisLabel
+            {
+                Visible = true,
+            },
+            Title = new BaseAxisTitle
+            {
+                Text = "Tension (V)",
+                Visible = true
+            },
+            Visible = true,
+            Min = 11,
+        },
+        Legend = new Legend
+        {
+            Visible = false
+        },
+        SeriesField = nameof(LineChartData<object>.type),
+        Color = new [] { "blue" }
+    };
+    
+    readonly LineConfig _configVoltageSolar = new()
+    {
+        Padding = "auto",
+        AutoFit = true,
+        XField = nameof(LineChartData<object>.date),
+        YField = nameof(LineChartData<object>.value),
+        YAxis = new ValueAxis
+        {
+            Label = new BaseAxisLabel
+            {
+                Visible = true,
+            },
+            Title = new BaseAxisTitle
+            {
+                Text = "Tension (V)",
+                Visible = true
+            },
+            Visible = true
+        },
+        Legend = new Legend
+        {
+            Visible = false
+        },
+        SeriesField = nameof(LineChartData<object>.type),
+        Color = new [] { "red" }
+    };
+    
+    readonly LineConfig _configCurrent = new()
+    {
+        Padding = "auto",
+        AutoFit = true,
+        XField = nameof(LineChartData<object>.date),
+        YField = nameof(LineChartData<object>.value),
+        YAxis = new ValueAxis
+        {
+            Label = new BaseAxisLabel
+            {
+                Visible = true,
+            },
+            Title = new BaseAxisTitle
+            {
+                Text = "Courant (mA)",
+                Visible = true
+            },
+            Min = 0,
+            // Max = 1000,
+            Visible = true
+        },
+        Legend = new Legend
+        {
+            Position = "bottom"
+        },
+        SeriesField = nameof(LineChartData<object>.type),
+        Color = new [] { "blue", "red" }
+    };
+    
+    readonly LineConfig _configTemperature = new()
+    {
+        Padding = "auto",
+        AutoFit = true,
+        XField = nameof(LineChartData<object>.date),
+        YField = nameof(LineChartData<object>.value),
+        YAxis = new ValueAxis
+        {
+            Label = new BaseAxisLabel
+            {
+                Visible = true,
+            },
+            Title = new BaseAxisTitle
+            {
+                Text = "Température (°C) / Humidité (%)"
+            },
+            Min = -10,
+            Max = 100,
+            Visible = true
+        },
+        Legend = new Legend
+        {
+            Position = "bottom"
+        },
+        SeriesField = nameof(LineChartData<object>.type),
+        Color = new [] { "blue", "red" }
+    };
+
+    private bool Loading { get; set; } = true;
+}

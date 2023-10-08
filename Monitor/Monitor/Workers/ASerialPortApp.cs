@@ -15,8 +15,8 @@ public abstract class ASerialPortApp : AWorker
     private readonly int _speed;
     private readonly bool _simulate;
 
-    protected ASerialPortApp(ILogger<ASerialPortApp> logger, IServiceProvider serviceProvider
-        , IConfiguration configuration, string configSectionName, string fakeInput = "")
+    protected ASerialPortApp(ILogger<ASerialPortApp> logger, IServiceProvider serviceProvider,
+        IConfiguration configuration, string configSectionName, string fakeInput = "")
         : base(logger, serviceProvider)
     {
         MonitorService = Services.GetRequiredService<MonitorService>();
@@ -55,6 +55,10 @@ public abstract class ASerialPortApp : AWorker
         else
         {
             SerialPort = new SerialPort(_path, _speed);
+
+            // TODO change it for only one app
+            SerialMessageService.SerialPort ??= SerialPort;
+
             SerialPort.NewLine = "\n";
             SerialPort.DataReceived += (_, _) =>
             {
@@ -62,7 +66,7 @@ public abstract class ASerialPortApp : AWorker
                 {
                     string input = SerialPort.ReadLine();
                 
-                    Logger.LogDebug("Received serial : {input}", input);
+                    Logger.LogTrace("Received serial : {input}", input);
 
                     MessageReceived(input);
                 }

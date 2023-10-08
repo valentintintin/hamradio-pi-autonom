@@ -10,6 +10,8 @@ public class TimeData : Message
     [JsonPropertyName("uptime")] 
     public long Uptime { get; set; }
 
+    [JsonIgnore]
     public DateTimeOffset DateTime => DateTimeOffset.FromUnixTimeSeconds(Timestamp);
+    [JsonIgnore]
     public TimeSpan UptimeTimeSpan => TimeSpan.FromSeconds(Uptime);
 }

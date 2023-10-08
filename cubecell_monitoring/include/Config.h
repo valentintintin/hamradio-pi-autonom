@@ -3,13 +3,12 @@
 
 #include <JsonWriter.h>
 
-#define LOG_LEVEL LOG_LEVEL_INFO
+#define LOG_LEVEL LOG_LEVEL_TRACE
 #define WireUsed Wire
 #define SerialPiUsed Serial1
 
 #define USE_RF true
 #define USE_RTC true
-#define USE_BUTTON false
 #define SET_RTC 0
 
 #define RF_FREQUENCY 433775000 // Hz
@@ -27,16 +26,16 @@
 #define LORA_FIX_LENGTH_PAYLOAD_ON false
 #define LORA_IQ_INVERSION_ON false
 #define TX_OUTPUT_POWER 20
-#define TRX_BUFFER 256
+#define TRX_BUFFER 210
 
-#define INTERVAL_REFRESH_APRS 300000 // 5 minutes
-#define INTERVAL_POSITION_APRS 900000 // 15 minutes
+#define INTERVAL_TELEMETRY_APRS 300000 // 5 minutes
+#define INTERVAL_POSITION_APRS 750000 // 15 minutes
 #define INTERVAL_ALARM_BOX_OPENED_APRS 120000 // 2 minutes
 
-#define INTERVAL_WEATHER 30000
+#define INTERVAL_WEATHER 10000
 #define INTERVAL_MPPT 10000
 #define INTERVAL_TIME 30000
-#define DELAY_SCREEN_DISPLAYED 1500
+#define TIME_PAUSE_SCREEN 1500
 #define TIME_SCREEN_ON 20000
 
 #define APRS_CALLSIGN "F4HVV-15"
@@ -45,11 +44,10 @@
 #define APRS_DESTINATION "F4HVV"
 #define APRS_SYMBOL 'I'
 #define APRS_SYMBOL_TABLE '/'
-#define APRS_LATITUDE 45.323423
-#define APRS_LONGITUDE 5.609752
-#define APRS_COMMENT "Solar NPR+Lora digi+Cam"
-#define APRS_TELEMETRY_PARAMS_SEQUENCE 55
-#define APRS_TELEMETRY_EQUATIONS_ENABLED false
+#define APRS_LATITUDE 45.3283542
+#define APRS_LONGITUDE 5.6344881
+#define APRS_ALTITUDE 820
+#define APRS_COMMENT "f4hvv.valentin-saugnier.fr"
 
 #define PIN_DHT GPIO11
 #define PIN_WIFI GPIO12

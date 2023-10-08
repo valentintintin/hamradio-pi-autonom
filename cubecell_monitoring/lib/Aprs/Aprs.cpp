@@ -69,6 +69,8 @@ uint8_t Aprs::encode(AprsPacket* aprsPacket, char* aprsResult) {
 }
 
 bool Aprs::decode(const char* aprs, AprsPacket* aprsPacket) {
+    reset(aprsPacket);
+
     if (sscanf_P(aprs, PSTR("%9[^>]>%9[^,],%19[^:]:"), aprsPacket->source, aprsPacket->destination, aprsPacket->path) != 3) {
         return false;
     }
@@ -216,11 +218,15 @@ void Aprs::appendTelemetries(AprsPacket *aprsPacket, char* aprsResult) {
     char bufferBase91[] = {"00\0"};
     uint8_t boolTelemetry = 0;
 
+    if (aprsPacket->telemetries.telemetrySequenceNumber > 0x1FFF) {
+        aprsPacket->telemetries.telemetrySequenceNumber = 0;
+    }
+
     switch (aprsPacket->type) {
         case Position:
             strcat_P(aprsResult, PSTR("|"));
 
-            ax25Base91Enc(bufferBase91, 2, aprsPacket->telemetries.telemetrySequenceNumber & 0x1FFF);
+            ax25Base91Enc(bufferBase91, 2, aprsPacket->telemetries.telemetrySequenceNumber);
             strcpy(&aprsResult[strlen(aprsResult)], bufferBase91);
 
             for (auto telemetry : aprsPacket->telemetries.telemetriesAnalog) {
@@ -241,7 +247,7 @@ void Aprs::appendTelemetries(AprsPacket *aprsPacket, char* aprsResult) {
             strcat_P(aprsResult, PSTR("|"));
             break;
         case Telemetry:
-            sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("T#%d,"), aprsPacket->telemetries.telemetrySequenceNumber & 0x1FFF);
+            sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("T#%d,"), aprsPacket->telemetries.telemetrySequenceNumber);
 
             for (auto telemetry : aprsPacket->telemetries.telemetriesAnalog) {
                 sprintf_P(&aprsResult[strlen(aprsResult)], formatDouble(telemetry.value), telemetry.value);
@@ -296,6 +302,10 @@ void Aprs::appendTelemetries(AprsPacket *aprsPacket, char* aprsResult) {
 
                 if (i > 0) {
                     strcat_P(aprsResult, PSTR(","));
+                }
+
+                if (equation.a == 0 && equation.b == 0) {
+                    equation.b = 1;
                 }
 
                 sprintf_P(&aprsResult[strlen(aprsResult)], formatDouble(equation.a), equation.a);
@@ -413,7 +423,7 @@ const char *Aprs::formatDouble(double value) {
     double fractional = modf(value, &integral);
 
     if (fractional != 0) {
-        return PSTR("%.2f");
+        return PSTR("%.3f");
     }
 
     return PSTR("%.0f");
@@ -447,4 +457,53 @@ void Aprs::trimStart(char *string) {
 
 void Aprs::trimFirstSpace(char *string) {
     string[strcspn(string, " ")] = '\0';
+}
+
+void Aprs::reset(AprsPacket *aprsPacket) {
+    aprsPacket->source[0] = '\0';
+    aprsPacket->destination[0] = '\0';
+    aprsPacket->path[0] = '\0';
+
+    aprsPacket->content[0] = '\0';
+
+    aprsPacket->comment[0] = '\0';
+
+    aprsPacket->message.message[0] = '\0';
+    aprsPacket->message.ackConfirmed[0] = '\0';
+    aprsPacket->message.ackRejected[0] = '\0';
+    aprsPacket->message.ackToAsk[0] = '\0';
+    aprsPacket->message.ackToConfirm[0] = '\0';
+    aprsPacket->message.ackToReject[0] = '\0';
+    aprsPacket->message.destination[0] = '\0';
+
+    aprsPacket->weather.device[0] = '\0';
+    aprsPacket->weather.temperatureFahrenheit = 0;
+    aprsPacket->weather.humidity = 0;
+    aprsPacket->weather.pressure = 0;
+    aprsPacket->weather.rain1HourHundredthsOfAnInch = 0;
+    aprsPacket->weather.rain24HourHundredthsOfAnInch = 0;
+    aprsPacket->weather.rainSinceMidnightHundredthsOfAnInch = 0;
+    aprsPacket->weather.windDirectionDegress = 0;
+    aprsPacket->weather.windSpeedMph = 0;
+    aprsPacket->weather.gustSpeedMph = 0;
+
+    aprsPacket->telemetries.telemetrySequenceNumber = 0;
+    aprsPacket->telemetries.projectName[0] = '\0';
+    for (uint8_t i = 0; i < 8; i++) {
+        aprsPacket->telemetries.telemetriesBoolean[i].name[0] = '\0';
+        aprsPacket->telemetries.telemetriesBoolean[i].unit[0] = '\0';
+        aprsPacket->telemetries.telemetriesBoolean[i].value = 0;
+        aprsPacket->telemetries.telemetriesBoolean[i].bitSense = false;
+    }
+    for (uint8_t i = 0; i < 5; i++) {
+        aprsPacket->telemetries.telemetriesAnalog[i].name[0] = '\0';
+        aprsPacket->telemetries.telemetriesBoolean[i].unit[0] = '\0';
+        aprsPacket->telemetries.telemetriesBoolean[i].value = 0;
+        aprsPacket->telemetries.telemetriesBoolean[i].equation.a = 0;
+        aprsPacket->telemetries.telemetriesBoolean[i].equation.b = 1;
+        aprsPacket->telemetries.telemetriesBoolean[i].equation.c = 0;
+    }
+
+
+    aprsPacket->type = Unknown;
 }

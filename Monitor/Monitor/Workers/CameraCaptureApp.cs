@@ -5,7 +5,7 @@ using Monitor.Services;
 
 namespace Monitor.Workers;
 
-public class CameraCaptureApp : AWorker
+public class CameraCaptureApp : AEnabledWorker
 {
     public readonly MqttEntity<TimeSpan> Interval = new("cameras/interval", true, TimeSpan.FromSeconds(30));
     
@@ -17,25 +17,30 @@ public class CameraCaptureApp : AWorker
         : base(logger, serviceProvider)
     {
         _cameraService = Services.GetRequiredService<CameraService>();
+        EntitiesManagerService.Add(Interval);
     }
 
     private async Task Do()
     {
         await _cameraService.CreateFinalImageFromLasts();
+            
+        _scheduler?.Dispose();
+        
+        _scheduler = AddDisposable(Scheduler.SchedulePeriodic(Interval.Value, async () =>
+        {
+            await Do();
+        }));
     }
 
     protected override async Task Start()
     {
         await Do();
 
-        AddDisposable(Interval.ValueChanges().Subscribe(value =>
+        AddDisposable(Interval.ValueChanges().SubscribeAsync(async value =>
         {
             _scheduler?.Dispose();
-            
-            _scheduler = AddDisposable(Scheduler.SchedulePeriodic(value.value, async () =>
-            {
-                await Do();
-            }));
+
+            await Do();
         }));
     }
 }

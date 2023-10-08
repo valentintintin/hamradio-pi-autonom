@@ -1,8 +1,8 @@
 #include <Arduino.h>
 #include <radio/radio.h>
 #include <ArduinoLog.h>
+#include <innerWdt.h>
 #include "System.h"
-#include "innerWdt.h"
 
 extern JsonWriter serialJsonWriter(&SerialPiUsed);
 
@@ -19,14 +19,6 @@ void sentEvent() {
 
 void receivedEvent(uint8_t * payload, uint16_t size, int16_t rssi, int8_t snr) {
     communication.received(payload, size, rssi, snr);
-}
-
-void userButton() {
-    Log.traceln(F("[GPIO] User key pressed"));
-
-    delay(250);
-
-    systemControl.userButton();
 }
 
 void setup() {
@@ -49,11 +41,6 @@ void setup() {
 //    innerWdtEnable(true);
 
     systemControl.begin(&radioEvents);
-
-    if (USE_BUTTON) {
-        pinMode(USER_KEY, INPUT);
-        attachInterrupt(USER_KEY, userButton, FALLING);
-    }
 }
 
 void loop() {

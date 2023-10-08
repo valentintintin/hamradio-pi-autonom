@@ -10,5 +10,6 @@ public class McuSystemData : Message
     [JsonPropertyName("boxOpened")]
     public bool BoxOpened { get; set; }
 
+    [JsonIgnore]
     public bool IsAlert => State == "alert";
 }

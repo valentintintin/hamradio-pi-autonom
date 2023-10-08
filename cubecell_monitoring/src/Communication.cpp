@@ -13,28 +13,33 @@ Communication::Communication(System *system) : system(system) {
     aprsPacketTx.position.overlay = APRS_SYMBOL_TABLE;
     aprsPacketTx.position.latitude = APRS_LATITUDE;
     aprsPacketTx.position.longitude = APRS_LONGITUDE;
-    aprsPacketTx.position.withTelemetry = true;
+    aprsPacketTx.position.altitudeFeet = APRS_ALTITUDE * 3.28;
+    aprsPacketTx.position.altitudeInComment = false;
+
+    strcpy_P(aprsPacketTx.weather.device, PSTR("4HVV"));
 
     strcpy_P(aprsPacketTx.telemetries.projectName, PSTR("Data"));
 
     // Voltage battery between 0 and 15000mV
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[0].name, PSTR("Battery"));
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[0].name, PSTR("VBat")); // 7
     strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[0].unit, PSTR("V"));
+    aprsPacketTx.telemetries.telemetriesAnalog[0].equation.b = 0.001;
 
-    // Current charge between -2000mA and 2000mA
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[1].name, PSTR("ICharg"));
+    // Current charge between 0mA and 2000mA
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[1].name, PSTR("IBat")); // 6
     strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[1].unit, PSTR("mA"));
 
-    // Temperature in degrees
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[2].name, PSTR("Temp"));
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[2].unit, PSTR("°C"));
+    // Voltage battery between 0 and 30000mV
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[2].name, PSTR("VSol")); // 5
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[2].unit, PSTR("V"));
+    aprsPacketTx.telemetries.telemetriesAnalog[2].equation.b = 0.001;
 
-    // Humidity in percentage
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[3].name, PSTR("Humdt"));
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[3].unit, PSTR("%"));
+    // Current charge between 0mA and 2000mA
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[3].name, PSTR("ISol")); // 5
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[3].unit, PSTR("mA"));
 
     // Watchdog poweroff in seconds
-    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[4].name, PSTR("Slep"));
+    strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[4].name, PSTR("Slep")); // 4
     strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[4].unit, PSTR("min"));
 
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[0].name, PSTR("Night"));
@@ -94,7 +99,6 @@ void Communication::send() {
         Log.warningln(F("[LORA_TX] Locked. Radio Status : %d"), Radio.GetStatus());
         delay(2500);
         Radio.IrqProcess();
-        system->feedDog();
     }
 
     Log.traceln(F("[LORA_TX] Radio ready, status : %d"), Radio.GetStatus());
@@ -168,10 +172,10 @@ void Communication::sendTelemetry() {
     sprintf_P(aprsPacketTx.comment, PSTR("Chg:%s Up:%lds"), mpptChg::getStatusAsString(system->mpptMonitor.getStatus()), millis() / 1000);
     aprsPacketTx.telemetries.telemetrySequenceNumber = telemetrySequenceNumber++;
     aprsPacketTx.telemetries.telemetriesAnalog[0].value = system->mpptMonitor.getVoltageBattery();
-    aprsPacketTx.telemetries.telemetriesAnalog[1].value = system->mpptMonitor.getCurrentCharge();
-    aprsPacketTx.telemetries.telemetriesAnalog[2].value = system->weatherSensors.getTemperature();
-    aprsPacketTx.telemetries.telemetriesAnalog[3].value = system->weatherSensors.getHumidity();
-    aprsPacketTx.telemetries.telemetriesAnalog[4].value = system->mpptMonitor.isWatchdogEnabled() ? system->mpptMonitor.getWatchdogPowerOffTime() : 0;
+    aprsPacketTx.telemetries.telemetriesAnalog[1].value = system->mpptMonitor.getCurrentBattery();
+    aprsPacketTx.telemetries.telemetriesAnalog[2].value = system->mpptMonitor.getVoltageSolar();
+    aprsPacketTx.telemetries.telemetriesAnalog[3].value = system->mpptMonitor.getCurrentSolar();
+    aprsPacketTx.telemetries.telemetriesAnalog[4].value = system->mpptMonitor.isWatchdogEnabled() ? system->mpptMonitor.getWatchdogCounter() : 0;
     aprsPacketTx.telemetries.telemetriesBoolean[0].value = system->mpptMonitor.isNight();
     aprsPacketTx.telemetries.telemetriesBoolean[1].value = system->mpptMonitor.isAlert();
     aprsPacketTx.telemetries.telemetriesBoolean[2].value = system->mpptMonitor.isWatchdogEnabled();
@@ -179,25 +183,28 @@ void Communication::sendTelemetry() {
     aprsPacketTx.telemetries.telemetriesBoolean[4].value = system->mpptMonitor.isPowerEnabled();
     aprsPacketTx.telemetries.telemetriesBoolean[5].value = system->isBoxOpened();
 
-    if (aprsPacketTx.telemetries.telemetrySequenceNumber > 0
-        && aprsPacketTx.telemetries.telemetrySequenceNumber % APRS_TELEMETRY_PARAMS_SEQUENCE == 0)
-    {
-        aprsPacketTx.type = TelemetryLabel;
-        send();
-
-        aprsPacketTx.type = TelemetryUnit;
-        send();
-
-        if (APRS_TELEMETRY_EQUATIONS_ENABLED) {
-            aprsPacketTx.type = TelemetryEquation;
-            send();
-
-            aprsPacketTx.type = TelemetryBitSense;
-            send();
-        }
-    }
-
     aprsPacketTx.type = Telemetry;
+    send();
+
+    if (shouldSendTelemetryParams) {
+        shouldSendTelemetryParams = false;
+
+        sendTelemetryParams();
+    }
+}
+
+void Communication::sendTelemetryParams() {
+    strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH));
+    strcpy_P(aprsPacketTx.source, PSTR(APRS_CALLSIGN));
+    strcpy_P(aprsPacketTx.destination, PSTR(APRS_DESTINATION));
+
+    aprsPacketTx.type = TelemetryLabel;
+    send();
+
+    aprsPacketTx.type = TelemetryUnit;
+    send();
+
+    aprsPacketTx.type = TelemetryEquation;
     send();
 }
 
@@ -208,19 +215,17 @@ void Communication::sendPosition(const char* comment) {
     strcpy(aprsPacketTx.comment, comment);
 
     aprsPacketTx.type = Position;
+    aprsPacketTx.position.withWeather = !system->weatherSensors.IsInError();
 
-    aprsPacketTx.telemetries.telemetriesAnalog[0].value = system->mpptMonitor.getVoltageBattery();
-    aprsPacketTx.telemetries.telemetriesAnalog[1].value = system->mpptMonitor.getCurrentCharge();
-    aprsPacketTx.telemetries.telemetriesAnalog[2].value = system->weatherSensors.getTemperature();
-    aprsPacketTx.telemetries.telemetriesAnalog[3].value = system->weatherSensors.getHumidity();
-    aprsPacketTx.telemetries.telemetriesAnalog[4].value = system->mpptMonitor.isWatchdogEnabled() ? system->mpptMonitor.getWatchdogPowerOffTime() : 0;
+    aprsPacketTx.weather.temperatureFahrenheit = system->weatherSensors.getTemperature() * 9 / 5 + 32;
+    aprsPacketTx.weather.humidity = system->weatherSensors.getHumidity();
 
     send();
 }
 
 void Communication::sent() {
-    Radio.Rx(0);
     Radio.IrqProcess();
+    Radio.Rx(0);
 
     system->turnOffRGB();
 
@@ -228,6 +233,8 @@ void Communication::sent() {
 }
 
 void Communication::received(uint8_t * payload, uint16_t size, int16_t rssi, int8_t snr) {
+    Radio.Rx(0);
+
     Log.traceln(F("[LORA_RX] Payload of size %d, RSSI : %d and SNR : %d"), size, rssi, snr);
     Log.infoln(F("[LORA_RX] %s"), payload);
 
@@ -259,10 +266,12 @@ void Communication::received(uint8_t * payload, uint16_t size, int16_t rssi, int
             system->displayText(PSTR("[APRS] Received for me"), aprsPacketRx.content);
 
             if (strlen(aprsPacketRx.message.message) > 0) {
-                sendMessage(aprsPacketRx.source, PSTR(""), aprsPacketRx.message.ackToConfirm);
-            }
+                bool processCommandResult = system->command.processCommand(aprsPacketRx.message.message);
 
-            system->command.processCommand(aprsPacketRx.message.message);
+                if (processCommandResult) {
+                    sendMessage(aprsPacketRx.source, PSTR(""), aprsPacketRx.message.ackToConfirm);
+                }
+            }
         } else {
             // Digi only for WIDE1-1 or VIA Callsign
             const char *hasWide = strstr_P(aprsPacketRx.path, PSTR("WIDE1-1"));

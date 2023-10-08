@@ -9,52 +9,20 @@ namespace Monitor.Services;
 public class SystemService : AService
 {
     private readonly SerialMessageService _serialMessageService;
-    private readonly string _shutdownFilePath;
-    private readonly string _timeFilePath;
-    private readonly string? _infoFilePath;
+    public DateTime? ChangeDateTime { get; set; }
     private TimeSpan? WillSleep { get; set; }
+    private bool WillShutdown { get; set; }
 
-    public SystemService(ILogger<SystemService> logger, IConfiguration configuration, SerialMessageService serialMessageService) : base(logger)
+    public SystemService(ILogger<SystemService> logger, SerialMessageService serialMessageService) : base(logger)
     {
         _serialMessageService = serialMessageService;
-        
-        IConfigurationSection configurationSection = configuration.GetSection("System");
-        
-        _shutdownFilePath = configurationSection.GetValueOrThrow<string>("ShutdownFile");
-        _timeFilePath = configurationSection.GetValueOrThrow<string>("TimeFile");
-        _infoFilePath = configurationSection.GetValue<string>("InfoFile");
-        
-        File.WriteAllText(_shutdownFilePath, "0");
-        File.Delete(_timeFilePath);
-    }
-
-    public SystemState? GetInfo()
-    {
-        if (string.IsNullOrWhiteSpace(_infoFilePath))
-        {
-            Logger.LogWarning("Get system without info file path");
-            
-            return null;
-        }
-
-        try
-        {
-            string infoJson = File.ReadAllText(_infoFilePath!);
-            Logger.LogInformation("System info : {json}", infoJson);
-            return JsonSerializer.Deserialize<SystemState>(infoJson);
-        }
-        catch (Exception e)
-        {
-            Logger.LogError(e, "System info reading error");
-            return null;
-        }
     }
 
     public void AskForShutdown(TimeSpan sleepTime)
     {
         Logger.LogInformation("Ask for shutdown during {time}", sleepTime);
         
-        if (IsShutdownOrderGiven())
+        if (WillShutdown)
         {
             Logger.LogWarning("Ask for shutdown during {time} KO because already shutdown order given", sleepTime);
             
@@ -73,25 +41,18 @@ public class SystemService : AService
     {
         Logger.LogInformation("Send shutdown command");
 
-        if (IsShutdownOrderGiven())
+        if (WillShutdown)
         {
             Logger.LogWarning("Will already shutdown");
             return;
         }
-        
-        try
-        {
-            File.WriteAllText(_shutdownFilePath, "1");
-        }
-        catch (Exception e)
-        {
-            Logger.LogError(e, "Send shutdown command error");
-        }
+
+        WillShutdown = true;
     }
 
     public void SetTime(DateTime dateTime)
     {
-        if (Math.Abs((DateTime.UtcNow - dateTime).TotalSeconds) <= 10)
+        if (Math.Abs((DateTime.UtcNow - dateTime).TotalSeconds) <= 20)
         {
             Logger.LogDebug("Change dateTime not done because difference is < 10 second : {now} and {new}", DateTime.UtcNow, dateTime);
             return;
@@ -103,33 +64,13 @@ public class SystemService : AService
             return;
         }
         
-        Logger.LogInformation("Change dateTime {dateTime}", dateTime);
+        Logger.LogInformation("Change dateTime {dateTime}. Old : {now}", dateTime, DateTime.UtcNow);
 
-        try
-        {
-            File.WriteAllText(_timeFilePath, dateTime.ToString("s"));
-        }
-        catch (Exception e)
-        {
-            Logger.LogError(e, "Change dateTime error");
-        }
+        ChangeDateTime = dateTime;
     }
-
+    
     public bool IsShutdownAsked()
     {
-        return WillSleep.HasValue || IsShutdownOrderGiven();
-    }
-
-    public bool IsShutdownOrderGiven()
-    {
-        try
-        {
-            return File.ReadAllText(_shutdownFilePath) == "1";
-        }
-        catch (Exception e)
-        {
-            Logger.LogError(e, "Read shutdown file error");
-            return false;
-        }
+        return WillSleep.HasValue || WillShutdown;
     }
 }

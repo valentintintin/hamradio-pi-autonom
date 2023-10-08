@@ -1,10 +1,10 @@
-using FlashCap;
+using System.Diagnostics;
+using Monitor.Exceptions;
 using Monitor.Extensions;
+using Monitor.Models;
 using SixLabors.Fonts;
 using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Formats.Webp;
 
 namespace Monitor.Services;
@@ -15,15 +15,16 @@ public class CameraService : AService
     private readonly string? _message;
     private readonly Font _fontTitle, _fontInfo, _fontFooter;
     private readonly ImageEncoder _imageEncoder;
-    private readonly CaptureDevices _devices;
     private const int WidthData = 500;
     private const int MarginData = 10;
     private readonly int _widthMaxProgressBar;
+    private readonly List<FswebcamParameters> _fswebcamParameters;
     
     public CameraService(ILogger<CameraService> logger, IConfiguration configuration) : base(logger)
     {
         IConfigurationSection configurationSection = configuration.GetSection("Cameras");
         _message = configurationSection.GetValue<string?>("Message");
+        _fswebcamParameters = configurationSection.GetSection("Devices").Get<List<FswebcamParameters>>() ?? new List<FswebcamParameters>();
         
         _storagePath = Path.Combine(
             configuration.GetValueOrThrow<string>("StoragePath"), 
@@ -42,7 +43,6 @@ public class CameraService : AService
             SkipMetadata = true,
             Method = WebpEncodingMethod.Fastest,
         };
-        _devices = new CaptureDevices();
 
         _widthMaxProgressBar = WidthData - MarginData * 2;
     }
@@ -74,11 +74,11 @@ public class CameraService : AService
         
         List<Image> imagesCamera = new();
 
-        foreach (Task<MemoryStream> memoryStream in CaptureAllCameras())
+        foreach (Task<string> file in CaptureAllCameras())
         {
             try
             {
-                imagesCamera.Add(await Image.LoadAsync(await memoryStream));
+                imagesCamera.Add(await Image.LoadAsync(await file));
             }
             catch (Exception e)
             {
@@ -86,10 +86,10 @@ public class CameraService : AService
             }
         }
 
-        Logger.LogDebug("We have {count} cameras", imagesCamera.Count);
+        Logger.LogTrace("We have {count} cameras", imagesCamera.Count);
 
         int width = 0;
-        int height = 0;
+        int height = 480;
 
         if (imagesCamera.Any())
         {
@@ -108,12 +108,12 @@ public class CameraService : AService
                 Color.White,
                 new PointF(MarginData + 100, 10));
 
-            DrawProgressBarwithInfo(ctx, 0, "Tension batterie", "mV", EntitiesManagerService.Entities.BatteryVoltage.Value, 11000, 13000, Color.Red, Color.Black);
-            DrawProgressBarwithInfo(ctx, 1, "Courant batterie", "mA", EntitiesManagerService.Entities.BatteryCurrent.Value, 0, 2000, Color.Yellow, Color.Black);
+            DrawProgressBarwithInfo(ctx, 0, "Tension batterie", "mV", EntitiesManagerService.Entities.BatteryVoltage.Value, 11000, 13500, Color.Red, Color.Black);
+            DrawProgressBarwithInfo(ctx, 1, "Courant batterie", "mA", EntitiesManagerService.Entities.BatteryCurrent.Value, 0, 1000, Color.Yellow, Color.Black);
             DrawProgressBarwithInfo(ctx, 2, "Tension panneau", "mV", EntitiesManagerService.Entities.SolarVoltage.Value, 0, 25000, Color.Red, Color.Black);
-            DrawProgressBarwithInfo(ctx, 3, "Courant panneau", "mA", EntitiesManagerService.Entities.SolarCurrent.Value, 0, 2000, Color.Yellow, Color.Black);
-            DrawProgressBarwithInfo(ctx, 4, "Température", "°C", EntitiesManagerService.Entities.WeatherTemperature.Value, -10, 40, Color.LightGreen, Color.Black);
-            DrawProgressBarwithInfo(ctx, 5, "Humidité", "%", EntitiesManagerService.Entities.WeatherHumidity.Value, 0, 100, Color.LightBlue, Color.Black);
+            DrawProgressBarwithInfo(ctx, 3, "Courant panneau", "mA", EntitiesManagerService.Entities.SolarCurrent.Value, 0, 1000, Color.Yellow, Color.Black);
+            // DrawProgressBarwithInfo(ctx, 4, "Température", "°C", EntitiesManagerService.Entities.WeatherTemperature.Value, -10, 40, Color.LightGreen, Color.Black);
+            // DrawProgressBarwithInfo(ctx, 5, "Humidité", "%", EntitiesManagerService.Entities.WeatherHumidity.Value, 0, 100, Color.LightBlue, Color.Black);
 
             if (!string.IsNullOrWhiteSpace(_message))
             {
@@ -144,7 +144,9 @@ public class CameraService : AService
 
         if (save)
         {
-            string filePath = $"{_storagePath}/{DateTime.UtcNow:yyyy-MM-dd--HH-mm-ss}-{Random.Shared.NextInt64()}.webp";
+            Directory.CreateDirectory($"{_storagePath}/{DateTime.UtcNow:yyyy-MM-dd-HH-mm-ss}");
+            
+            string filePath = $"{_storagePath}/{DateTime.UtcNow:yyyy-MM-dd-HH-mm-ss}/{DateTime.UtcNow:yyyy-MM-dd-HH-mm-ss}-{Random.Shared.NextInt64()}.webp";
             string lastPath = $"{_storagePath}/last.webp";
             
             Logger.LogTrace("Save final image to {path}", filePath);
@@ -160,25 +162,21 @@ public class CameraService : AService
         return stream;
     }
 
-    private List<Task<MemoryStream>> CaptureAllCameras()
+    private List<Task<string>> CaptureAllCameras()
     {
-        List<CaptureDeviceDescriptor> cameras = _devices.EnumerateDescriptors().ToList();
-        
-        Logger.LogInformation("Captures images from {cameras}", cameras.Select(j => (string) j.Identity).JoinString());
+        Logger.LogInformation("Will capture images from cameras : {cameras}", _fswebcamParameters.Select(j => j.Device).JoinString());
 
-        return cameras.Select(async camera =>
+        return _fswebcamParameters.Select(async parameters =>
             {
-                string cameraName = ((string)camera.Identity).Replace("/dev/", string.Empty);
+                string cameraName = parameters.Device.Replace("/dev/", string.Empty);
 
                 Logger.LogTrace("Capture image from {camera}", cameraName);
 
                 try
                 {
-                    return new MemoryStream(
-                        await camera.TakeOneShotAsync(
-                            camera.Characteristics.FirstOrDefault() ?? new VideoCharacteristics(PixelFormats.JPEG, 640, 480, 1)
-                        )
-                    );
+                    parameters.SaveFile = $"/{_storagePath}/{cameraName}.jpg";
+                    
+                    return await CaptureImage(parameters);
                 }
                 catch (Exception e)
                 {
@@ -188,6 +186,7 @@ public class CameraService : AService
                 return null;
             })
             .Where(c => c != null)
+            .Cast<Task<string>>()
             .ToList()!;
     }
 
@@ -209,5 +208,46 @@ public class CameraService : AService
     private int MapValue(double value, double inMin, double inMax, double outMin, double outMax)
     {
         return (int)Math.Round((value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin);
+    }
+
+    private async Task<string> CaptureImage(FswebcamParameters parameters)
+    {
+        Process process = new()
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "fswebcam",
+                Arguments = parameters.ToString(),
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
+
+        process.Start();
+        await process.WaitForExitAsync();
+
+        string errorStream = await process.StandardError.ReadToEndAsync();
+        string standardStream = await process.StandardOutput.ReadToEndAsync();
+        string stream = standardStream + " " + errorStream;
+        
+        Logger.LogTrace("Image capture output for {device} : {stream}", parameters.Device, stream);
+        
+        if (process.ExitCode == 0)
+        {
+            if (errorStream.Contains("No frames captured") || standardStream.Contains("No frames captured"))
+            {
+                throw new WebcamException(stream);
+            }
+            
+            Logger.LogInformation("Image captured successfully for device {device}", parameters.Device);
+
+            return parameters.SaveFile;
+        }
+
+        Logger.LogError("Error capturing image for device {device}. Exit code: {exitCode}", parameters.Device, process.ExitCode);
+            
+        throw new WebcamException(stream);
     }
 }

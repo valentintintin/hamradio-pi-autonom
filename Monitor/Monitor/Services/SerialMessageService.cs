@@ -23,9 +23,25 @@ public class SerialMessageService : AService
         }
         catch (Exception e)
         {
-            Logger.LogError(e, "Received serial message KO. Deserialize impossible : {input}", input);
+            if (input.Contains("lora")) // because APRS can have char " in string and we do not escape it in C++
+            {
+                string payloadString = "payload\":\"";
+                
+                message = new LoraData
+                {
+                    Type = "lora",
+                    State = input.Contains("tx") ? "tx" : "rx",
+                    Payload = input[(input.IndexOf(payloadString, StringComparison.Ordinal) + payloadString.Length)..input.LastIndexOf('"')]
+                };
 
-            throw new MessageParseException(e, input);
+                input = JsonSerializer.Serialize(message, typeof(LoraData));
+            }
+            else
+            {
+                Logger.LogError(e, "Received serial message KO. Deserialize impossible : {input}", input);
+
+                throw new MessageParseException(e, input);
+            }
         }
 
         if (message == null)
@@ -50,21 +66,9 @@ public class SerialMessageService : AService
         }
         catch (Exception e)
         {
-            if (input.Contains("lora")) // because APRS can have char " in string and we do not escape it in C++
-            {
-                messageTyped = message = new LoraData
-                {
-                    Type = "lora",
-                    State = input.Contains("tx") ? "tx" : "rx",
-                    Payload = input.Split("payload\":\"").First()
-                };
-            }
-            else
-            {
-                Logger.LogError(e, "Received serial message KO. Sub Deserialize impossible : {input}", input);
+            Logger.LogError(e, "Received serial message KO. Sub Deserialize impossible : {input}", input);
 
-                throw new MessageParseException(e, input);
-            }
+            throw new MessageParseException(e, input);
         }
 
         Logger.LogInformation("Received serial message OK : {input}", input);
@@ -84,12 +88,12 @@ public class SerialMessageService : AService
 
     public void SetWifi(bool enabled)
     {
-        SendCommand($"wifi {(enabled ? "on" : "off")}");
+        SendCommand($"wifi {(enabled ? "1" : "0")}");
     }
 
     public void SetNpr(bool enabled)
     {
-        SendCommand($"npr {(enabled ? "on" : "off")}");
+        SendCommand($"npr {(enabled ? "1" : "0")}");
     }
 
     public void SendTelemetry()
@@ -105,11 +109,6 @@ public class SerialMessageService : AService
         }
         
         SendCommand($"lora \"{message}\"");
-    }
-
-    public void SetTime(DateTimeOffset dateTime)
-    {
-        SendCommand($"time {dateTime.ToUnixTimeSeconds()}");
     }
 
     public void SendCommand(string command)

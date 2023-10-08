@@ -49,7 +49,10 @@ public class MpptData : Message
     [JsonPropertyName("powerOnVoltage")]
     public int PowerOnVoltage { get; set; }
 
+    [JsonIgnore]
     public TimeSpan WatchdogCounterTimeSpan => TimeSpan.FromSeconds(WatchdogCounter);
+    [JsonIgnore]
     public TimeSpan WatchdogPowerOffTimeSpan => TimeSpan.FromSeconds(WatchdogPowerOffTime);
+    [JsonIgnore]
     public DateTime WatchdogPowerOffDateTime => DateTime.UtcNow.Add(WatchdogPowerOffTimeSpan);
 }

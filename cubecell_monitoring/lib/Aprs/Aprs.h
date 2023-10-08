@@ -92,6 +92,7 @@ class Aprs {
 public:
     static uint8_t encode(AprsPacket* aprsPacket, char* aprsResult);
     static bool decode(const char* aprs, AprsPacket* aprsPacket);
+    static void reset(AprsPacket* aprsPacket);
 private:
     static void appendPosition(AprsPosition* position, char* aprsResult);
     static void appendTelemetries(AprsPacket *aprsPacket, char* aprsResult);

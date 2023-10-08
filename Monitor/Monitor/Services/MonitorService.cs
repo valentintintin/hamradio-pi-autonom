@@ -28,7 +28,7 @@ public class MonitorService : AService
         switch (message)
         {
             case McuSystemData systemData:
-                Logger.LogTrace("New system data received");
+                Logger.LogTrace("New system data received : {message}", systemData);
                 
                 State.McuSystem = systemData;
                 
@@ -36,7 +36,7 @@ public class MonitorService : AService
                 EntitiesManagerService.Entities.StatusBoxOpened.SetValue(systemData.BoxOpened);
                 break;
             case WeatherData weatherData:
-                Logger.LogTrace("New weather data received");
+                Logger.LogTrace("New weather data received : {message}", weatherData);
 
                 State.Weather = weatherData;
                 
@@ -51,7 +51,7 @@ public class MonitorService : AService
                 await context.SaveChangesAsync();
                 break;
             case MpptData mpptData:
-                Logger.LogTrace("New MPPT data received");
+                Logger.LogTrace("New MPPT data received : {message}", mpptData);
 
                 State.Mppt = mpptData;
                 
@@ -87,7 +87,7 @@ public class MonitorService : AService
                 await context.SaveChangesAsync();
                 break;
             case TimeData timeData:
-                Logger.LogTrace("New time data received");
+                Logger.LogTrace("New time data received : {message}", timeData);
 
                 State.Time = timeData;
                 
@@ -96,7 +96,7 @@ public class MonitorService : AService
                 _systemService.SetTime(State.Time.DateTime.DateTime);
                 break;
             case GpioData gpioData:
-                Logger.LogTrace("New GPIO data received");
+                Logger.LogTrace("New GPIO data received : {message}", gpioData);
 
                 State.Gpio = gpioData;
                 
@@ -115,17 +115,17 @@ public class MonitorService : AService
                 await context.SaveChangesAsync();
                 break;
             case LoraData loraData:
-                Logger.LogTrace("New LoRa data received");
+                Logger.LogTrace("New LoRa data received : {message}", loraData);
 
                 if (loraData.IsTx)
                 {
-                    State.Lora.LastTx.Add((loraData.Payload, DateTime.UtcNow));
+                    State.Lora.LastTx.Add(loraData);
                 
                     EntitiesManagerService.Entities.LoraTxPayload.SetValue(loraData.Payload);
                 }
                 else
                 {
-                    State.Lora.LastRx.Add((loraData.Payload, DateTime.UtcNow));
+                    State.Lora.LastRx.Add(loraData);
                 
                     EntitiesManagerService.Entities.LoraRxPayload.SetValue(loraData.Payload);
                 }
@@ -133,9 +133,11 @@ public class MonitorService : AService
         }
     }
 
-    public void UpdateSystemState()
+    public void UpdateSystemState(SystemState? systemState)
     {
-        State.System = _systemService.GetInfo();
+        Logger.LogInformation("New system info received");
+        
+        State.System = systemState;
 
         if (State.System != null)
         {

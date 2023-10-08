@@ -1,5 +1,4 @@
 #include <radio/radio.h>
-#include <innerWdt.h>
 #include "System.h"
 #include "ArduinoLog.h"
 
@@ -9,8 +8,6 @@ System::System(SH1107Wire *display, CubeCell_NeoPixel *pixels) :
 }
 
 bool System::begin(RadioEvents_t *radioEvents) {
-    feedDog();
-
     bool boxOpened = isBoxOpened();
 
     Log.infoln(F("[SYSTEM] Starting"));
@@ -41,7 +38,7 @@ bool System::begin(RadioEvents_t *radioEvents) {
     communication->begin(radioEvents);
 
     if (USE_RTC) {
-        if (SET_RTC > 0) {
+        if (SET_RTC > 0 && RTClib::now().year() < 2023) {
             Log.warningln(F("[TIME] Set clock to %l"), SET_RTC + 60);
             RTC.setEpoch(SET_RTC + 60);
         }
@@ -79,7 +76,7 @@ void System::update() {
     if (streamReceived != nullptr) {
         turnOnRGB(COLOR_RXWINDOW1);
 
-        size_t lineLength = streamReceived->readBytesUntil('\n', bufferText, 127);
+        size_t lineLength = streamReceived->readBytesUntil('\n', bufferText, 150);
         bufferText[lineLength] = '\0';
 
         command.processCommand(bufferText);
@@ -115,7 +112,7 @@ void System::update() {
         }
 
         mpptMonitor.update();
-        weatherSensors.update();
+//        weatherSensors.update(); // Waiting to replace with another sensor so we don't use it
 
         if (!mpptMonitor.isPowerEnabled()) {
             if (gpio.isNprEnabled()) {
@@ -154,7 +151,13 @@ void System::update() {
 
 void System::turnOnRGB(uint32_t color) {
     if (screenOn || color == 0) {
-        Log.verboseln(F("Turn led color : %l"), color);
+        if (color == ledColor) {
+            return;
+        }
+
+        ledColor = color;
+
+        Log.traceln(F("Turn led color : %l"), color);
 
         uint8_t red, green, blue;
         red = (uint8_t) (color >> 16);
@@ -171,7 +174,7 @@ void System::turnOffRGB() {
 
 void System::turnScreenOn() {
     if (!screenOn) {
-        Log.verboseln(F("Turn screen on"));
+        Log.traceln(F("Turn screen on"));
 
         display->wakeup();
         screenOn = true;
@@ -182,7 +185,7 @@ void System::turnScreenOn() {
 
 void System::turnScreenOff() {
     if (screenOn) {
-        Log.verboseln(F("Turn screen off"));
+        Log.traceln(F("Turn screen off"));
 
         display->sleep();
         screenOn = false;
@@ -205,19 +208,12 @@ void System::displayText(const char *title, const char *content, uint16_t pause)
     delay(pause);
 }
 
-void System::userButton() {
-    if (millis() >= 5000) {
-        if (timerScreen.hasExpired()) {
-            turnScreenOn();
-        } else {
-            forceSendTelemetry = true;
-        }
-    }
-}
-
 DateTime System::nowToString(char *result) {
-//    DateTime now = RTClib::now();
-    DateTime now = DateTime(TimerGetSysTime().Seconds);
+    DateTime now = RTClib::now();
+    if (now.year() < 2023) {
+        Log.warningln("[TIME] Use System instead of RTC");
+        now = DateTime(TimerGetSysTime().Seconds);
+    }
     sprintf(result, "%04d-%02d-%02dT%02d:%02d:%02d Uptime %lds", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), millis() / 1000);
     return now;
 }
@@ -258,8 +254,4 @@ void System::serialError(const char *content) const {
             .property(F("state"), (char*) content)
             .property(F("boxOpened"), isBoxOpened())
             .endObject(); SerialPiUsed.println();
-}
-
-void System::feedDog() {
-//    innerWdtEnable(true);
 }

@@ -1,42 +1,39 @@
+using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using Monitor.Services;
 
 namespace Monitor.Workers;
 
-public class WatchdogApp : AWorker
+public class WatchdogApp : AEnabledWorker
 {
     private readonly SerialMessageService _serialMessageService;
     private readonly SystemService _systemService;
+    private readonly IScheduler _scheduler;
     
     public WatchdogApp(ILogger<WatchdogApp> logger, IServiceProvider serviceProvider) : base(logger, serviceProvider)
     {
         _serialMessageService = Services.GetRequiredService<SerialMessageService>();
         _systemService = Services.GetRequiredService<SystemService>();
+        _scheduler = Services.GetRequiredService<IScheduler>();
     }
 
     private void FeedDog()
     {
-        Logger.LogInformation("Feed dog");
+        Logger.LogInformation("Feed dog. IsShutdownAsked : {isShutdownAsked}", _systemService.IsShutdownAsked());
 
         _serialMessageService.SetWatchdog(TimeSpan.FromSeconds(10));
     }
 
     protected override Task Start()
     {
-        AddDisposable(EntitiesManagerService.Entities.WatchdogCounter.ValueChanges()
-            .Select(v => v.value)
-            .Where(s => s.TotalSeconds % 5 == 0)
-            .Sample(TimeSpan.FromSeconds(5))
-            .Where(_ => !_systemService.IsShutdownAsked())
-            .Subscribe(_ =>
+        AddDisposable(_scheduler.SchedulePeriodic(TimeSpan.FromSeconds(5), () =>
+        {
+            if (!_systemService.IsShutdownAsked())
             {
                 FeedDog();
-            })
-        );
+            }
+        }));
 
-        Logger.LogInformation("Start watchdog");
-        FeedDog();
-        
         return Task.CompletedTask;
     }
 
@@ -47,6 +44,10 @@ public class WatchdogApp : AWorker
             Logger.LogInformation("Disable watchdog");
 
             _serialMessageService.SetWatchdog(TimeSpan.Zero);
+        }
+        else
+        {
+            Logger.LogInformation("We do not disable watchdog because shutdown asked");
         }
         
         return base.Stop();

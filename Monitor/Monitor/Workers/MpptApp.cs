@@ -7,16 +7,17 @@ namespace Monitor.Workers;
 
 public class MpptApp : AWorker
 {
-    public readonly MqttEntity<TimeSpan> DurationAfterAlert = new("sleep/duration_after_alter", true, TimeSpan.FromSeconds(20));
+    public readonly MqttEntity<TimeSpan> DurationAfterAlert = new("sleep/duration_after_alert", true, TimeSpan.FromSeconds(20));
 
     private readonly SystemService _systemService;
     private readonly SerialMessageService _serialMessageService;
 
-    public MpptApp(ILogger<MpptApp> logger, IServiceProvider serviceProvider, IConfiguration configuration) 
-        : base(logger, serviceProvider)
+    public MpptApp(ILogger<MpptApp> logger, IServiceProvider serviceProvider) : base(logger, serviceProvider)
     {
         _systemService = Services.GetRequiredService<SystemService>();
         _serialMessageService = Services.GetRequiredService<SerialMessageService>();
+
+        EntitiesManagerService.Add(DurationAfterAlert);
     }
 
     protected override Task Start()
