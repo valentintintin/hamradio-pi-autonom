@@ -7,7 +7,7 @@ namespace Monitor.Workers;
 
 public class CameraCaptureApp : AEnabledWorker
 {
-    public readonly MqttEntity<TimeSpan> Interval = new("cameras/interval", true, TimeSpan.FromSeconds(30));
+    public readonly StringConfigEntity<TimeSpan> Interval = new("cameras/interval", true, TimeSpan.FromSeconds(30));
     
     private readonly CameraService _cameraService;
 
@@ -22,14 +22,20 @@ public class CameraCaptureApp : AEnabledWorker
 
     private async Task Do()
     {
-        await _cameraService.CreateFinalImageFromLasts();
-            
         _scheduler?.Dispose();
-        
-        _scheduler = AddDisposable(Scheduler.SchedulePeriodic(Interval.Value, async () =>
+
+        try
         {
-            await Do();
-        }));
+            await _cameraService.CreateFinalImageFromLasts();
+        }
+        catch (Exception e)
+        {
+            Logger.LogError(e, "Error during Camera Capture");
+        }
+        finally
+        {
+            _scheduler = AddDisposable(Scheduler.SchedulePeriodic(Interval.Value, async () => { await Do(); }));
+        }
     }
 
     protected override async Task Start()

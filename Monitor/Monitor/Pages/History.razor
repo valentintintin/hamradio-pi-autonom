@@ -6,7 +6,6 @@
 @using Monitor.Models
 @using System.Globalization
 @using Monitor.Extensions
-@using Tooltip = AntDesign.Charts.Tooltip
 
 @inject IDbContextFactory<DataContext> DbContextFactory
 
@@ -18,7 +17,8 @@
     <AntDesign.Charts.Line Data="DataVoltageBattery" Config="_configVoltageBattery" />
     <AntDesign.Charts.Line Data="DataVoltageSolar" Config="_configVoltageSolar" />
     <AntDesign.Charts.Line Data="DataCurrent" Config="_configCurrent" />
-    @* <AntDesign.Charts.Line Data="DataWeather" Config="_configTemperature" /> *@
+    <AntDesign.Charts.Line Data="DataWeather" Config="_configTemperature" />
+    <AntDesign.Charts.Line Data="DataWeatherPressure" Config="_configPressure" />
 </Spin>
 
 @code
@@ -95,6 +95,16 @@
                 value = m.Temperature
             },
         }).ToList();
+        
+        DataWeatherPressure = weatherData.SelectMany(m => new List<LineChartData<float>>
+        {
+            new()
+            {
+                date = m.CreatedAt.ToFrench().ToString(CultureInfo.CurrentCulture),
+                type = "Pression",
+                value = m.Pressure
+            },
+        }).ToList();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -109,6 +119,7 @@
     List<LineChartData<float>> DataVoltageSolar { get; set; } = new();
     List<LineChartData<int>> DataCurrent { get; set; } = new();
     List<LineChartData<float>> DataWeather { get; set; } = new();
+    List<LineChartData<float>> DataWeatherPressure { get; set; } = new();
 
     readonly LineConfig _configVoltageBattery = new()
     {
@@ -220,6 +231,34 @@
         },
         SeriesField = nameof(LineChartData<object>.type),
         Color = new [] { "blue", "red" }
+    };
+    
+    readonly LineConfig _configPressure = new()
+    {
+        Padding = "auto",
+        AutoFit = true,
+        XField = nameof(LineChartData<object>.date),
+        YField = nameof(LineChartData<object>.value),
+        YAxis = new ValueAxis
+        {
+            Label = new BaseAxisLabel
+            {
+                Visible = true,
+            },
+            Title = new BaseAxisTitle
+            {
+                Text = "Pression atmosphérique (hPa)"
+            },
+            Min = 800,
+            Max = 1200,
+            Visible = true
+        },
+        Legend = new Legend
+        {
+            Position = "bottom"
+        },
+        SeriesField = nameof(LineChartData<object>.type),
+        Color = new [] { "blue" }
     };
 
     private bool Loading { get; set; } = true;

@@ -4,22 +4,23 @@ using System.Text.Json;
 
 namespace Monitor.Models;
 
-public interface IMqttEntity
+public interface IStringConfigEntity
 {
     string Id { get; }
     bool Retain { get; }
-    bool HasReceivedFromMqtt { get; }
+    bool HasReceivedFromElsewere { get; }
 
-    IObservable<string> ValueMqttAsync();
-    bool SetFromMqttPayload(string? payload);
+    IObservable<string> ValueStringAsync();
+    string ValueAsString();
+    bool SetFromStringPayload(string? payload);
     void SetValueToInitialValue();
 }
 
-public class MqttEntity<T> : IMqttEntity
+public class StringConfigEntity<T> : IStringConfigEntity
 {
     public string Id { get; }
     public bool Retain { get; }
-    public bool HasReceivedFromMqtt { get; private set; }
+    public bool HasReceivedFromElsewere { get; private set; }
 
     public T? Value
     {
@@ -32,7 +33,7 @@ public class MqttEntity<T> : IMqttEntity
     private readonly Subject<(T? old, T? value)> _valueSubject = new();
     private readonly T? _initialValue;
 
-    public MqttEntity(string id, bool retain = false, T? initialValue = default)
+    public StringConfigEntity(string id, bool retain = false, T? initialValue = default)
     {
         Retain = retain;
         Id = id;
@@ -45,9 +46,14 @@ public class MqttEntity<T> : IMqttEntity
         return _valueSubject.AsObservable().Where(v => !onlyIfDifferent || v.old?.Equals(v.value) != true);
     }
 
-    public IObservable<string> ValueMqttAsync()
+    public IObservable<string> ValueStringAsync()
     {
-        return _valueSubject.AsObservable().Skip(1).Select(v => JsonSerializer.Serialize(v.value));
+        return _valueSubject.AsObservable().Select(v => JsonSerializer.Serialize(v.value));
+    }
+
+    public string ValueAsString()
+    {
+        return JsonSerializer.Serialize(ValuePrivate);
     }
 
     public void SetValue(T? state)
@@ -58,9 +64,9 @@ public class MqttEntity<T> : IMqttEntity
         _valueSubject.OnNext((OldValue, ValuePrivate));
     }
 
-    public bool SetFromMqttPayload(string? payload)
+    public bool SetFromStringPayload(string? payload)
     {
-        HasReceivedFromMqtt = true;
+        HasReceivedFromElsewere = true;
         
         T? newValue = string.IsNullOrWhiteSpace(payload) ? default : JsonSerializer.Deserialize<T?>(payload);
 

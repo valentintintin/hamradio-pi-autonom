@@ -10,6 +10,15 @@
         <RootNamespace>Monitor</RootNamespace>
         <Configurations>Debug;Release</Configurations>
         <Platforms>x64;arm32</Platforms>
+        <LangVersion>11</LangVersion>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|arm32' ">
+      <PlatformTarget>arm32</PlatformTarget>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|arm32' ">
+      <PlatformTarget>arm32</PlatformTarget>
     </PropertyGroup>
 
     <ItemGroup>
@@ -28,14 +37,14 @@
 
     <ItemGroup>
       <PackageReference Include="AntDesign" Version="0.15.5" />
-      <PackageReference Include="AntDesign.Charts" Version="0.3.1" />
+      <PackageReference Include="AntDesign.Charts" Version="0.3.2" />
       <PackageReference Include="AprsSharp.AprsIsClient" Version="0.3.1" />
       <PackageReference Include="JoySoftware.NetDaemon.Extensions.Scheduling" Version="23.38.0" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.11">
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.12">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.11" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.12" />
       <PackageReference Include="MQTTnet" Version="4.3.1.873" />
       <PackageReference Include="Seq.Extensions.Logging" Version="6.1.0" />
       <PackageReference Include="SixLabors.ImageSharp" Version="3.0.2" />

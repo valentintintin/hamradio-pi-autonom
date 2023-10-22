@@ -8,5 +8,8 @@ public class WeatherData : Message
     public float Temperature { get; set; }
 
     [JsonPropertyName("humidity")]
-    public int Humidity { get; set; }
+    public float Humidity { get; set; }
+
+    [JsonPropertyName("pressure")]
+    public float Pressure { get; set; }
 }

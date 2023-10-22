@@ -4,12 +4,12 @@ using Microsoft.Extensions.Primitives;
 
 namespace Monitor;
 
-public class PerformanceMiddleware
+public class PerformanceAndCultureMiddleware
 {
     private readonly RequestDelegate _next;
-    private readonly ILogger<PerformanceMiddleware> _logger;
+    private readonly ILogger<PerformanceAndCultureMiddleware> _logger;
 
-    public PerformanceMiddleware(RequestDelegate requestDelegate, ILogger<PerformanceMiddleware> logger)
+    public PerformanceAndCultureMiddleware(RequestDelegate requestDelegate, ILogger<PerformanceAndCultureMiddleware> logger)
     {
         _next = requestDelegate;
         _logger = logger;

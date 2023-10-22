@@ -4,9 +4,12 @@
 @using Monitor.Services
 @using Message = Monitor.Models.SerialMessages.Message
 @using System.Globalization
+@using Microsoft.EntityFrameworkCore
+@using Monitor.Context
 @using Monitor.Models.SerialMessages
 
 @implements IDisposable
+@inject IDbContextFactory<DataContext> DbContextFactory
 
 <PageTitle>Tableau de bord</PageTitle>
 
@@ -64,19 +67,17 @@
                      Color="@(EntitiesManagerService.Entities.SolarIsDay.Value ? "orange" : "darkblue")">
             <Card Title="Météo">
                 <Body>
-                <Result
-                    Status="error"
-                    Title="Capteur HS"
-                    SubTitle="Commande AliExpress en cours"
-                ></Result>
-                @* <Row> *@
-                @*     <Col Span="12"> *@
-                @*         <Statistic Title="Température" Value="EntitiesManagerService.Entities.WeatherTemperature.Value" Suffix="°C" /> *@
-                @*     </Col> *@
-                @*     <Col Span="12"> *@
-                @*         <Statistic Title="Humidité" Value="EntitiesManagerService.Entities.WeatherHumidity.Value" Suffix="%" /> *@
-                @*     </Col> *@
-                @* </Row> *@
+                <Row>
+                    <Col Span="8">
+                        <Statistic Title="Température" Value="EntitiesManagerService.Entities.WeatherTemperature.Value" Suffix="°C" />
+                    </Col>
+                    <Col Span="8">
+                        <Statistic Title="Humidité" Value="EntitiesManagerService.Entities.WeatherHumidity.Value" Suffix="%" />
+                    </Col>
+                    <Col Span="8">
+                        <Statistic Title="Pression" Value="EntitiesManagerService.Entities.WeatherPressure.Value" Suffix="hPa" />
+                    </Col>
+                </Row>
                 </Body>
             </Card>
         </BadgeRibbon>
@@ -136,10 +137,23 @@
     </GridCol>
     
     <GridCol Xs="24" Md="12">
+        <Card Title="Derniers indicatifs entendus">
+            <Body>
+            <Timeline>
+                @foreach (LoraData message in _loraLastHeards)
+                {
+                    <TimelineItem>
+                        <strong>@message.Sender - @message.ReceivedAt.ToFrench().ToString(CultureInfo.CurrentCulture)</strong>
+                        <pre>@message.Payload</pre>
+                    </TimelineItem>
+                }
+            </Timeline>
+            </Body>
+        </Card>
         <Card Title="LoRa">
             <Body>
-            <Timeline Reverse="true">
-                @foreach (LoraData message in MonitorService.State.Lora.All)
+            <Timeline>
+                @foreach (LoraData message in _loras)
                 {
                     <TimelineItem  Color="@(message.IsTx ? "red" : "green")">
                         <strong>@message.ReceivedAt.ToFrench().ToString(CultureInfo.CurrentCulture) - @(message.IsTx ? "TX" : "RX")</strong>
@@ -176,6 +190,32 @@
 
     private async Task UpdateData()
     {
+        DataContext context = await DbContextFactory.CreateDbContextAsync();
+        _loras = await context.LoRas
+            .OrderByDescending(l => l.Id)
+            .Take(10)
+            .Select(l => new LoraData
+            {
+                Type = "lora", 
+                State = l.IsTx ? "tx" : "rx",
+                Payload = l.Frame,
+                ReceivedAt = l.CreatedAt
+            }).ToListAsync();
+        _loraLastHeards = context.LoRas
+            .Where(e => !e.IsTx && e.Sender != null)
+            .AsEnumerable()
+            .GroupBy(e => e.Sender, 
+                (sender, frames) => frames.OrderByDescending(l => l.Id).First())
+            .Select(l => new LoraData
+            {
+                Type = "lora", 
+                State = "rx",
+                Payload = l.Frame,
+                ReceivedAt = l.CreatedAt
+            })
+            .OrderByDescending(l => l.ReceivedAt)
+            .ToList();
+        
         await InvokeAsync(StateHasChanged);
     }
 
@@ -183,6 +223,8 @@
     {
         _timer?.Dispose();
     }
-    
+
+    private List<LoraData> _loras = new(); // If we use LoRa Entity class, We have error CS1503
+    private List<LoraData> _loraLastHeards = new();
     private Timer? _timer;
 }

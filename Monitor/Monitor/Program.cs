@@ -39,9 +39,8 @@ builder.Services.AddDbContextFactory<DataContext>(option =>
 });
 
 builder.Services.AddSingleton<MpptApp>();
-builder.Services.AddSingleton<PowerNightApp>();
 builder.Services.AddSingleton<WatchdogApp>();
-builder.Services.AddSingleton<LowBatteryApp>();
+builder.Services.AddSingleton<BatteryApp>();
 builder.Services.AddSingleton<GpioApp>();
 builder.Services.AddSingleton<CameraCaptureApp>();
 builder.Services.AddSingleton<SerialPortMcuCommandsApp>();
@@ -50,9 +49,8 @@ builder.Services.AddSingleton<AprsIsApp>();
 builder.Services.AddHostedService(services => services.GetRequiredService<MpptApp>());
 builder.Services.AddHostedService(services => services.GetRequiredService<GpioApp>());
 builder.Services.AddHostedService(services => services.GetRequiredService<SerialPortMcuCommandsApp>());
-builder.Services.AddHostedService(services => services.GetRequiredService<PowerNightApp>());
 builder.Services.AddHostedService(services => services.GetRequiredService<WatchdogApp>());
-builder.Services.AddHostedService(services => services.GetRequiredService<LowBatteryApp>());
+builder.Services.AddHostedService(services => services.GetRequiredService<BatteryApp>());
 builder.Services.AddHostedService(services => services.GetRequiredService<CameraCaptureApp>());
 builder.Services.AddHostedService(services => services.GetRequiredService<AprsIsApp>());
 
@@ -66,7 +64,7 @@ builder.Services.AddSingleton<EntitiesManagerService>();
 
 WebApplication app = builder.Build();
 
-app.UseMiddleware<PerformanceMiddleware>();
+app.UseMiddleware<PerformanceAndCultureMiddleware>();
 app.UseResponseCompression();
 
 app.UseStaticFiles();

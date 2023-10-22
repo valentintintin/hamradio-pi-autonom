@@ -1,3 +1,4 @@
+using AprsSharp.AprsParser;
 using Microsoft.EntityFrameworkCore;
 using Monitor.Context;
 using Monitor.Context.Entities;
@@ -42,11 +43,13 @@ public class MonitorService : AService
                 
                 EntitiesManagerService.Entities.WeatherTemperature.SetValue(weatherData.Temperature);
                 EntitiesManagerService.Entities.WeatherHumidity.SetValue(weatherData.Humidity);
+                EntitiesManagerService.Entities.WeatherPressure.SetValue(weatherData.Pressure);
 
                 context.Add(new Weather
                 {
                     Temperature = weatherData.Temperature,
-                    Humidity = weatherData.Humidity
+                    Humidity = weatherData.Humidity,
+                    Pressure = weatherData.Pressure,
                 });
                 await context.SaveChangesAsync();
                 break;
@@ -116,7 +119,7 @@ public class MonitorService : AService
                 break;
             case LoraData loraData:
                 Logger.LogTrace("New LoRa data received : {message}", loraData);
-
+                
                 if (loraData.IsTx)
                 {
                     State.Lora.LastTx.Add(loraData);
@@ -129,6 +132,26 @@ public class MonitorService : AService
                 
                     EntitiesManagerService.Entities.LoraRxPayload.SetValue(loraData.Payload);
                 }
+
+                string? sender = null;
+                
+                try
+                {
+                    Packet packet = new(loraData.Payload);
+                    sender = packet.Sender;
+                }
+                catch (Exception e)
+                {
+                    Logger.LogWarning(e, "LoRa APRS frame received not decodable : {payload}", loraData.Payload);
+                }
+
+                context.Add(new LoRa
+                {
+                    Sender = sender,
+                    Frame = loraData.Payload,
+                    IsTx = loraData.IsTx
+                });
+                await context.SaveChangesAsync();
                 break;
         }
     }

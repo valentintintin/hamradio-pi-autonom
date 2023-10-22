@@ -8,9 +8,10 @@ Global
 		Debug|x64 = Debug|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Release|arm32.ActiveCfg = Debug|x64
-		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Release|arm32.Build.0 = Debug|x64
 		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Debug|x64.ActiveCfg = Debug|x64
 		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Debug|x64.Build.0 = Debug|x64
+		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Release|arm32.ActiveCfg = Release|arm32
+		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Release|arm32.Build.0 = Release|arm32
+		{2B342B16-F6DA-4874-B35F-A9B6A63CA86B}.Release|arm32.Deploy.0 = Release|arm32
 	EndGlobalSection
 EndGlobal

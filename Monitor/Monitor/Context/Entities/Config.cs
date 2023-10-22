@@ -2,15 +2,14 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Monitor.Context.Entities;
 
-public class Weather : IEntity
+public class Config : IEntity
 {
-    [Key]
     public long Id { get; set; }
     public DateTime CreatedAt { get; set; }
     
-    public float Temperature { get; set; }
+    [MaxLength(64)]
+    public required string Name { get; set; }
     
-    public float Humidity { get; set; } 
-    
-    public float Pressure { get; set; } 
+    [MaxLength(128)]
+    public required string Value { get; set; }
 }

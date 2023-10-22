@@ -8,6 +8,10 @@ case $1 in
     server="192.168.1.241"
     port=22
     ;;
+"usb")
+    server="192.168.7.2"
+    port=22
+    ;;
 esac
 
 set -e
@@ -15,7 +19,7 @@ set -x
 
 rm -Rf published/*
 cd Monitor || exit
-dotnet publish -c Production --no-restore --no-self-contained --nologo --output ../published/
+dotnet publish -c Release --no-restore --no-self-contained --nologo --output ../published/
 cd ..
 
 rsync -e "ssh -p $port" -r --info=progress2 published/ debian@$server:/home/debian/docker/Monitor

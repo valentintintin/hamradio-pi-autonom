@@ -101,6 +101,21 @@ public class SerialMessageService : AService
         SendCommand("telem");
     }
 
+    public void SendTelemetryParams()
+    {
+        SendCommand("telemParam");
+    }
+
+    public void ResetMcu()
+    {
+        SendCommand("reset");
+    }
+
+    public void SetWatchdogSafety(bool enabled)
+    {
+        SetEepromMcu(0x01, enabled ? 1 : 0);
+    }
+
     public void SendLora(string message)
     {
         if (string.IsNullOrWhiteSpace(message))
@@ -109,6 +124,11 @@ public class SerialMessageService : AService
         }
         
         SendCommand($"lora \"{message}\"");
+    }
+
+    private void SetEepromMcu(int address, int value)
+    {
+        SendCommand($"set {address} {value}");
     }
 
     public void SendCommand(string command)

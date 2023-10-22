@@ -7,10 +7,11 @@ namespace Monitor.Context;
 public class DataContext : DbContext
 {
     public required DbSet<Weather> Weathers { get; set; }
-    
     public required DbSet<Mppt> Mppts { get; set; }
     
     public required DbSet<Entities.System> Systems { get; set; }
+    public required DbSet<LoRa> LoRas { get; set; }
+    public required DbSet<Config> Configs { get; set; }
     
     public DataContext(DbContextOptions<DataContext> options) : base(options) {}
 

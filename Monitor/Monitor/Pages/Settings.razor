@@ -10,9 +10,8 @@
 
 @inject CameraCaptureApp CameraCaptureApp
 @inject GpioApp GpioApp
-@inject LowBatteryApp LowBatteryApp
 @inject MpptApp MpptApp
-@inject PowerNightApp PowerNightApp
+@inject BatteryApp BatteryApp
 @inject WatchdogApp WatchdogApp
 @inject AprsIsApp AprsIsApp
 
@@ -28,19 +27,19 @@
             <Body>
             <Descriptions Bordered="true" Column="1">
                 <DescriptionsItem Title="Activé">
-                    <Switch @bind-Checked="PowerNightApp.Enabled.Value"></Switch>
+                    <Switch @bind-Checked="BatteryApp.NightEnabled.Value"></Switch>
                 </DescriptionsItem>
                 <DescriptionsItem Title="Utilise l'heure de lever du soleil">
-                    <Switch @bind-Checked="PowerNightApp.UseSun.Value"></Switch>
+                    <Switch @bind-Checked="BatteryApp.NightUseSun.Value"></Switch>
                 </DescriptionsItem>
                 <DescriptionsItem Title="Réveil la nuit">
-                    <Switch @bind-Checked="PowerNightApp.TurnOn.Value"></Switch>
+                    <Switch @bind-Checked="BatteryApp.NightTurnOn.Value"></Switch>
                 </DescriptionsItem>
                 <DescriptionsItem Title="Tension limite du réveil">
-                    <AntDesign.InputNumber @bind-Value="PowerNightApp.LimitVoltage.Value" Min="11000" Max="12000"></AntDesign.InputNumber>
+                    <AntDesign.InputNumber @bind-Value="BatteryApp.NightLimitVoltage.Value" Min="11000" Max="12000"></AntDesign.InputNumber>
                 </DescriptionsItem>
                 <DescriptionsItem Title="Durée éteint">
-                    <TimeSpanPicker @bind-Model="PowerNightApp.TimeOff.Value" />
+                    <TimeSpanPicker @bind-Model="BatteryApp.NightTimeOff.Value" />
                 </DescriptionsItem>
             </Descriptions>
             </Body>
@@ -51,13 +50,13 @@
             <Body>
             <Descriptions Bordered="true" Column="1">
                 <DescriptionsItem Title="Activé">
-                    <Switch @bind-Checked="LowBatteryApp.Enabled.Value"></Switch>
+                    <Switch @bind-Checked="BatteryApp.LowBatteryEnabled.Value"></Switch>
                 </DescriptionsItem>
                 <DescriptionsItem Title="Tension limite">
-                    <AntDesign.InputNumber @bind-Value="LowBatteryApp.Voltage.Value" Min="11000" Max="12000"></AntDesign.InputNumber>
+                    <AntDesign.InputNumber @bind-Value="BatteryApp.LowBatteryVoltage.Value" Min="11000" Max="12000"></AntDesign.InputNumber>
                 </DescriptionsItem>
                 <DescriptionsItem Title="Durée éteint">
-                    <TimeSpanPicker @bind-Model="LowBatteryApp.TimeOff.Value" />
+                    <TimeSpanPicker @bind-Model="BatteryApp.LowBatteryTimeOff.Value" />
                 </DescriptionsItem>
             </Descriptions>
             </Body>
@@ -86,9 +85,6 @@
                 </DescriptionsItem>
                 <DescriptionsItem Title="Temps éteint">
                     <TimeSpanPicker @bind-Model="EntitiesManagerService.Entities.WatchdogPowerOffTime.Value" />
-                </DescriptionsItem>
-                <DescriptionsItem Title="Durée après alerte">
-                    <TimeSpanPicker @bind-Model="MpptApp.DurationAfterAlert.Value" />
                 </DescriptionsItem>
             </Descriptions>
             </Body>

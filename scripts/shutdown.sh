@@ -1,12 +1,5 @@
 #!/bin/bash
 
-if [ ! -e "/tmp/shutdown.txt" ]; then
-    exit 1
-fi;
+date
 
-if grep -q "1" "/tmp/shutdown.txt"; then
-    echo "Stop system"
-    /sbin/halt
-fi
-
-exit 0
+curl -f http://localhost/states/shutdown && echo "Will shutdown !" && /sbin/halt

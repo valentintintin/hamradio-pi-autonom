@@ -7,8 +7,6 @@ namespace Monitor.Workers;
 
 public class MpptApp : AWorker
 {
-    public readonly MqttEntity<TimeSpan> DurationAfterAlert = new("sleep/duration_after_alert", true, TimeSpan.FromSeconds(20));
-
     private readonly SystemService _systemService;
     private readonly SerialMessageService _serialMessageService;
 
@@ -16,31 +14,28 @@ public class MpptApp : AWorker
     {
         _systemService = Services.GetRequiredService<SystemService>();
         _serialMessageService = Services.GetRequiredService<SerialMessageService>();
-
-        EntitiesManagerService.Add(DurationAfterAlert);
     }
 
     protected override Task Start()
     {
-        MqttEntity<int> powerOnVoltageEntity = EntitiesManagerService.Entities.MpptPowerOnVoltage;
-        MqttEntity<int> powerOffVoltageEntity = EntitiesManagerService.Entities.MpptPowerOffVoltage;
+        StringConfigEntity<int> powerOnVoltageConfigEntity = EntitiesManagerService.Entities.MpptPowerOnVoltage;
+        StringConfigEntity<int> powerOffVoltageConfigEntity = EntitiesManagerService.Entities.MpptPowerOffVoltage;
 
         AddDisposable(EntitiesManagerService.Entities.MpptAlertShutdown.ValueChanges()
             .Select(v => v.value)
-            .Do(_ => Logger.LogWarning("Alert so shutdown in {duration}", DurationAfterAlert.Value))
-            .Delay(DurationAfterAlert.Value)
+            .Do(_ => Logger.LogWarning("Alert so shutdown"))
             .Subscribe(_ =>
             {
                 _systemService.Shutdown();
             }));
 
-        AddDisposable(powerOffVoltageEntity.ValueChanges()
-            .Merge(powerOnVoltageEntity.ValueChanges())
+        AddDisposable(powerOffVoltageConfigEntity.ValueChanges()
+            .Merge(powerOnVoltageConfigEntity.ValueChanges())
             .Subscribe(_ =>
             {
                 _serialMessageService.SetPowerOnOffVoltage(
-                    powerOnVoltageEntity.Value,
-                    powerOffVoltageEntity.Value
+                    powerOnVoltageConfigEntity.Value,
+                    powerOffVoltageConfigEntity.Value
                 );
             }));
         

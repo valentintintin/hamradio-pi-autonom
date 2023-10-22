@@ -6,11 +6,11 @@ namespace Monitor.Workers;
 
 public abstract class AEnabledWorker : AWorker
 {
-    public readonly MqttEntity<bool> Enabled;
+    public readonly StringConfigEntity<bool> Enabled;
     
     protected AEnabledWorker(ILogger<AEnabledWorker> logger, IServiceProvider serviceProvider) : base(logger, serviceProvider)
     {
-        Enabled = new MqttEntity<bool>($"worker/{GetType().Name.ToLower().Replace("app", "")}", true, true);
+        Enabled = new StringConfigEntity<bool>($"worker/{GetType().Name.ToLower().Replace("app", "")}", true, true);
         EntitiesManagerService.Add(Enabled);
     }
 

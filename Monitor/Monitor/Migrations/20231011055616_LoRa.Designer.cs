@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Monitor.Context;
 
@@ -10,36 +11,14 @@ using Monitor.Context;
 namespace Monitor.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20231011055616_LoRa")]
+    partial class LoRa
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "7.0.12");
-
-            modelBuilder.Entity("Monitor.Context.Entities.Config", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Value")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Configs");
-                });
+            modelBuilder.HasAnnotation("ProductVersion", "7.0.11");
 
             modelBuilder.Entity("Monitor.Context.Entities.LoRa", b =>
                 {
@@ -57,10 +36,6 @@ namespace Monitor.Migrations
 
                     b.Property<bool>("IsTx")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("Sender")
-                        .HasMaxLength(16)
-                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -152,11 +127,8 @@ namespace Monitor.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<float>("Humidity")
-                        .HasColumnType("REAL");
-
-                    b.Property<float>("Pressure")
-                        .HasColumnType("REAL");
+                    b.Property<int>("Humidity")
+                        .HasColumnType("INTEGER");
 
                     b.Property<float>("Temperature")
                         .HasColumnType("REAL");
