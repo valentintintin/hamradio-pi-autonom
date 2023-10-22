@@ -37,6 +37,10 @@ void Gpio::setWifi(bool enabled) {
 }
 
 void Gpio::setNpr(bool enabled) {
+    if (npr != enabled) {
+        system->forceSendTelemetry = true;
+    }
+
     setState(PIN_NPR, enabled, PSTR("NPR"), npr, true);
 }
 

@@ -55,7 +55,7 @@ uint8_t Aprs::encode(AprsPacket* aprsPacket, char* aprsResult) {
             return 0;
     }
 
-    if (strlen(aprsPacket->comment) && (aprsPacket->type == Position || aprsPacket->type == Telemetry)) {
+    if (strlen(aprsPacket->comment) && (aprsPacket->type == Position || aprsPacket->type == Telemetry || aprsPacket->type == Weather)) {
         sprintf_P(&aprsResult[strlen(aprsResult)], PSTR(" %s"), aprsPacket->comment); // Normally, 40 max for position
     }
 
@@ -68,7 +68,7 @@ uint8_t Aprs::encode(AprsPacket* aprsPacket, char* aprsResult) {
     return strlen(aprsResult);
 }
 
-bool Aprs::decode(const char* aprs, AprsPacket* aprsPacket) {
+bool Aprs::decode(const char* aprs, AprsPacketLite* aprsPacket) {
     reset(aprsPacket);
 
     if (sscanf_P(aprs, PSTR("%9[^>]>%9[^,],%19[^:]:"), aprsPacket->source, aprsPacket->destination, aprsPacket->path) != 3) {
@@ -133,11 +133,6 @@ bool Aprs::decode(const char* aprs, AprsPacket* aprsPacket) {
             find = strstr_P(aprsPacket->message.message, PSTR("BITS"));
             if (find != nullptr) {
                 aprsPacket->type = TelemetryBitSense;
-
-                find = strchr(aprsPacket->message.message, ',');
-                if (find != nullptr) {
-                    strcpy(aprsPacket->telemetries.projectName, find + 1);
-                }
             }
 
             find = strstr_P(aprsPacket->message.message, PSTR("EQNS"));
@@ -185,32 +180,31 @@ void Aprs::appendPosition(AprsPosition* position, char* aprsResult) {
 
     if (position->withWeather) {
         strcat_P(aprsResult, PSTR("_"));
-    }
-    else {
+    } else {
         strncat(aprsResult, &position->symbol, 1);
+    }
 
-        if (position->altitudeInComment) {
-            ax25Base91Enc(bufferBase91, 1, (uint32_t) position->courseDeg / 4);
-            strcpy(&aprsResult[strlen(aprsResult)], bufferBase91);
-            ax25Base91Enc(bufferBase91, 1, (uint32_t) (log1p(position->speedKnots) / 0.07696));
-            strcpy(&aprsResult[strlen(aprsResult)], bufferBase91);
+    if (position->altitudeInComment) {
+        ax25Base91Enc(bufferBase91, 1, (uint32_t) position->courseDeg / 4);
+        strcpy(&aprsResult[strlen(aprsResult)], bufferBase91);
+        ax25Base91Enc(bufferBase91, 1, (uint32_t) (log1p(position->speedKnots) / 0.07696));
+        strcpy(&aprsResult[strlen(aprsResult)], bufferBase91);
 
-            strcat_P(aprsResult, PSTR("G")); // Fix GPS + RMC + Compressed
+        sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("%c"), char(getCompressionType(CURRENT, RMC, COMPRESSED)+33));
 
-            if (position->altitudeFeet > 0) {
-                int alt_int = max(-99999, min(999999, (int) position->altitudeFeet));
-                if (alt_int < 0) {
-                    sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("/A=-%05d"), alt_int * -1);
-                } else {
-                    sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("/A=%06d"), alt_int);
-                }
+        if (position->altitudeFeet > 0) {
+            int alt_int = max(-99999, min(999999, (int) position->altitudeFeet));
+            if (alt_int < 0) {
+                sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("/A=-%05d"), alt_int * -1);
+            } else {
+                sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("/A=%06d"), alt_int);
             }
-        } else {
-            ax25Base91Enc(bufferBase91, 2, (uint32_t) (log(position->altitudeFeet) / log(1.002)));
-            strcpy(&aprsResult[strlen(aprsResult)], bufferBase91);
-
-            strcat_P(aprsResult, PSTR("Y")); // Fix GPS + GEA + Compressed
         }
+    } else {
+        ax25Base91Enc(bufferBase91, 2, (uint32_t) (log(position->altitudeFeet) / log(1.002)));
+        strcpy(&aprsResult[strlen(aprsResult)], bufferBase91);
+
+        sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("%c"), char(getCompressionType(CURRENT, GGA, COMPRESSED)+33));
     }
 }
 
@@ -218,12 +212,12 @@ void Aprs::appendTelemetries(AprsPacket *aprsPacket, char* aprsResult) {
     char bufferBase91[] = {"00\0"};
     uint8_t boolTelemetry = 0;
 
-    if (aprsPacket->telemetries.telemetrySequenceNumber > 0x1FFF) {
-        aprsPacket->telemetries.telemetrySequenceNumber = 0;
-    }
-
     switch (aprsPacket->type) {
         case Position:
+            if (aprsPacket->telemetries.telemetrySequenceNumber > 0x1FFF) {
+                aprsPacket->telemetries.telemetrySequenceNumber = 0;
+            }
+
             strcat_P(aprsResult, PSTR("|"));
 
             ax25Base91Enc(bufferBase91, 2, aprsPacket->telemetries.telemetrySequenceNumber);
@@ -247,6 +241,10 @@ void Aprs::appendTelemetries(AprsPacket *aprsPacket, char* aprsResult) {
             strcat_P(aprsResult, PSTR("|"));
             break;
         case Telemetry:
+            if (aprsPacket->telemetries.telemetrySequenceNumber > 999) {
+                aprsPacket->telemetries.telemetrySequenceNumber = 0;
+            }
+
             sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("T#%d,"), aprsPacket->telemetries.telemetrySequenceNumber);
 
             for (auto telemetry : aprsPacket->telemetries.telemetriesAnalog) {
@@ -351,56 +349,65 @@ void Aprs::appendMessage(AprsMessage *message, char* aprsResult) {
 }
 
 void Aprs::appendWeather(AprsWeather *weather, char* aprsResult) {
-    if (weather->windDirectionDegress > 0) {
+    if (weather->useWindDirection) {
         sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("%03d"), (uint16_t) weather->windDirectionDegress);
     } else {
         strcat_P(aprsResult, PSTR("..."));
     }
 
     strcat_P(aprsResult, PSTR("/"));
-    if (weather->windSpeedMph > 0) {
+    if (weather->useWindSpeed) {
         sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("%03d"), (uint16_t) weather->windSpeedMph);
     } else {
         strcat_P(aprsResult, PSTR("..."));
     }
 
     strcat_P(aprsResult, PSTR("g"));
-    if (weather->gustSpeedMph > 0) {
+    if (weather->useGustSpeed) {
         sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("%03d"), (uint16_t) weather->gustSpeedMph);
     } else {
         strcat_P(aprsResult, PSTR("..."));
     }
 
     strcat_P(aprsResult, PSTR("t"));
-    if (weather->temperatureFahrenheit != 0) {
+    if (weather->useTemperature) {
         sprintf_P(&aprsResult[strlen(aprsResult)], weather->temperatureFahrenheit > 0 ? PSTR("%03d") : PSTR("%02d"), (int16_t) weather->temperatureFahrenheit);
     } else {
         strcat_P(aprsResult, PSTR("..."));
     }
 
     strcat_P(aprsResult, PSTR("r"));
-    if (weather->rain1HourHundredthsOfAnInch > 0) {
+    if (weather->useRain1Hour) {
         sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("%03d"), (uint16_t) weather->rain1HourHundredthsOfAnInch);
+    } else {
+        strcat_P(aprsResult, PSTR("..."));
     }
-
     strcat_P(aprsResult, PSTR("p"));
-    if (weather->rain1HourHundredthsOfAnInch > 0) {
-        sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("%03d"), (uint16_t) weather->rain1HourHundredthsOfAnInch);
+    if (weather->useRain24Hour) {
+        sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("%03d"), (uint16_t) weather->rain24HourHundredthsOfAnInch);
+    } else {
+        strcat_P(aprsResult, PSTR("..."));
     }
 
     strcat_P(aprsResult, PSTR("P"));
-    if (weather->rain1HourHundredthsOfAnInch > 0) {
+    if (weather->useRainSinceMidnight) {
         sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("%03d"), (uint16_t) weather->rain1HourHundredthsOfAnInch);
+    } else {
+        strcat_P(aprsResult, PSTR("..."));
     }
 
     strcat_P(aprsResult, PSTR("h"));
-    if (weather->humidity > 0) {
+    if (weather->useHumidity) {
         sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("%02d"), (uint16_t) weather->humidity);
+    } else {
+        strcat_P(aprsResult, PSTR(".."));
     }
 
     strcat_P(aprsResult, PSTR("b"));
-    if (weather->pressure > 0) {
-        sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("%04d"), (uint16_t) weather->pressure * 10);
+    if (weather->usePressure) {
+        sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("%05d"), (uint16_t) weather->pressure * 10);
+    } else {
+        strcat_P(aprsResult, PSTR("....."));
     }
 
     strcat_P(aprsResult, weather->device);
@@ -459,6 +466,14 @@ void Aprs::trimFirstSpace(char *string) {
     string[strcspn(string, " ")] = '\0';
 }
 
+uint8_t Aprs::getCompressionType(enum GPSFix gpsFix, enum NMEA nmeaSource, enum Compression compressionType) {
+    uint8_t value = 0;
+    value |= (gpsFix & 0x01) << 5;
+    value |= (nmeaSource & 0x03) << 3;
+    value |= (compressionType & 0x07);
+    return value;
+}
+
 void Aprs::reset(AprsPacket *aprsPacket) {
     aprsPacket->source[0] = '\0';
     aprsPacket->destination[0] = '\0';
@@ -489,21 +504,36 @@ void Aprs::reset(AprsPacket *aprsPacket) {
 
     aprsPacket->telemetries.telemetrySequenceNumber = 0;
     aprsPacket->telemetries.projectName[0] = '\0';
-    for (uint8_t i = 0; i < 8; i++) {
-        aprsPacket->telemetries.telemetriesBoolean[i].name[0] = '\0';
-        aprsPacket->telemetries.telemetriesBoolean[i].unit[0] = '\0';
-        aprsPacket->telemetries.telemetriesBoolean[i].value = 0;
-        aprsPacket->telemetries.telemetriesBoolean[i].bitSense = false;
+    for (auto & i : aprsPacket->telemetries.telemetriesBoolean) {
+        i.name[0] = '\0';
+        i.unit[0] = '\0';
+        i.value = 0;
+        i.bitSense = false;
     }
-    for (uint8_t i = 0; i < 5; i++) {
-        aprsPacket->telemetries.telemetriesAnalog[i].name[0] = '\0';
-        aprsPacket->telemetries.telemetriesBoolean[i].unit[0] = '\0';
-        aprsPacket->telemetries.telemetriesBoolean[i].value = 0;
-        aprsPacket->telemetries.telemetriesBoolean[i].equation.a = 0;
-        aprsPacket->telemetries.telemetriesBoolean[i].equation.b = 1;
-        aprsPacket->telemetries.telemetriesBoolean[i].equation.c = 0;
+    for (auto & i : aprsPacket->telemetries.telemetriesAnalog) {
+        i.name[0] = '\0';
+        i.unit[0] = '\0';
+        i.value = 0;
+        i.equation.a = 0;
+        i.equation.b = 1;
+        i.equation.c = 0;
     }
 
+    aprsPacket->type = Unknown;
+}
+
+void Aprs::reset(AprsPacketLite *aprsPacket) {
+    aprsPacket->source[0] = '\0';
+    aprsPacket->destination[0] = '\0';
+    aprsPacket->path[0] = '\0';
+
+    aprsPacket->content[0] = '\0';
+
+    aprsPacket->message.message[0] = '\0';
+    aprsPacket->message.ackConfirmed[0] = '\0';
+    aprsPacket->message.ackRejected[0] = '\0';
+    aprsPacket->message.ackToConfirm[0] = '\0';
+    aprsPacket->message.destination[0] = '\0';
 
     aprsPacket->type = Unknown;
 }

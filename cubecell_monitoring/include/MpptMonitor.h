@@ -12,7 +12,7 @@ public:
 
     bool begin();
     bool update();
-    bool setWatchdog(uint32_t powerOffTime);
+    bool setWatchdog(uint16_t powerOffTime, uint8_t timeoutTime = WATCHDOG_TIMEOUT);
     bool setPowerOnOff(uint16_t powerOnVoltage, uint16_t powerOffVoltage);
 
     inline int16_t getVoltageBattery() const {
@@ -75,13 +75,16 @@ private:
     TwoWire &wire;
     mpptChg charger;
     Timer timer = Timer(INTERVAL_MPPT, true);
-
-    char bufferText[100]{};
+    Timer timerWatchdogSafety = Timer(WATCHDOG_SAFETY_RESET);
 
     bool init = false, night = false, alert = false, watchdogEnabled = false, powerEnabled = false;
     uint8_t watchdogCounter = 0;
     uint16_t status = 0, watchdogPowerOffTime = 0, powerOffVoltage, powerOnVoltage;
     int16_t vs = 0, is = 0, vb = 0, ib = 0;
+
+    bool useWatchdogSafety = false;
+
+    void doWatchdogSafety();
 };
 
 #endif //CUBECELL_MONITORING_MPPTMONITOR_H

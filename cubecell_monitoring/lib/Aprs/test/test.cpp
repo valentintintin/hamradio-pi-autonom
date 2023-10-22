@@ -1,6 +1,5 @@
 #include <cstring>
 #include <cstdio>
-#include <cstdlib>
 #include "../Aprs.h"
 
 int main() {
@@ -161,6 +160,15 @@ int main() {
     packet.weather.rain24HourHundredthsOfAnInch = 12.23;
     packet.weather.rainSinceMidnightHundredthsOfAnInch = 6.32;
     packet.weather.pressure = 1123;
+    packet.weather.useWindSpeed = true;
+    packet.weather.useWindDirection = true;
+    packet.weather.useGustSpeed = true;
+    packet.weather.useTemperature = true;
+    packet.weather.useHumidity = true;
+    packet.weather.useRain1Hour = true;
+    packet.weather.useRain24Hour = true;
+    packet.weather.useRainSinceMidnight = true;
+    packet.weather.usePressure = true;
     packet.position.withWeather = true;
     packet.position.withTelemetry = false;
     strcpy(packet.weather.device, "Test");
@@ -186,7 +194,7 @@ int main() {
     packet.message.ackToConfirm[0] = '\0';
     Aprs::encode(&packet, encoded_packet);
 
-    AprsPacket packet2;
+    AprsPacketLite packet2;
     if (!Aprs::decode("F4HVV-10>APDR16,WIDE1-1::F4HVV-15 :ack1 hello{2", &packet2)) {
         printf("Decode error for %s\n\n", encoded_packet);
     } else {
@@ -197,7 +205,7 @@ int main() {
                packet2.message.message);
     }
 
-    AprsPacket packet3;
+    AprsPacketLite packet3;
     if (!Aprs::decode("F4HVV-9>APDR16,WIDE1-1:=4519.92N/00537.15E[", &packet3)) {
         printf("Decode error for %s\n\n", encoded_packet);
     } else {

@@ -1,4 +1,5 @@
 #include <pgmspace.h>
+#include <EEPROM.h>
 #include "ArduinoLog.h"
 
 #include "Command.h"
@@ -11,11 +12,14 @@ Command::Command(System *system) {
 
     parser.registerCommand(PSTR("wifi"), PSTR("u"), doWifi);
     parser.registerCommand(PSTR("npr"), PSTR("u"), doNpr);
+    parser.registerCommand(PSTR("position"), PSTR(""), doPosition);
     parser.registerCommand(PSTR("telem"), PSTR(""), doTelemetry);
-    parser.registerCommand(PSTR("telemParams"), PSTR(""), doTelemetry);
+    parser.registerCommand(PSTR("telemParams"), PSTR(""), doTelemetryParams);
     parser.registerCommand(PSTR("dog"), PSTR("u"), doWatchdog);
     parser.registerCommand(PSTR("pow"), PSTR("uu"), doMpptPower);
     parser.registerCommand(PSTR("lora"), PSTR("s"), doLora);
+    parser.registerCommand(PSTR("reset"), PSTR(""), doReset);
+    parser.registerCommand(PSTR("set"), PSTR("uu"), doSetEeprom);
 //    parser.registerCommand(PSTR("time"), PSTR("u"), doSetTime);
 }
 
@@ -41,7 +45,7 @@ void Command::doWifi(MyCommandParser::Argument *args, char *response) {
 
     system->gpio.setWifi(state);
 
-    sprintf_P(response, PSTR("OK with state %d"), state);
+    sprintf_P(response, PSTR("OK state %d"), state);
 }
 
 void Command::doNpr(MyCommandParser::Argument *args, char *response) {
@@ -49,11 +53,17 @@ void Command::doNpr(MyCommandParser::Argument *args, char *response) {
 
     system->gpio.setNpr(state);
 
-    sprintf_P(response, PSTR("OK with state %d"), state);
+    sprintf_P(response, PSTR("OK state %d"), state);
 }
 
 void Command::doTelemetry(MyCommandParser::Argument *args, char *response) {
     system->forceSendTelemetry = true;
+
+    sprintf_P(response, PSTR("OK"));
+}
+
+void Command::doPosition(MyCommandParser::Argument *args, char *response) {
+    system->forceSendPosition = true;
 
     sprintf_P(response, PSTR("OK"));
 }
@@ -75,7 +85,14 @@ void Command::doWatchdog(MyCommandParser::Argument *args, char *response) {
 void Command::doLora(MyCommandParser::Argument *args, char *response) {
     char *message = args[0].asString;
 
+    // todo remake
     system->communication->sendMessage(PSTR(APRS_DESTINATION), message);
+
+    sprintf_P(response, PSTR("OK"));
+}
+
+void Command::doReset(MyCommandParser::Argument *args, char *response) {
+    CySoftwareReset();
 
     sprintf_P(response, PSTR("OK"));
 }
@@ -87,6 +104,12 @@ void Command::doMpptPower(MyCommandParser::Argument *args, char *response) {
     bool ok = system->mpptMonitor.setPowerOnOff(powerOnVoltage, powerOffVoltage);
 
     sprintf_P(response, ok ? PSTR("OK") : PSTR("KO"));
+}
+
+void Command::doSetEeprom(MyCommandParser::Argument *args, char *response) {
+    system->setFunctionAllowed((byte) args[0].asUInt64, args[1].asUInt64 == 1);
+
+    sprintf_P(response, EEPROM.read((int const) args[0].asUInt64) ? PSTR("OK") : PSTR("KO"));
 }
 
 //void Command::doSetTime(MyCommandParser::Argument *args, char *response) {

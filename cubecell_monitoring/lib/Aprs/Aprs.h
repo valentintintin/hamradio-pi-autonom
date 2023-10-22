@@ -1,7 +1,7 @@
 #ifndef CUBECELL_MONITORING_APRS_H
 #define CUBECELL_MONITORING_APRS_H
 
-#define MAX_PACKET_LENGTH 200
+#define MAX_PACKET_LENGTH 250
 #define CALLSIGN_LENGTH 11
 #define MAX_PATH 8
 #define MAX_TELEMETRY_ANALOG 5
@@ -17,6 +17,29 @@
 
 enum AprsPacketType { Unknown, Position, Message, Telemetry, TelemetryUnit, TelemetryLabel, TelemetryEquation, TelemetryBitSense, Weather, Item, Object, Status, RawContent };
 
+enum GPSFix {
+    OLD = 0,
+    CURRENT = 1
+};
+
+enum NMEA {
+    OTHER = 0,
+    GLL = 1,
+    GGA = 2,
+    RMC = 3
+};
+
+enum Compression {
+    COMPRESSED = 0,
+    TNC_BTEXT = 1,
+    SOFTWARE = 2,
+    TBD_1 = 3,
+    KPC3 = 4,
+    PICO = 5,
+    OTHER_TRACKER_TBD_2 = 6,
+    DIGIPEATER_CONVERSION = 7
+};
+
 typedef struct {
     double windDirectionDegress = 0;
     double windSpeedMph = 0;
@@ -27,6 +50,15 @@ typedef struct {
     double rainSinceMidnightHundredthsOfAnInch = 0;
     double humidity = 0;
     double pressure = 0;
+    bool useWindDirection = false;
+    bool useWindSpeed = false;
+    bool useGustSpeed = false;
+    bool useTemperature = false;
+    bool useRain1Hour = false;
+    bool useRain24Hour = false;
+    bool useRainSinceMidnight = false;
+    bool useHumidity = false;
+    bool usePressure = false;
     char device[WEATHER_DEVICE_LENGTH]{};
 } AprsWeather;
 
@@ -76,6 +108,14 @@ typedef struct {
 } AprsMessage;
 
 typedef struct {
+    char destination[CALLSIGN_LENGTH]{};
+    char message[MESSAGE_LENGTH]{};
+    char ackToConfirm[ACK_MESSAGE_LENGTH]{}; // when RX
+    char ackConfirmed[ACK_MESSAGE_LENGTH]{}; // when RX after TX
+    char ackRejected[ACK_MESSAGE_LENGTH]{}; // when RX after TX
+} AprsMessageLite;
+
+typedef struct {
     char content[MAX_PACKET_LENGTH]{};
     char source[CALLSIGN_LENGTH]{};
     char destination[CALLSIGN_LENGTH]{};
@@ -88,11 +128,21 @@ typedef struct {
     AprsPacketType type = Unknown;
 } AprsPacket;
 
+typedef struct {
+    char content[MAX_PACKET_LENGTH]{};
+    char source[CALLSIGN_LENGTH]{};
+    char destination[CALLSIGN_LENGTH]{};
+    char path[CALLSIGN_LENGTH * MAX_PATH]{};
+    AprsMessageLite message;
+    AprsPacketType type = Unknown;
+} AprsPacketLite;
+
 class Aprs {
 public:
     static uint8_t encode(AprsPacket* aprsPacket, char* aprsResult);
-    static bool decode(const char* aprs, AprsPacket* aprsPacket);
+    static bool decode(const char* aprs, AprsPacketLite* aprsPacket);
     static void reset(AprsPacket* aprsPacket);
+    static void reset(AprsPacketLite* aprsPacket);
 private:
     static void appendPosition(AprsPosition* position, char* aprsResult);
     static void appendTelemetries(AprsPacket *aprsPacket, char* aprsResult);
@@ -104,6 +154,7 @@ private:
     static void trimStart(char *string);
     static void trimEnd(char *string);
     static void trimFirstSpace(char *string);
+    static uint8_t getCompressionType(enum GPSFix gpsFix, enum NMEA nmeaSource, enum Compression compressionType);
 };
 
 #endif //CUBECELL_MONITORING_APRS_H

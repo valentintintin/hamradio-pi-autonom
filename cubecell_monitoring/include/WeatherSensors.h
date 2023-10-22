@@ -1,12 +1,13 @@
 #ifndef CUBECELL_MONITORING_WEATHERSENSORS_H
 #define CUBECELL_MONITORING_WEATHERSENSORS_H
 
-#include "DHT.h"
+#include "vt_bme280"
 
 #include "Config.h"
 #include "Timer.h"
 
 class System;
+using namespace vt;
 
 class WeatherSensors {
 public:
@@ -15,27 +16,26 @@ public:
     bool begin();
     bool update();
 
-    inline double getTemperature() const {
+    inline float getTemperature() const {
         return temperature;
     }
 
-    inline uint8_t getHumidity() const {
+    inline float getHumidity() const {
         return humidity;
     }
 
-    inline bool IsInError() const {
-        return hasError;
+    inline float getPressure() const {
+        return pressure;
     }
 private:
     System *system;
     Timer timer = Timer(INTERVAL_WEATHER, true);
 
-    DHT dht = DHT();
-    char bufferText[40]{};
+    bme280_t sensor = bme280_t();
 
-    double temperature = 0;
-    uint8_t humidity = 0;
-    bool hasError = true;
+    float temperature = 0;
+    float humidity = 0;
+    float pressure = 0;
 };
 
 #endif //CUBECELL_MONITORING_WEATHERSENSORS_H

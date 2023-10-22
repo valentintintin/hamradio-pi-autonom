@@ -15,6 +15,10 @@ Communication::Communication(System *system) : system(system) {
     aprsPacketTx.position.longitude = APRS_LONGITUDE;
     aprsPacketTx.position.altitudeFeet = APRS_ALTITUDE * 3.28;
     aprsPacketTx.position.altitudeInComment = false;
+    aprsPacketTx.position.withWeather = true;
+    aprsPacketTx.weather.useHumidity = true;
+    aprsPacketTx.weather.useTemperature = true;
+    aprsPacketTx.weather.usePressure = true;
 
     strcpy_P(aprsPacketTx.weather.device, PSTR("4HVV"));
 
@@ -41,11 +45,12 @@ Communication::Communication(System *system) : system(system) {
     // Watchdog poweroff in seconds
     strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[4].name, PSTR("Slep")); // 4
     strcpy_P(aprsPacketTx.telemetries.telemetriesAnalog[4].unit, PSTR("min"));
+    aprsPacketTx.telemetries.telemetriesAnalog[4].equation.b = 0.0166;
 
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[0].name, PSTR("Night"));
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[1].name, PSTR("Alrt"));
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[2].name, PSTR("WDog"));
-    strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[3].name, PSTR("Wifi"));
+    strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[3].name, PSTR("NPR"));
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[4].name, PSTR("5V"));
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[5].name, PSTR("Box"));
 }
@@ -78,11 +83,11 @@ bool Communication::begin(RadioEvents_t *radioEvents) {
 void Communication::update(bool sendTelemetry, bool sendPosition) {
     Radio.IrqProcess();
 
-    if (sendPosition) {
+    if (sendPosition && system->isFunctionAllowed(EEPROM_ADDRESS_APRS_POSITION)) {
         this->sendPosition(PSTR(APRS_COMMENT));
     }
 
-    if (sendTelemetry) {
+    if (sendTelemetry && system->isFunctionAllowed(EEPROM_ADDRESS_APRS_TELEMETRY)) {
         this->sendTelemetry();
     }
 }
@@ -142,10 +147,11 @@ void Communication::send() {
 }
 
 void Communication::sendMessage(const char* destination, const char* message, const char* ackToConfirm) {
-    strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH_MESSAGE));
+    strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH));
     strcpy_P(aprsPacketTx.source, PSTR(APRS_CALLSIGN));
     strcpy(aprsPacketTx.message.destination, destination);
     strcpy(aprsPacketTx.message.message, message);
+    aprsPacketTx.content[0] = '\0';
 
     aprsPacketTx.message.ackToAsk[0] = '\0';
     aprsPacketTx.message.ackToConfirm[0] = '\0';
@@ -153,10 +159,6 @@ void Communication::sendMessage(const char* destination, const char* message, co
 
     if (strlen(ackToConfirm) > 0) {
         strcpy(aprsPacketTx.message.ackToConfirm, ackToConfirm);
-    }
-
-    if (strlen(aprsPacketTx.message.ackToConfirm) == 0) {
-        sprintf_P(aprsPacketTx.message.ackToAsk, PSTR("%d"), ackToAsk++);
     }
 
     aprsPacketTx.type = Message;
@@ -168,6 +170,7 @@ void Communication::sendTelemetry() {
     strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH));
     strcpy_P(aprsPacketTx.source, PSTR(APRS_CALLSIGN));
     strcpy_P(aprsPacketTx.destination, PSTR(APRS_DESTINATION));
+    aprsPacketTx.content[0] = '\0';
 
     sprintf_P(aprsPacketTx.comment, PSTR("Chg:%s Up:%lds"), mpptChg::getStatusAsString(system->mpptMonitor.getStatus()), millis() / 1000);
     aprsPacketTx.telemetries.telemetrySequenceNumber = telemetrySequenceNumber++;
@@ -179,7 +182,7 @@ void Communication::sendTelemetry() {
     aprsPacketTx.telemetries.telemetriesBoolean[0].value = system->mpptMonitor.isNight();
     aprsPacketTx.telemetries.telemetriesBoolean[1].value = system->mpptMonitor.isAlert();
     aprsPacketTx.telemetries.telemetriesBoolean[2].value = system->mpptMonitor.isWatchdogEnabled();
-    aprsPacketTx.telemetries.telemetriesBoolean[3].value = system->gpio.isWifiEnabled();
+    aprsPacketTx.telemetries.telemetriesBoolean[3].value = system->gpio.isNprEnabled();
     aprsPacketTx.telemetries.telemetriesBoolean[4].value = system->mpptMonitor.isPowerEnabled();
     aprsPacketTx.telemetries.telemetriesBoolean[5].value = system->isBoxOpened();
 
@@ -188,7 +191,6 @@ void Communication::sendTelemetry() {
 
     if (shouldSendTelemetryParams) {
         shouldSendTelemetryParams = false;
-
         sendTelemetryParams();
     }
 }
@@ -197,6 +199,7 @@ void Communication::sendTelemetryParams() {
     strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH));
     strcpy_P(aprsPacketTx.source, PSTR(APRS_CALLSIGN));
     strcpy_P(aprsPacketTx.destination, PSTR(APRS_DESTINATION));
+    aprsPacketTx.content[0] = '\0';
 
     aprsPacketTx.type = TelemetryLabel;
     send();
@@ -212,13 +215,14 @@ void Communication::sendPosition(const char* comment) {
     strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH));
     strcpy_P(aprsPacketTx.source, PSTR(APRS_CALLSIGN));
     strcpy_P(aprsPacketTx.destination, PSTR(APRS_DESTINATION));
+    aprsPacketTx.content[0] = '\0';
     strcpy(aprsPacketTx.comment, comment);
 
     aprsPacketTx.type = Position;
-    aprsPacketTx.position.withWeather = !system->weatherSensors.IsInError();
 
     aprsPacketTx.weather.temperatureFahrenheit = system->weatherSensors.getTemperature() * 9 / 5 + 32;
     aprsPacketTx.weather.humidity = system->weatherSensors.getHumidity();
+    aprsPacketTx.weather.pressure = system->weatherSensors.getPressure();
 
     send();
 }
@@ -272,7 +276,7 @@ void Communication::received(uint8_t * payload, uint16_t size, int16_t rssi, int
                     sendMessage(aprsPacketRx.source, PSTR(""), aprsPacketRx.message.ackToConfirm);
                 }
             }
-        } else {
+        } else if (system->isFunctionAllowed(EEPROM_ADDRESS_APRS_DIGIPEATER)) {
             // Digi only for WIDE1-1 or VIA Callsign
             const char *hasWide = strstr_P(aprsPacketRx.path, PSTR("WIDE1-1"));
             const char *hasCallsign = strstr_P(aprsPacketRx.path, PSTR(APRS_CALLSIGN));

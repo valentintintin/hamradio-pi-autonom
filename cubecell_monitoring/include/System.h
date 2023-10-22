@@ -22,6 +22,11 @@ public:
     void update();
     void setTimeFromRTcToInternalRtc(uint64_t epoch);
     bool isBoxOpened() const;
+    void setFunctionAllowed(byte function, bool allowed);
+
+    inline bool isFunctionAllowed(byte function) const {
+        return functionsAllowed[function];
+    }
 
     void turnOnRGB(uint32_t color);
     void turnOffRGB();
@@ -37,11 +42,12 @@ public:
     Gpio gpio;
     DS3231 RTC;
 
+    bool forceSendPosition = false;
     bool forceSendTelemetry = false;
 private:
-    char bufferText[160]{};
     bool screenOn = false;
     uint32_t ledColor = 0;
+    bool functionsAllowed[4] = {true, true, true, true};
 
     Timer timerPosition = Timer(INTERVAL_POSITION_APRS, true);
     Timer timerTelemetry = Timer(INTERVAL_TELEMETRY_APRS, false);
@@ -56,6 +62,8 @@ private:
     void showTime();
     void turnScreenOn();
     void turnScreenOff();
+
+    void printJsonSystem(const char *state) const;
 };
 
 #endif //CUBECELL_MONITORING_SYSTEM_H

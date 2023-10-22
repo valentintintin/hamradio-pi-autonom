@@ -3,7 +3,7 @@
 
 #include <CommandParser.h>
 
-typedef CommandParser<> MyCommandParser;
+typedef CommandParser<16, 2, 16, 250, 0, 32> MyCommandParser;
 
 class System;
 
@@ -22,6 +22,8 @@ private:
 
     static void doNpr(MyCommandParser::Argument *args, char *response);
 
+    static void doPosition(MyCommandParser::Argument *args, char *response);
+
     static void doTelemetry(MyCommandParser::Argument *args, char *response);
 
     static void doTelemetryParams(MyCommandParser::Argument *args, char *response);
@@ -31,6 +33,10 @@ private:
     static void doMpptPower(MyCommandParser::Argument *args, char *response);
 
     static void doLora(MyCommandParser::Argument *args, char *response);
+
+    static void doReset(MyCommandParser::Argument *args, char *response);
+
+    static void doSetEeprom(MyCommandParser::Argument *args, char *response);
 
 //    static void doSetTime(MyCommandParser::Argument *args, char *response);
 };

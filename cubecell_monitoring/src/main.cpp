@@ -5,6 +5,7 @@
 #include "System.h"
 
 extern JsonWriter serialJsonWriter(&SerialPiUsed);
+extern char bufferText[255]{};
 
 SH1107Wire  display(0x3c, 500000, SDA, SCL ,GEOMETRY_128_64,GPIO10); // addr, freq, sda, scl, resolution, rst
 CubeCell_NeoPixel pixels = CubeCell_NeoPixel(1, RGB, NEO_GRB + NEO_KHZ800);

@@ -6,9 +6,7 @@ WeatherSensors::WeatherSensors(System *system) : system(system) {
 }
 
 bool WeatherSensors::begin() {
-    dht.setup(PIN_DHT, DHT::DHT22);
-
-    return true;
+    return sensor.begin();
 }
 
 bool WeatherSensors::update() {
@@ -20,31 +18,19 @@ bool WeatherSensors::update() {
 
     Log.traceln(F("Fetch weather sensors data"));
 
-    delay(dht.getMinimumSamplingPeriod());
-
-    dht.getTemperature();
-
-    hasError = dht.getStatus() != DHT::ERROR_NONE;
-
-    if (hasError) {
-        system->serialError(PSTR("[WEATHER] Fetch DHT sensor error"));
-        system->serialError(dht.getStatusString());
-        system->displayText(PSTR("Weather error"), PSTR("Failed to fetch DHT sensor"));
-        begin();
-        return false;
-    }
-
-    temperature = dht.getTemperature();
-    humidity = dht.getHumidity();
+    temperature = sensor.read_temperature_c();
+    humidity = sensor.read_humidity();
+    pressure = sensor.read_pressure();
 
     serialJsonWriter
             .beginObject()
             .property(F("type"), PSTR("weather"))
             .property(F("temperature"), temperature)
             .property(F("humidity"), humidity)
+            .property(F("pressure"), pressure)
             .endObject(); SerialPiUsed.println();
 
-    sprintf_P(bufferText, PSTR("Temperature: %.2fC Humidity: %d%"), temperature, humidity);
+    sprintf_P(bufferText, PSTR("Temperature: %.2fC Humidity: %.2f%% Pressure: %.2fhPa"), temperature, humidity, pressure);
     Log.infoln(PSTR("[WEATHER] %s"), bufferText);
     system->displayText(PSTR("Weather"), bufferText);
 

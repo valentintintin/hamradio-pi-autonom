@@ -1,6 +1,7 @@
+#include "ArduinoLog.h"
 #include "System.h"
 #include "MpptMonitor.h"
-#include "ArduinoLog.h"
+#include <EEPROM.h>
 
 MpptMonitor::MpptMonitor(System *system, TwoWire &wire) : system(system), wire(wire) {
 }
@@ -14,6 +15,7 @@ bool MpptMonitor::begin() {
     }
 
     init = true;
+    useWatchdogSafety = true;
 
     return true;
 }
@@ -28,6 +30,9 @@ bool MpptMonitor::update() {
     if (!init && !begin()) {
         return false;
     }
+
+    bool hasImportantChange = false;
+    bool oldBoolValue;
 
     Log.traceln(F("[MPPT] Fetch charger data"));
 
@@ -76,6 +81,7 @@ bool MpptMonitor::update() {
         Log.verboseln(F("[MPPT] Charger IB : %d"), ib);
     }
 
+    oldBoolValue = night;
     if (!charger.isNight(&night)) {
         system->serialError(PSTR("[MPPT] Fetch charger data night error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data night"));
@@ -83,8 +89,10 @@ bool MpptMonitor::update() {
         return false;
     } else {
         Log.verboseln(F("[MPPT] Charger night : %d"), night);
+        hasImportantChange |= oldBoolValue != night;
     }
 
+    oldBoolValue = alert;
     if (!charger.isAlert(&alert)) {
         system->serialError(PSTR("[MPPT] Fetch charger data alert error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data alert"));
@@ -92,8 +100,10 @@ bool MpptMonitor::update() {
         return false;
     } else {
         Log.verboseln(F("[MPPT] Charger alert : %d"), alert);
+        hasImportantChange |= oldBoolValue != alert;
     }
 
+    oldBoolValue = powerEnabled;
     if (!charger.isPowerEnabled(&powerEnabled)) {
         system->serialError(PSTR("[MPPT] Fetch charger data power enabled error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data power enabled"));
@@ -101,8 +111,10 @@ bool MpptMonitor::update() {
         return false;
     } else {
         Log.verboseln(F("[MPPT] Charger power enabled : %d"), powerEnabled);
+        hasImportantChange |= oldBoolValue != powerEnabled;
     }
 
+    oldBoolValue = watchdogEnabled;
     if (!charger.getWatchdogEnable(&watchdogEnabled)) {
         system->serialError(PSTR("[MPPT] Fetch charger data watchdog error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data watchdog"));
@@ -110,8 +122,10 @@ bool MpptMonitor::update() {
         return false;
     } else {
         Log.verboseln(F("[MPPT] Charger watchdog : %d"), watchdogEnabled);
+        hasImportantChange |= oldBoolValue != watchdogEnabled;
     }
 
+    uint16_t oldIntValue = watchdogPowerOffTime;
     if (!charger.getWatchdogPoweroff(&watchdogPowerOffTime)) {
         system->serialError(PSTR("[MPPT] Fetch charger data watchdog poweroff error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data watchdog poweroff"));
@@ -119,6 +133,7 @@ bool MpptMonitor::update() {
         return false;
     } else {
         Log.verboseln(F("[MPPT] Charger watchdog poweroff : %d"), watchdogPowerOffTime);
+        hasImportantChange |= oldIntValue != watchdogPowerOffTime;
     }
 
     if (!charger.getWatchdogTimeout(&watchdogCounter)) {
@@ -136,7 +151,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.verboseln(F("[MPPT] Charger watchdog counter : %d"), watchdogCounter);
+        Log.verboseln(F("[MPPT] Charger power off voltage : %d"), powerOffVoltage);
     }
 
     if (!charger.getConfigurationValue(CFG_PWR_ON_TH, &powerOnVoltage)) {
@@ -145,7 +160,7 @@ bool MpptMonitor::update() {
         init = false;
         return false;
     } else {
-        Log.verboseln(F("[MPPT] Charger watchdog counter : %d"), watchdogCounter);
+        Log.verboseln(F("[MPPT] Charger power on voltage : %d"), powerOnVoltage);
     }
 
     serialJsonWriter
@@ -171,43 +186,40 @@ bool MpptMonitor::update() {
     Log.infoln(F("[MPPT] Vb: %dmV Ib: %dmA Vs: %dmV Is: %dmA Ic: %dmA Status: %s Night: %d Alert: %d WD: %d WDOff: %ds WDCnt: %ds 5V: %d PowOffVolt: %d PowOnVolt: %d"), vb, ib, vs, is, getCurrentCharge(), mpptChg::getStatusAsString(status), night, alert, watchdogEnabled, watchdogPowerOffTime, watchdogCounter, powerEnabled, powerOffVoltage, powerOnVoltage);
 
     sprintf_P(bufferText, PSTR("Vb:%dmV Ib:%dmA Vs:%dmV Is:%dmA Ic:%dmA Status:%s PowOnVolt: %d"), vb, ib, vs, is, getCurrentCharge(), mpptChg::getStatusAsString(status), powerOnVoltage);
-    system->displayText(PSTR("MPPT"), bufferText);
+    system->displayText(PSTR("MPPT"), bufferText, 3000);
 
     sprintf_P(bufferText, PSTR("Night:%d Alert:%d WD:%d WDOff:%ds WDCnt:%ds 5V:%d PowOffVolt: %d"), night, alert, watchdogEnabled, watchdogPowerOffTime, watchdogCounter, powerEnabled, powerOffVoltage);
-    system->displayText(PSTR("MPPT"), bufferText);
+    system->displayText(PSTR("MPPT"), bufferText, 3000);
 
     timer.restart();
+
+    if (system->isFunctionAllowed(EEPROM_ADDRESS_WATCHDOG_SAFETY)) {
+        doWatchdogSafety();
+    }
+
+    if (hasImportantChange) {
+        system->forceSendTelemetry = true;
+    }
 
     return true;
 }
 
-bool MpptMonitor::setWatchdog(uint32_t powerOffTime) {
+bool MpptMonitor::setWatchdog(uint16_t powerOffTime, uint8_t timeoutTime) {
     if (!init) {
         if (!begin()) {
             return false;
         }
     }
 
-    if (!charger.isAlert(&alert)) {
-        system->serialError(PSTR("[MPPT_WATCHDOG]Change watchdog alert error"));
-        system->displayText(PSTR("Mttp error"), PSTR("Failed to get alert for watchdog"));
-        init = false;
-        return false;
-    }
-
-    if (alert) {
-        system->serialError(PSTR("[MPPT_WATCHDOG]Change watchdog error because alert"));
-        system->displayText(PSTR("Mttp watchdog"), PSTR("Failed to set watchdog because alert"));
-        return false;
-    }
-
     bool enabled = powerOffTime > 0;
+    system->forceSendTelemetry = watchdogEnabled != enabled || powerOffTime != watchdogPowerOffTime;
 
     if (enabled) {
         if (!charger.setWatchdogPoweroff(powerOffTime)) {
             system->serialError(PSTR("[MPPT_WATCHDOG]Change watchdog poweroff error"));
             system->displayText(PSTR("Mttp error"), PSTR("Failed to set watchdog poweroff"));
             init = false;
+            system->forceSendTelemetry = false;
             return false;
         }
 
@@ -217,6 +229,7 @@ bool MpptMonitor::setWatchdog(uint32_t powerOffTime) {
             system->serialError(PSTR("[MPPT_WATCHDOG]Change watchdog counter error"));
             system->displayText(PSTR("Mttp error"), PSTR("Failed to set watchdog counter"));
             init = false;
+            system->forceSendTelemetry = false;
             return false;
         }
 
@@ -227,10 +240,20 @@ bool MpptMonitor::setWatchdog(uint32_t powerOffTime) {
         system->serialError(PSTR("[MPPT_WATCHDOG]Change watchdog enable error"));
         system->displayText(PSTR("Mttp error"), PSTR("Failed to set watchdog"));
         init = false;
+        system->forceSendTelemetry = false;
         return false;
     }
 
-    watchdogEnabled = enabled;
+    if (!charger.getWatchdogEnable(&watchdogEnabled)) {
+        system->serialError(PSTR("[MPPT] Fetch charger data watchdog error"));
+        system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch data watchdog"));
+        init = false;
+        system->forceSendTelemetry = false;
+        return false;
+    }
+
+    useWatchdogSafety = !watchdogEnabled;
+    timerWatchdogSafety.restart();
 
     sprintf_P(bufferText, PSTR("[MPPT_WATCHDOG] Watchdog state : %d. PowerOff : %d, Counter : %d"), enabled, powerOffTime, WATCHDOG_TIMEOUT);
     Log.infoln(bufferText);
@@ -248,4 +271,21 @@ bool MpptMonitor::setPowerOnOff(uint16_t powerOnVoltage, uint16_t powerOffVoltag
 
     return charger.setConfigurationValue(CFG_PWR_ON_TH, powerOnVoltage)
            && charger.setConfigurationValue(CFG_PWR_OFF_TH, powerOffVoltage);
+}
+
+void MpptMonitor::doWatchdogSafety() {
+    if (alert) {
+        useWatchdogSafety = false;
+        return;
+    }
+
+    if (useWatchdogSafety && powerEnabled) {
+        Log.traceln(F("[MPPT] Watchdog safety check, timer : %ld"), timerWatchdogSafety.getTimeLeft());
+
+        if (timerWatchdogSafety.hasExpired()) {
+            system->serialError(PSTR("[MPPT] Watchdog safety triggered ! Restart"));
+            system->displayText(PSTR("Watchdog safety"), PSTR("Triggered so restart"));
+            setWatchdog(1, 1);
+        }
+    }
 }
