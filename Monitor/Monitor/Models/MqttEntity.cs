@@ -8,6 +8,7 @@ public interface IStringConfigEntity
 {
     string Id { get; }
     bool Retain { get; }
+    bool Mqtt { get; }
     bool HasReceivedFromElsewere { get; }
 
     IObservable<string> ValueStringAsync();
@@ -16,10 +17,11 @@ public interface IStringConfigEntity
     void SetValueToInitialValue();
 }
 
-public class StringConfigEntity<T> : IStringConfigEntity
+public class ConfigEntity<T> : IStringConfigEntity
 {
     public string Id { get; }
     public bool Retain { get; }
+    public bool Mqtt { get; }
     public bool HasReceivedFromElsewere { get; private set; }
 
     public T? Value
@@ -33,9 +35,10 @@ public class StringConfigEntity<T> : IStringConfigEntity
     private readonly Subject<(T? old, T? value)> _valueSubject = new();
     private readonly T? _initialValue;
 
-    public StringConfigEntity(string id, bool retain = false, T? initialValue = default)
+    public ConfigEntity(string id, bool retain = false, T? initialValue = default, bool mqtt = false)
     {
         Retain = retain;
+        Mqtt = mqtt;
         Id = id;
         OldValue = ValuePrivate = _initialValue = initialValue;
         SetValue(initialValue);

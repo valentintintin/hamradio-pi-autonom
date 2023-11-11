@@ -111,9 +111,39 @@ public class SerialMessageService : AService
         SendCommand("reset");
     }
 
+    public void Sleep(TimeSpan timeOff)
+    {
+        SendCommand($"sleep {timeOff.TotalMilliseconds}");
+    }
+
+    public void SetTime(DateTime dateTime)
+    {
+        SendCommand($"time {new DateTimeOffset(dateTime.ToUniversalTime()).ToUnixTimeSeconds()}");
+    }
+
     public void SetWatchdogSafety(bool enabled)
     {
-        SetEepromMcu(0x01, enabled ? 1 : 0);
+        SetEepromMcu(0, enabled ? 1 : 0);
+    }
+
+    public void SetAprsDigipeater(bool enabled)
+    {
+        SetEepromMcu(1, enabled ? 1 : 0);
+    }
+
+    public void SetAprsTelemetry(bool enabled)
+    {
+        SetEepromMcu(2, enabled ? 1 : 0);
+    }
+
+    public void SetAprsPosition(bool enabled)
+    {
+        SetEepromMcu(3, enabled ? 1 : 0);
+    }
+
+    public void SetSleep(bool enabled)
+    {
+        SetEepromMcu(4, enabled ? 1 : 0);
     }
 
     public void SendLora(string message)

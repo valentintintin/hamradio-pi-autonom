@@ -7,7 +7,7 @@ namespace Monitor.Workers;
 
 public class CameraCaptureApp : AEnabledWorker
 {
-    public readonly StringConfigEntity<TimeSpan> Interval = new("cameras/interval", true, TimeSpan.FromSeconds(30));
+    public readonly ConfigEntity<TimeSpan> Interval = new("cameras/interval", true, TimeSpan.FromSeconds(90));
     
     private readonly CameraService _cameraService;
 

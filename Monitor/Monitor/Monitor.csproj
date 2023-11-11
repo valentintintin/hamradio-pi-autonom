@@ -4,13 +4,13 @@
         <TargetFramework>net7.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
         <RuntimeIdentifiers>linux-arm;linux-x64</RuntimeIdentifiers>
         <AssemblyName>Monitor</AssemblyName>
         <RootNamespace>Monitor</RootNamespace>
         <Configurations>Debug;Release</Configurations>
         <Platforms>x64;arm32</Platforms>
         <LangVersion>11</LangVersion>
+        <PublishReadyToRun>true</PublishReadyToRun>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|arm32' ">
@@ -36,19 +36,19 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="AntDesign" Version="0.15.5" />
+      <PackageReference Include="AntDesign" Version="0.16.1" />
       <PackageReference Include="AntDesign.Charts" Version="0.3.2" />
       <PackageReference Include="AprsSharp.AprsIsClient" Version="0.3.1" />
-      <PackageReference Include="JoySoftware.NetDaemon.Extensions.Scheduling" Version="23.38.0" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.12">
+      <PackageReference Include="JoySoftware.NetDaemon.Extensions.Scheduling" Version="23.44.1" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.13">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.12" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.13" />
       <PackageReference Include="MQTTnet" Version="4.3.1.873" />
       <PackageReference Include="Seq.Extensions.Logging" Version="6.1.0" />
       <PackageReference Include="SixLabors.ImageSharp" Version="3.0.2" />
-      <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.0.0" />
+      <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.0.1" />
       <PackageReference Include="SunCalcNet" Version="1.2.2" />
       <PackageReference Include="System.Device.Gpio" Version="3.0.0" />
       <PackageReference Include="System.IO.Ports" Version="7.0.0" />

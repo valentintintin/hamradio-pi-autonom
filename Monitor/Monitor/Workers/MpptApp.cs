@@ -18,8 +18,8 @@ public class MpptApp : AWorker
 
     protected override Task Start()
     {
-        StringConfigEntity<int> powerOnVoltageConfigEntity = EntitiesManagerService.Entities.MpptPowerOnVoltage;
-        StringConfigEntity<int> powerOffVoltageConfigEntity = EntitiesManagerService.Entities.MpptPowerOffVoltage;
+        ConfigEntity<int> powerOnVoltageConfigEntity = EntitiesManagerService.Entities.MpptPowerOnVoltage;
+        ConfigEntity<int> powerOffVoltageConfigEntity = EntitiesManagerService.Entities.MpptPowerOffVoltage;
 
         AddDisposable(EntitiesManagerService.Entities.MpptAlertShutdown.ValueChanges()
             .Select(v => v.value)

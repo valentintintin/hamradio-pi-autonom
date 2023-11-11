@@ -54,8 +54,11 @@
                     <Col Span="12">
                         <Statistic Title="Courant panneau" Value="EntitiesManagerService.Entities.SolarCurrent.Value" Suffix="mA" />
                     </Col>
-                    <Col Offset="8" Span="12">
+                    <Col Span="12">
                         <Statistic Title="Courant de charge" Value="EntitiesManagerService.Entities.MpptChargeCurrent.Value" Suffix="mA" />
+                    </Col>
+                    <Col Span="12">
+                        <Statistic Title="Température" Value="EntitiesManagerService.Entities.MpptTemperature.Value" Suffix="°C" />
                     </Col>
                 </Row>
                 </Body>
@@ -88,17 +91,14 @@
             <Card Title="MCU">
                 <Body>
                 <Row>
-                    <Col Span="12">
+                    <Col Span="8">
                         <Statistic Title="État" Value="EntitiesManagerService.Entities.McuStatus.Value" />
                     </Col>
-                    <Col Span="12">
+                    <Col Span="8">
                         <Statistic Title="Uptime" Value="EntitiesManagerService.Entities.McuUptime.Value.ToString()" />
                     </Col>
-                    <Col Span="12">
-                        <Statistic Title="Wifi" Value="EntitiesManagerService.Entities.GpioWifi.Value.ToFrench()" />
-                    </Col>
-                    <Col Span="12">
-                        <Statistic Title="NPR" Value="EntitiesManagerService.Entities.GpioNpr.Value.ToFrench()" />
+                    <Col Span="8">
+                        <Statistic Title="Température boîte" Value="EntitiesManagerService.Entities.TemperatureRtc.Value" Suffix="°C" />
                     </Col>
                 </Row>
                 </Body>
@@ -139,6 +139,10 @@
     <GridCol Xs="24" Md="12">
         <Card Title="Derniers indicatifs entendus">
             <Body>
+            @if (!_loraLastHeards.Any())
+            {
+                <Empty></Empty>
+            }
             <Timeline>
                 @foreach (LoraData message in _loraLastHeards)
                 {
@@ -152,6 +156,10 @@
         </Card>
         <Card Title="LoRa">
             <Body>
+            @if (!_loras.Any())
+            {
+                <Empty></Empty>
+            }
             <Timeline>
                 @foreach (LoraData message in _loras)
                 {
@@ -167,6 +175,10 @@
     <GridCol Xs="24" Md="12">
         <Card Title="Message serie">
             <Body>
+            @if (!MonitorService.State.LastMessagesReceived.Any())
+            {
+                <Empty></Empty>
+            }
             <Timeline Reverse="true">
                 @foreach (Message message in MonitorService.State.LastMessagesReceived)
                 {

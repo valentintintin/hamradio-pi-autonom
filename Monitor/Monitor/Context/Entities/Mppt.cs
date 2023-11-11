@@ -29,4 +29,6 @@ public class Mppt : IEntity
     public bool WatchdogEnabled { get; set; }
 
     public long WatchdogPowerOffTime { get; set; } 
+    
+    public float Temperature { get; set; }
 }

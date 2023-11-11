@@ -164,8 +164,8 @@ public class EntitiesManagerService : AService, IAsyncDisposable
                     config.Value = value;
                     await _context.SaveChangesAsync();
                 }
-
-                if (_mqttClient.IsConnected)
+                
+                if (configEntity.Mqtt && _mqttClient.IsConnected)
                 {
                     Logger.LogTrace("Send MQTT {entityId} to {state}", configEntity.Id, value);
 
@@ -190,42 +190,50 @@ public class EntitiesManagerService : AService, IAsyncDisposable
 
 public record MqttEntities
 {
-    public StringConfigEntity<bool> GpioWifi { get; } = new("gpio/wifi");
-    public StringConfigEntity<bool> GpioNpr { get; } = new("gpio/npr");
-    public StringConfigEntity<int> GpioBoxLdr { get; } = new("gpio/box_ldr");
+    public ConfigEntity<bool> GpioWifi { get; } = new("gpio/wifi");
+    public ConfigEntity<bool> GpioNpr { get; } = new("gpio/npr");
+    public ConfigEntity<int> GpioBoxLdr { get; } = new("gpio/box_ldr");
 
-    public StringConfigEntity<bool> StatusBoxOpened { get; } = new("status/box_opened");
+    public ConfigEntity<bool> StatusBoxOpened { get; } = new("status/box_opened", false, default, true);
 
-    public StringConfigEntity<string> McuStatus { get; } = new("mcu/status");
-    public StringConfigEntity<TimeSpan> McuUptime { get; } = new("mcu/uptime");
-
-    public StringConfigEntity<float> WeatherTemperature { get; } = new("weather/temperature");
-    public StringConfigEntity<float> WeatherHumidity { get; } = new("weather/humidity");
-    public StringConfigEntity<float> WeatherPressure { get; } = new("weather/pressure");
-
-    public StringConfigEntity<int> BatteryVoltage { get; } = new("battery/voltage");
-    public StringConfigEntity<int> BatteryCurrent { get; } = new("battery/current");
-    public StringConfigEntity<int> SolarVoltage { get; } = new("solar/voltage");
-    public StringConfigEntity<int> SolarCurrent { get; } = new("solar/current");
-    public StringConfigEntity<bool> SolarIsDay { get; } = new("solar/is_day");
-
-    public StringConfigEntity<int> MpptChargeCurrent { get; } = new("mppt/charge_current");
-    public StringConfigEntity<string> MpptStatus { get; } = new("mppt/status");
-    public StringConfigEntity<bool> MpptAlertShutdown { get; } = new("mppt/alert_shutdown");
-    public StringConfigEntity<bool> MpptPowerEnabled { get; } = new("mppt/power_enabled");
-    public StringConfigEntity<int> MpptPowerOffVoltage { get; } = new("mppt/power_off_voltage", true, 11500);
-    public StringConfigEntity<int> MpptPowerOnVoltage { get; } = new("mppt/power_on_voltage", true, 12500);
+    public ConfigEntity<string> McuStatus { get; } = new("mcu/status", false, default, true);
+    public ConfigEntity<float> TemperatureRtc { get; } = new("mcu/temperature_rtc", false, default, true);
+    public ConfigEntity<TimeSpan> McuUptime { get; } = new("mcu/uptime", false, default, true);
     
-    public StringConfigEntity<bool> WatchdogEnabled { get; } = new("watchdog/enabled");
-    public StringConfigEntity<TimeSpan> WatchdogCounter { get; } = new("watchdog/counter");
-    public StringConfigEntity<TimeSpan> WatchdogPowerOffTime { get; } = new("watchdog/power_off_time");
+    public ConfigEntity<bool> FeatureWatchdogSafetyEnabled { get; } = new("feature/watchdog_safety");
+    public ConfigEntity<bool> FeatureAprsDigipeaterEnabled { get; } = new("feature/aprs_digipeater");
+    public ConfigEntity<bool> FeatureAprsTelemetryEnabled { get; } = new("feature/aprs_telemetry");
+    public ConfigEntity<bool> FeatureAprsPositionEnabled { get; } = new("feature/aprs_position");
+    public ConfigEntity<bool> FeatureSleepEnabled { get; } = new("feature/sleep");
 
-    public StringConfigEntity<string> LoraTxPayload { get; } = new("lora/tx_payload");
+    public ConfigEntity<float> WeatherTemperature { get; } = new("weather/temperature", false, default, true);
+    public ConfigEntity<float> WeatherHumidity { get; } = new("weather/humidity", false, default, true);
+    public ConfigEntity<float> WeatherPressure { get; } = new("weather/pressure", false, default, true);
 
-    public StringConfigEntity<string> LoraRxPayload { get; } = new("lora/rx_payload");
+    public ConfigEntity<int> BatteryVoltage { get; } = new("battery/voltage", false, default, true);
+    public ConfigEntity<int> BatteryCurrent { get; } = new("battery/current", false, default, true);
+    public ConfigEntity<int> SolarVoltage { get; } = new("solar/voltage", false, default, true);
+    public ConfigEntity<int> SolarCurrent { get; } = new("solar/current", false, default, true);
+    public ConfigEntity<bool> SolarIsDay { get; } = new("solar/is_day", false, default, true);
+
+    public ConfigEntity<int> MpptChargeCurrent { get; } = new("mppt/charge_current");
+    public ConfigEntity<string> MpptStatus { get; } = new("mppt/status");
+    public ConfigEntity<bool> MpptAlertShutdown { get; } = new("mppt/alert_shutdown", false, default, true);
+    public ConfigEntity<bool> MpptPowerEnabled { get; } = new("mppt/power_enabled");
+    public ConfigEntity<int> MpptPowerOffVoltage { get; } = new("mppt/power_off_voltage", true, 11500);
+    public ConfigEntity<int> MpptPowerOnVoltage { get; } = new("mppt/power_on_voltage", true, 12500);
+    public ConfigEntity<float> MpptTemperature { get; } = new("mppt/temperature", false, default, true);
     
-    public StringConfigEntity<TimeSpan> SystemUptime { get; } = new("system/uptime");
-    public StringConfigEntity<int> SystemCpu { get; } = new("system/cpu");
-    public StringConfigEntity<int> SystemRam { get; } = new("system/ram");
-    public StringConfigEntity<int> SystemDisk { get; } = new("system/disk");
+    public ConfigEntity<bool> WatchdogEnabled { get; } = new("watchdog/enabled", false, default, true);
+    public ConfigEntity<TimeSpan> WatchdogCounter { get; } = new("watchdog/counter");
+    public ConfigEntity<TimeSpan> WatchdogPowerOffTime { get; } = new("watchdog/power_off_time");
+
+    public ConfigEntity<string> LoraTxPayload { get; } = new("lora/tx_payload", false, default, true);
+
+    public ConfigEntity<string> LoraRxPayload { get; } = new("lora/rx_payload", false, default, true);
+    
+    public ConfigEntity<TimeSpan> SystemUptime { get; } = new("system/uptime", false, default, true);
+    public ConfigEntity<int> SystemCpu { get; } = new("system/cpu");
+    public ConfigEntity<int> SystemRam { get; } = new("system/ram");
+    public ConfigEntity<int> SystemDisk { get; } = new("system/disk", false, default, true);
 }

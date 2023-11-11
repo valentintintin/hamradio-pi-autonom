@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using Monitor.Exceptions;
@@ -12,6 +13,8 @@ namespace Monitor.Services;
 
 public class CameraService : AService
 {
+    private bool _isRunning;
+
     private readonly string _storagePath;
     private readonly string? _message;
     private readonly Font _fontTitle, _fontInfo, _fontFooter;
@@ -19,10 +22,11 @@ public class CameraService : AService
     private readonly List<FswebcamParameters> _fswebcamParameters;
 
     private const int FrameToTakeDuringNight = 25;
-    private const int WidthData = 600;
+    private const int WidthData = 700;
     private const int LegendSize = 70;
+    private const int LegendMargin = 15;
     private readonly int _widthMaxProgressBar;
-    
+
     public CameraService(ILogger<CameraService> logger, IConfiguration configuration) : base(logger)
     {
         IConfigurationSection configurationSection = configuration.GetSection("Cameras");
@@ -47,7 +51,7 @@ public class CameraService : AService
             Method = WebpEncodingMethod.Fastest,
         };
 
-        _widthMaxProgressBar = WidthData - LegendSize * 2;
+        _widthMaxProgressBar = WidthData - (LegendSize + LegendMargin) * 2;
     }
 
     public string? GetFinalLast()
@@ -74,15 +78,24 @@ public class CameraService : AService
     public async Task<MemoryStream> CreateFinalImageFromLasts(bool save = true)
     {
         Logger.LogInformation("Create final image");
+
+        if (_isRunning)
+        {
+            throw new WarningException("Already running");
+        }
+
+        _isRunning = true;
         
         List<Image> imagesCamera = new();
 
         foreach (string file in CaptureAllCameras())
         {
+            Logger.LogTrace("Load photo {file}", file);
+            
             imagesCamera.Add(await Image.LoadAsync(file));
         }
 
-        Logger.LogTrace("We have {count} cameras", imagesCamera.Count);
+        Logger.LogTrace("We have {count} photos", imagesCamera.Count);
 
         int width = 0;
         int height = 480;
@@ -100,12 +113,14 @@ public class CameraService : AService
         
         dataImage.Mutate(ctx =>
         {
+            Logger.LogTrace("Draw title on image");
+
             ctx.DrawText(
                 $"{now.ToFrench():G}",
                 _fontTitle,
                 Color.White,
-                new PointF(LegendSize, 10));
-
+                new PointF(LegendMargin + LegendSize, 10));
+            
             DrawProgressBarwithInfo(ctx, 0, "Tension batterie", "mV", EntitiesManagerService.Entities.BatteryVoltage.Value, 11000, 13500, Color.IndianRed, Color.Black);
             DrawProgressBarwithInfo(ctx, 1, "Courant batterie", "mA", EntitiesManagerService.Entities.BatteryCurrent.Value, 0, 1000, Color.Cyan, Color.Black);
             DrawProgressBarwithInfo(ctx, 2, "Tension panneau", "mV", EntitiesManagerService.Entities.SolarVoltage.Value, 0, 25000, Color.Yellow, Color.Black);
@@ -116,11 +131,13 @@ public class CameraService : AService
 
             if (!string.IsNullOrWhiteSpace(_message))
             {
+                Logger.LogTrace("Draw footer on image");
+
                 ctx.DrawText(
                     _message,
                     _fontFooter,
                     Color.White,
-                    new PointF(0, height - 30));
+                    new PointF(LegendMargin, height - 30));
             }
         });
         
@@ -130,12 +147,18 @@ public class CameraService : AService
 
             foreach (Image image in imagesCamera)
             {
+                Logger.LogTrace("Draw image at {x} on image", x);
+
                 ctx.DrawImage(image, new Point(x, 0), 1);
                 x += image.Width;
             }
+            
+            Logger.LogTrace("Draw date image on image");
 
             ctx.DrawImage(dataImage, new Point(width, 0), 1);
         });
+        
+        Logger.LogTrace("Saving image to stream");
         
         MemoryStream stream = new();
         await resultImage.SaveAsync(stream, _imageEncoder);
@@ -157,7 +180,9 @@ public class CameraService : AService
         }
         
         Logger.LogInformation("Create final image OK");
-
+        
+        _isRunning = false;
+        
         return stream;
     }
 
@@ -167,7 +192,7 @@ public class CameraService : AService
 
         return _fswebcamParameters.Select(parameters =>
         {
-            string cameraName = parameters.Device.Replace("/dev/", string.Empty);
+            string cameraName = parameters.Device.Replace("/dev/v4l/by-id/", string.Empty);
 
             Logger.LogTrace("Capture image from {camera}", cameraName);
 
@@ -180,27 +205,29 @@ public class CameraService : AService
     
     private void DrawProgressBarwithInfo(IImageProcessingContext ctx, int indexValue, string label, string unit, double value, double min, double max, Color colorBar, Color colorText)
     {
+        Logger.LogTrace("Draw bar on image for {label}", label);
+
         int y = indexValue * 50 + 60;
         
-        ctx.Fill(Color.LightGray, new Rectangle(LegendSize, y, _widthMaxProgressBar, 24));
-        ctx.Fill(colorBar, new Rectangle(LegendSize, y, 
-            MapValue(value, min, max, 0, _widthMaxProgressBar),
+        ctx.Fill(Color.LightGray, new Rectangle(LegendMargin + LegendSize, y, _widthMaxProgressBar, 24));
+        ctx.Fill(colorBar, new Rectangle(LegendMargin + LegendSize, y, 
+            (int) Math.Round((double) MapValue(value, min, max, 0, _widthMaxProgressBar), 2),
             24));
         ctx.DrawText(
             $"{label}: {value} {unit}",
             _fontInfo,
             colorText,
-            new PointF(LegendSize + 50, y + 2));
+            new PointF(LegendMargin + LegendSize + 50, y + 2));
         ctx.DrawText(
             $"{min.ToString(CultureInfo.CurrentCulture)}",
             _fontInfo,
             Color.White,
-            new PointF(0, y + 2));
+            new PointF(LegendMargin, y + 2));
         ctx.DrawText(
             $"{max.ToString(CultureInfo.CurrentCulture)}",
             _fontInfo,
             Color.White,
-            new PointF(LegendSize + _widthMaxProgressBar + 5, y + 2));
+            new PointF(LegendMargin + LegendSize + _widthMaxProgressBar + 5, y + 2));
     }
     
     private int MapValue(double value, double inMin, double inMax, double outMin, double outMax)
@@ -234,9 +261,9 @@ public class CameraService : AService
         
         if (process.ExitCode == 0)
         {
-            if (errorStream.Contains("No frames captured") || standardStream.Contains("No frames captured"))
+            if (errorStream.Length > 0 || standardStream.Contains("No frames captured"))
             {
-                throw new WebcamException(stream);
+                // throw new WebcamException(stream); // TODO uncomment
             }
             
             Logger.LogInformation("Image captured successfully for device {device}", parameters.Device);

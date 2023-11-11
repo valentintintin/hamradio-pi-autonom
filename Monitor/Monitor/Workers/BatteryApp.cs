@@ -9,15 +9,15 @@ namespace Monitor.Workers;
 
 public class BatteryApp : AWorker
 {
-    public static readonly StringConfigEntity<bool> NightEnabled = new("night/enabled", true);
-    public static readonly StringConfigEntity<bool> NightTurnOn = new("night/turn_on", true);
-    public static readonly StringConfigEntity<int> NightLimitVoltage = new("night/limit_voltage", true, 11600);
-    public static readonly StringConfigEntity<TimeSpan> NightTimeOff = new("night/time_off", true, TimeSpan.FromMinutes(60));
-    public static readonly StringConfigEntity<bool> NightUseSun = new("night/use_sun", true);
+    public static readonly ConfigEntity<bool> NightEnabled = new("night/enabled", true);
+    public static readonly ConfigEntity<bool> NightTurnOn = new("night/turn_on", true);
+    public static readonly ConfigEntity<int> NightLimitVoltage = new("night/limit_voltage", true, 11600);
+    public static readonly ConfigEntity<TimeSpan> NightTimeOff = new("night/time_off", true, TimeSpan.FromMinutes(60));
+    public static readonly ConfigEntity<bool> NightUseSun = new("night/use_sun", true);
     
-    public static readonly StringConfigEntity<bool> LowBatteryEnabled = new("low_battery/enabled", true);
-    public static readonly StringConfigEntity<int> LowBatteryVoltage = new("low_battery/voltage", true, 11600);
-    public static readonly StringConfigEntity<TimeSpan> LowBatteryTimeOff = new("low_battery/time_off", true, TimeSpan.FromMinutes(30));
+    public static readonly ConfigEntity<bool> LowBatteryEnabled = new("low_battery/enabled", true);
+    public static readonly ConfigEntity<int> LowBatteryVoltage = new("low_battery/voltage", true, 11600);
+    public static readonly ConfigEntity<TimeSpan> LowBatteryTimeOff = new("low_battery/time_off", true, TimeSpan.FromMinutes(30));
 
     private readonly (double latitude, double longitude, int altitude) _position;
     private readonly SystemService _systemService;

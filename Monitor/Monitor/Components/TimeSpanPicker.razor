@@ -1,7 +1,6 @@
 @using Monitor.Extensions
-@using Microsoft.AspNetCore.Components
 
-<TimePicker Value="Value" OnChange="OnChange" AllowClear="false" ShowToday="false" />
+<TimePicker TValue="TimeOnly?" Value="Value" OnChange="OnChange" AllowClear="false" ShowToday="false" />
 
 @code {
     [Parameter]
@@ -10,15 +9,15 @@
     [Parameter]
     public EventCallback<TimeSpan> ModelChanged { get; set; }
     
-    private DateTime Value
+    private TimeOnly Value
     {
-        get => Model.ToDateTime();
-        set => Model = value.TimeOfDay;
+        get => TimeOnly.FromTimeSpan(Model);
+        set => Model = value.ToTimeSpan();
     }
 
-    private async Task OnChange(DateTimeChangedEventArgs arg)
+    private async Task OnChange(DateTimeChangedEventArgs<TimeOnly?> arg)
     {
-        Value = arg.Date ?? DateTime.MinValue;
+        Value = arg.Date ?? TimeOnly.MinValue;
         await ModelChanged.InvokeAsync(Model);
     }
 }

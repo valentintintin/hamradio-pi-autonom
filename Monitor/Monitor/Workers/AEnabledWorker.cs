@@ -6,11 +6,11 @@ namespace Monitor.Workers;
 
 public abstract class AEnabledWorker : AWorker
 {
-    public readonly StringConfigEntity<bool> Enabled;
+    public readonly ConfigEntity<bool> Enabled;
     
     protected AEnabledWorker(ILogger<AEnabledWorker> logger, IServiceProvider serviceProvider) : base(logger, serviceProvider)
     {
-        Enabled = new StringConfigEntity<bool>($"worker/{GetType().Name.ToLower().Replace("app", "")}", true, true);
+        Enabled = new ConfigEntity<bool>($"worker/{GetType().Name.ToLower().Replace("app", "")}", true, true);
         EntitiesManagerService.Add(Enabled);
     }
 

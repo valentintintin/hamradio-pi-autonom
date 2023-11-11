@@ -35,6 +35,12 @@ public class MonitorService : AService
                 
                 EntitiesManagerService.Entities.McuStatus.SetValue(systemData.State);
                 EntitiesManagerService.Entities.StatusBoxOpened.SetValue(systemData.BoxOpened);
+                EntitiesManagerService.Entities.FeatureWatchdogSafetyEnabled.SetValue(systemData.WatchdogSafetyEnabled);
+                EntitiesManagerService.Entities.FeatureAprsDigipeaterEnabled.SetValue(systemData.AprsDigipeaterEnabled);
+                EntitiesManagerService.Entities.FeatureAprsTelemetryEnabled.SetValue(systemData.AprsTelemetryEnabled);
+                EntitiesManagerService.Entities.FeatureAprsPositionEnabled.SetValue(systemData.AprsPositionEnabled);
+                EntitiesManagerService.Entities.FeatureSleepEnabled.SetValue(systemData.Sleep);
+                EntitiesManagerService.Entities.TemperatureRtc.SetValue(systemData.TemperatureRtc);
                 break;
             case WeatherData weatherData:
                 Logger.LogTrace("New weather data received : {message}", weatherData);
@@ -72,6 +78,7 @@ public class MonitorService : AService
                 EntitiesManagerService.Entities.WatchdogPowerOffTime.SetValue(TimeSpan.FromSeconds(mpptData.WatchdogPowerOffTime));
                 EntitiesManagerService.Entities.MpptPowerOffVoltage.SetValue(mpptData.PowerOffVoltage);
                 EntitiesManagerService.Entities.MpptPowerOnVoltage.SetValue(mpptData.PowerOnVoltage);
+                EntitiesManagerService.Entities.MpptTemperature.SetValue(mpptData.Temperature);
 
                 context.Add(new Mppt
                 {
@@ -85,7 +92,8 @@ public class MonitorService : AService
                     Night = mpptData.Night,
                     Alert = mpptData.Alert,
                     WatchdogEnabled = mpptData.WatchdogEnabled,
-                    WatchdogPowerOffTime = mpptData.WatchdogPowerOffTime
+                    WatchdogPowerOffTime = mpptData.WatchdogPowerOffTime,
+                    Temperature = mpptData.Temperature
                 });
                 await context.SaveChangesAsync();
                 break;
@@ -113,7 +121,8 @@ public class MonitorService : AService
                     Wifi = gpioData.Wifi,
                     Uptime = (long)EntitiesManagerService.Entities.SystemUptime.Value.TotalSeconds,
                     BoxOpened = State.McuSystem.BoxOpened,
-                    McuUptime = State.Time.Uptime
+                    McuUptime = State.Time.Uptime,
+                    TemperatureRtc = State.McuSystem.TemperatureRtc
                 });
                 await context.SaveChangesAsync();
                 break;

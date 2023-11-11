@@ -48,6 +48,9 @@ public class MpptData : Message
 
     [JsonPropertyName("powerOnVoltage")]
     public int PowerOnVoltage { get; set; }
+    
+    [JsonPropertyName("temperature")]
+    public float Temperature { get; set; }
 
     [JsonIgnore]
     public TimeSpan WatchdogCounterTimeSpan => TimeSpan.FromSeconds(WatchdogCounter);

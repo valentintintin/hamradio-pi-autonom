@@ -69,6 +69,7 @@ public class AprsIsApp : AEnabledWorker
         if (!HasStationHeard())
         {
             Logger.LogInformation("No station heard since {duration}. So no TX", _durationHeard);
+            return;
         }
 
         Packet packetToSend = new(_callsign, new List<string> { "TCPIP", _callsign }, packet.InfoField);

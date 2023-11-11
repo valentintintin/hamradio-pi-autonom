@@ -14,4 +14,6 @@ public class System : IEntity
     public long Uptime { get; set; }
     
     public long McuUptime { get; set; }
+    
+    public float TemperatureRtc { get; set; }
 }

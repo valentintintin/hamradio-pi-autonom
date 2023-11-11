@@ -127,8 +127,8 @@
     <GridCol Md="24" Lg="12">
         <Card Title="LoRa TX">
             <Body>
-            <Switch @bind-Checked="AprsIsApp.Enabled.Value"></Switch>
-            <Input @bind-Value="LoRaTxPayload" Placeholder="Payload" />
+            <Switch @bind-Checked="AprsIsApp.Enabled.Value" CheckedChildren="Igate TX activé" UnCheckedChildren="Igate TX désactivé"></Switch>
+            <Input @bind-Value="LoRaTxPayload" Placeholder="Payload"/>
             <Button Type="@ButtonType.Primary" HtmlType="button" OnClick="SendLoRa">
                 Envoyer
             </Button>
@@ -142,6 +142,29 @@
             <Button Type="@ButtonType.Primary" HtmlType="button" OnClick="SendSerial">
                 Envoyer
             </Button>
+            </Body>
+        </Card>
+    </GridCol>
+    <GridCol Md="24" Lg="12">
+        <Card Title="Fonctions MCU">
+            <Body>
+            <Descriptions Bordered="true" Column="1">
+                <DescriptionsItem Title="Watchdog Safety">
+                    <Switch @bind-Checked="EntitiesManagerService.Entities.FeatureWatchdogSafetyEnabled.Value"></Switch>
+                </DescriptionsItem>
+                <DescriptionsItem Title="APRS DigiPeater">
+                    <Switch @bind-Checked="EntitiesManagerService.Entities.FeatureAprsDigipeaterEnabled.Value"></Switch>
+                </DescriptionsItem>
+                <DescriptionsItem Title="APRS Télémétrie">
+                    <Switch @bind-Checked="EntitiesManagerService.Entities.FeatureAprsTelemetryEnabled.Value"></Switch>
+                </DescriptionsItem>
+                <DescriptionsItem Title="APRS Position">
+                    <Switch @bind-Checked="EntitiesManagerService.Entities.FeatureAprsPositionEnabled.Value"></Switch>
+                </DescriptionsItem>
+                <DescriptionsItem Title="Sleep">
+                    <Switch @bind-Checked="EntitiesManagerService.Entities.FeatureSleepEnabled.Value"></Switch>
+                </DescriptionsItem>
+            </Descriptions>
             </Body>
         </Card>
     </GridCol>

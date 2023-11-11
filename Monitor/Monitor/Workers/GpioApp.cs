@@ -7,8 +7,8 @@ namespace Monitor.Workers;
 
 public class GpioApp : AWorker
 {
-    public readonly StringConfigEntity<bool> StartWifiTurnOn = new("gpio/start_wifi_turn_on", true);
-    public readonly StringConfigEntity<bool> StartNprTurnOn = new("gpio/start_npr_turn_on", true);
+    public readonly ConfigEntity<bool> StartWifiTurnOn = new("gpio/start_wifi_turn_on", true);
+    public readonly ConfigEntity<bool> StartNprTurnOn = new("gpio/start_npr_turn_on", true);
     
     private readonly SerialMessageService _serialMessageService;
 

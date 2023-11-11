@@ -45,6 +45,7 @@ builder.Services.AddSingleton<GpioApp>();
 builder.Services.AddSingleton<CameraCaptureApp>();
 builder.Services.AddSingleton<SerialPortMcuCommandsApp>();
 builder.Services.AddSingleton<AprsIsApp>();
+builder.Services.AddSingleton<McuFeatureApp>();
 
 builder.Services.AddHostedService(services => services.GetRequiredService<MpptApp>());
 builder.Services.AddHostedService(services => services.GetRequiredService<GpioApp>());
@@ -53,6 +54,7 @@ builder.Services.AddHostedService(services => services.GetRequiredService<Watchd
 builder.Services.AddHostedService(services => services.GetRequiredService<BatteryApp>());
 builder.Services.AddHostedService(services => services.GetRequiredService<CameraCaptureApp>());
 builder.Services.AddHostedService(services => services.GetRequiredService<AprsIsApp>());
+builder.Services.AddHostedService(services => services.GetRequiredService<McuFeatureApp>());
 
 builder.Services.AddHostedService<MqttConnect>();
 
@@ -85,7 +87,7 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/storage"
 });
 
-using IServiceScope scope = app.Services.GetService<IServiceScopeFactory>()!.CreateScope();
+using IServiceScope scope = app.Services.GetService<IServiceScopeFactory>()!.CreateAsyncScope();
 await scope.ServiceProvider.GetRequiredService<DataContext>().Database.MigrateAsync();
 
 LocaleProvider.DefaultLanguage = "fr-FR";
