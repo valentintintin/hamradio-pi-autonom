@@ -13,12 +13,13 @@ public:
     explicit Communication(System *system);
 
     bool begin(RadioEvents_t *radioEvents);
-    void update(bool sendTelemetry, bool sendPosition);
+    void update(bool sendTelemetry, bool sendPosition, bool sendStatus);
     void sent();
     void received(uint8_t * payload, uint16_t size, int16_t rssi, int8_t snr);
 
     void sendMessage(const char* destination, const char* message, const char* ackToConfirm = nullptr);
     void sendPosition(const char* comment);
+    void sendStatus(const char* comment);
     void sendTelemetry();
     void sendTelemetryParams();
 

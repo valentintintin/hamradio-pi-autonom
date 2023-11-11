@@ -16,7 +16,7 @@ bool WeatherSensors::update() {
 
     timer.restart();
 
-    Log.traceln(F("Fetch weather sensors data"));
+    Log.traceln(F("[WEATHER] Fetch weather sensors data"));
 
     temperature = sensor.read_temperature_c();
     humidity = sensor.read_humidity();
@@ -28,7 +28,7 @@ bool WeatherSensors::update() {
             .property(F("temperature"), temperature)
             .property(F("humidity"), humidity)
             .property(F("pressure"), pressure)
-            .endObject(); SerialPiUsed.println();
+            .endObject(); SerialPi->println();
 
     sprintf_P(bufferText, PSTR("Temperature: %.2fC Humidity: %.2f%% Pressure: %.2fhPa"), temperature, humidity, pressure);
     Log.infoln(PSTR("[WEATHER] %s"), bufferText);

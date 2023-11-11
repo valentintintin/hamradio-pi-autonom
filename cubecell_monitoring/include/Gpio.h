@@ -25,7 +25,6 @@ public:
     }
 private:
     System *system;
-//    char buffer[64]{};
     bool initialized = false;
 
     bool wifi = false;

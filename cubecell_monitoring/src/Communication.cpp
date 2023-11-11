@@ -80,8 +80,12 @@ bool Communication::begin(RadioEvents_t *radioEvents) {
     return true;
 }
 
-void Communication::update(bool sendTelemetry, bool sendPosition) {
+void Communication::update(bool sendTelemetry, bool sendPosition, bool sendStatus) {
     Radio.IrqProcess();
+
+    if (sendStatus && system->isFunctionAllowed(EEPROM_ADDRESS_APRS_POSITION)) {
+        this->sendStatus(PSTR(APRS_STATUS));
+    }
 
     if (sendPosition && system->isFunctionAllowed(EEPROM_ADDRESS_APRS_POSITION)) {
         this->sendPosition(PSTR(APRS_COMMENT));
@@ -98,7 +102,7 @@ void Communication::send() {
 
     Log.traceln(F("[LORA_TX] Radio status : %d"), Radio.GetStatus());
 
-    system->turnOnRGB(COLOR_SEND);
+    system->turnOnRGB(COLOR_YELLOW);
 
     while (USE_RF && !(Radio.GetStatus() == RF_RX_RUNNING || Radio.GetStatus() == RF_IDLE)) {
         Log.warningln(F("[LORA_TX] Locked. Radio Status : %d"), Radio.GetStatus());
@@ -108,7 +112,7 @@ void Communication::send() {
 
     Log.traceln(F("[LORA_TX] Radio ready, status : %d"), Radio.GetStatus());
 
-    system->turnOnRGB(COLOR_SEND);
+    system->turnOnRGB(COLOR_RED);
 
     uint8_t size = Aprs::encode(&aprsPacketTx, bufferText);
 
@@ -135,12 +139,13 @@ void Communication::send() {
                 .property(F("type"), PSTR("lora"))
                 .property(F("state"), PSTR("tx"))
                 .property(F("payload"), bufferText)
-                .endObject(); SerialPiUsed.println();
+                .endObject(); SerialPi->println();
 
         Log.infoln(F("[LORA_TX] Start send : %s"), bufferText);
         system->displayText("LoRa send", bufferText);
 
         if (!USE_RF) {
+            delay(1000);
             sent();
         }
     }
@@ -227,6 +232,18 @@ void Communication::sendPosition(const char* comment) {
     send();
 }
 
+void Communication::sendStatus(const char* comment) {
+    strcpy_P(aprsPacketTx.path, PSTR(APRS_PATH));
+    strcpy_P(aprsPacketTx.source, PSTR(APRS_CALLSIGN));
+    strcpy_P(aprsPacketTx.destination, PSTR(APRS_DESTINATION));
+    aprsPacketTx.content[0] = '\0';
+    strcpy(aprsPacketTx.comment, comment);
+
+    aprsPacketTx.type = Status;
+
+    send();
+}
+
 void Communication::sent() {
     Radio.IrqProcess();
     Radio.Rx(0);
@@ -247,17 +264,17 @@ void Communication::received(uint8_t * payload, uint16_t size, int16_t rssi, int
             .property(F("type"), PSTR("lora"))
             .property(F("state"), PSTR("rx"))
             .property(F("payload"), payload)
-            .endObject(); SerialPiUsed.println();
+            .endObject(); SerialPi->println();
 
     for (uint16_t i = 0; i < size; i++) {
         Log.verboseln(F("[LORA_RX] Payload[%d]=%X %c"), i, payload[i], payload[i]);
     }
 
-    system->turnOnRGB(COLOR_RECEIVED);
-
+    system->turnOnRGB(COLOR_GREEN);
     system->displayText("LoRa received", reinterpret_cast<const char *>(payload));
-
     system->turnOffRGB();
+
+    bool shouldTx = false;
 
     if (!Aprs::decode(reinterpret_cast<const char *>(payload + sizeof(uint8_t) * 3), &aprsPacketRx)) {
         system->serialError(PSTR("[APRS] Error during decode"));
@@ -280,7 +297,7 @@ void Communication::received(uint8_t * payload, uint16_t size, int16_t rssi, int
             // Digi only for WIDE1-1 or VIA Callsign
             const char *hasWide = strstr_P(aprsPacketRx.path, PSTR("WIDE1-1"));
             const char *hasCallsign = strstr_P(aprsPacketRx.path, PSTR(APRS_CALLSIGN));
-            bool shouldTx = hasWide != nullptr || hasCallsign != nullptr;
+            shouldTx = hasWide != nullptr || hasCallsign != nullptr;
 
             Log.traceln(F("[APRS] Message should TX : %d. hasWide : %d, hasCallsign : %d"), shouldTx,
                         hasWide != nullptr, hasCallsign != nullptr);
@@ -307,5 +324,9 @@ void Communication::received(uint8_t * payload, uint16_t size, int16_t rssi, int
                 }
             }
         }
+    }
+
+    if (!shouldTx) {
+        system->turnOffRGB();
     }
 }

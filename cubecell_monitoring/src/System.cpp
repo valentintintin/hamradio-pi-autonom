@@ -3,29 +3,36 @@
 #include <EEPROM.h>
 #include "System.h"
 
-System::System(SH1107Wire *display, CubeCell_NeoPixel *pixels) :
-        display(display), pixels(pixels), RTC(WireUsed),
+#ifdef USE_SCREEN
+System::System(SH1107Wire *display, CubeCell_NeoPixel *pixels, TimerEvent_t *wakeUpEvent) :
+        display(display), pixels(pixels), wakeUpEvent(wakeUpEvent),
         mpptMonitor(this, WireUsed), weatherSensors(this), gpio(this), command(this) {
 }
+#else
+System::System(CubeCell_NeoPixel *pixels, TimerEvent_t *wakeUpEvent) :
+        pixels(pixels), RTC(Wire), wakeUpEvent(wakeUpEvent),
+        mpptMonitor(this, Wire), weatherSensors(this), gpio(this), command(this) {
+}
+#endif
 
 bool System::begin(RadioEvents_t *radioEvents) {
     Log.infoln(F("[SYSTEM] Starting"));
     printJsonSystem(PSTR("Starting"));
 
-    Wire.begin(SDA, SCL, 500000);
-
-    if (&WireUsed != &Wire) {
-        WireUsed.begin(SDA1, SCL1);
-    }
+    Wire.begin();
 
     pixels->begin();
     pixels->clear();
 
+#ifdef USE_SCREEN
     if (!display->init()) {
         serialError(PSTR("[SYSTEM] Display error"));
     }
+#endif
 
     turnScreenOn();
+
+    turnOnRGB(COLOR_CYAN);
 
     EEPROM.begin(512);
 
@@ -81,8 +88,8 @@ bool System::begin(RadioEvents_t *radioEvents) {
 void System::update() {
     Stream *streamReceived = nullptr;
 
-    if (Serial1.available()) {
-        streamReceived = &Serial1;
+    if (SerialPi->available()) {
+        streamReceived = SerialPi;
         Log.verboseln(F("Serial Pi incoming"));
     } else if (Serial.available()) {
         streamReceived = &Serial;
@@ -90,8 +97,6 @@ void System::update() {
     }
 
     if (streamReceived != nullptr) {
-        turnOnRGB(COLOR_RXWINDOW1);
-
         size_t lineLength = streamReceived->readBytesUntil('\n', bufferText, 150);
         bufferText[lineLength] = '\0';
 
@@ -134,8 +139,12 @@ void System::update() {
             }
         }
 
-        if (timerTelemetry.hasExpired() || timerPosition.hasExpired() || forceSendTelemetry || forceSendPosition) {
-            communication->update(forceSendTelemetry || timerTelemetry.hasExpired(), forceSendPosition || timerPosition.hasExpired());
+        if (timerTelemetry.hasExpired() || timerPosition.hasExpired() || timerStatus.hasExpired()
+            || forceSendTelemetry || forceSendPosition
+        ) {
+            communication->update(forceSendTelemetry || timerTelemetry.hasExpired(),
+                                  forceSendPosition || timerPosition.hasExpired(),
+                                  forceSendPosition || timerStatus.hasExpired());
             forceSendTelemetry = false;
             forceSendPosition = false;
 
@@ -145,6 +154,10 @@ void System::update() {
 
             if (timerPosition.hasExpired()) {
                 timerPosition.restart();
+            }
+
+            if (timerStatus.hasExpired()) {
+                timerStatus.restart();
             }
         }
     }
@@ -168,7 +181,7 @@ void System::turnOnRGB(uint32_t color) {
 
         ledColor = color;
 
-        Log.traceln(F("Turn led color : %l"), color);
+        Log.traceln(F("[LED] Turn led color : 0x%x"), color);
 
         uint8_t red, green, blue;
         red = (uint8_t) (color >> 16);
@@ -185,10 +198,12 @@ void System::turnOffRGB() {
 
 void System::turnScreenOn() {
     if (!screenOn) {
-        Log.traceln(F("Turn screen on"));
-
-        display->wakeup();
         screenOn = true;
+        Log.traceln(F("[SCREEN/LED] Turn screen/led on"));
+
+#ifdef USE_SCREEN
+        display->wakeup();
+#endif
 
         timerScreen.restart();
     }
@@ -196,9 +211,11 @@ void System::turnScreenOn() {
 
 void System::turnScreenOff() {
     if (screenOn) {
-        Log.traceln(F("Turn screen off"));
-
+        Log.traceln(F("[SCREEN/LED] Turn screen/led off"));
+#ifdef USE_SCREEN
         display->sleep();
+#endif
+
         screenOn = false;
     }
 
@@ -206,17 +223,18 @@ void System::turnScreenOff() {
 }
 
 void System::displayText(const char *title, const char *content, uint16_t pause) const {
+#ifdef USE_SCREEN
     if (!screenOn) {
         return;
     }
 
     Log.traceln(F("[Display] %s --> %s"), title, content);
-
     display->clear();
     display->drawString(0, 0, title);
     display->drawStringMaxWidth(0, 10, 120, content);
     display->display();
     delay(pause);
+#endif
 }
 
 DateTime System::nowToString(char *result) {
@@ -241,9 +259,9 @@ void System::showTime() {
             .property(F("type"), PSTR("time"))
             .property(F("state"), now.unixtime())
             .property(F("uptime"), millis() / 1000)
-            .endObject(); SerialPiUsed.println();
+            .endObject(); SerialPi->println();
 
-    Log.infoln(F("[TIME] %s"), bufferText);
+    Log.infoln(F("[TIME] %s. Temperature RTC: %dC"), bufferText, RTC.getTemperature());
     displayText(PSTR("Time"), bufferText, 1000);
 }
 
@@ -257,13 +275,18 @@ bool System::isBoxOpened() const {
     return millis() >= 60000 && gpio.getLdr() >= LDR_ALARM_LEVEL;
 }
 
-void System::serialError(const char *content) const {
+void System::serialError(const char *content) {
+    turnOnRGB(COLOR_VIOLET);
     Log.errorln(content);
     printJsonSystem((char*)content);
+    delay(2000);
+    turnOffRGB();
 }
 
 void System::setFunctionAllowed(byte function, bool allowed) {
-    Log.infoln(F("[EEPROM] Set %d to %d"), function, allowed);
+    sprintf_P(bufferText, PSTR("[EEPROM] Set %d to %d"), function, allowed);
+    Log.infoln(bufferText);
+    displayText("EEPROM", bufferText);
 
     functionsAllowed[function] = allowed;
 
@@ -271,15 +294,29 @@ void System::setFunctionAllowed(byte function, bool allowed) {
     EEPROM.commit();
 }
 
-void System::printJsonSystem(const char *state) const {
+void System::printJsonSystem(const char *state) {
     serialJsonWriter
             .beginObject()
             .property(F("type"), PSTR("system"))
             .property(F("state"), (char*)state)
             .property(F("boxOpened"), isBoxOpened())
-            .property(F("watchdogSefaty"), functionsAllowed[EEPROM_ADDRESS_WATCHDOG_SAFETY])
+            .property(F("temperatureRtc"), RTC.getTemperature())
+            .property(F("watchdogSafety"), functionsAllowed[EEPROM_ADDRESS_WATCHDOG_SAFETY])
             .property(F("aprsDigipeater"), functionsAllowed[EEPROM_ADDRESS_APRS_DIGIPEATER])
             .property(F("aprsTelemetry"), functionsAllowed[EEPROM_ADDRESS_APRS_TELEMETRY])
             .property(F("aprsPosition"), functionsAllowed[EEPROM_ADDRESS_APRS_POSITION])
-            .endObject(); SerialPiUsed.println();
+            .endObject(); SerialPi->println();
+}
+
+void System::sleep(uint64_t time) {
+    sprintf_P(bufferText, PSTR("[SLEEP] Sleep during %dms"), time);
+    Log.infoln(bufferText);
+    displayText("Sleep", bufferText);
+
+    digitalWrite(Vext,HIGH); // 0V
+    Radio.Sleep();
+    TimerSetValue(wakeUpEvent, time);
+    TimerStart(wakeUpEvent);
+
+    lowPowerHandler();
 }

@@ -1,13 +1,14 @@
 #ifndef CUBECELL_MONITORING_CONFIG_H
 #define CUBECELL_MONITORING_CONFIG_H
 
+#include <softSerial.h>
 #include <JsonWriter.h>
 
 #define LOG_LEVEL LOG_LEVEL_TRACE
-#define WireUsed Wire
-#define SerialPiUsed Serial1
 
-#define USE_RF true
+//#define USE_SCREEN
+#define USE_SOFT_SERIAL
+#define USE_RF false
 #define USE_RTC true
 #define SET_RTC 0
 
@@ -29,11 +30,12 @@
 #define TRX_BUFFER 210
 
 #define INTERVAL_TELEMETRY_APRS 300000 // 5 minutes
-#define INTERVAL_POSITION_APRS 900000 // 15 minutes
+#define INTERVAL_POSITION_APRS 300000 // 5 minutes
+#define INTERVAL_STATUS_APRS 3600000 // 60 minutes
 #define INTERVAL_ALARM_BOX_OPENED_APRS 120000 // 2 minutes
 
 #define INTERVAL_WEATHER 30000
-#define INTERVAL_MPPT 10000
+#define INTERVAL_MPPT 30000
 #define INTERVAL_TIME 30000
 #define TIME_PAUSE_SCREEN 1500
 #define TIME_SCREEN_ON 30000
@@ -46,15 +48,21 @@
 #define APRS_LATITUDE 45.325776
 #define APRS_LONGITUDE 5.63658087
 #define APRS_ALTITUDE 830
-#define APRS_COMMENT "f4hvv.valentin-saugnier.fr"
+#define APRS_COMMENT "Cam, Meteo, Digi"
+#define APRS_STATUS "f4hvv.valentin-saugnier.fr"
 
-#define PIN_WIFI GPIO12
-#define PIN_NPR GPIO14
-#define PIN_LDR ADC2
+#define PIN_WIFI GPIO0
+#define PIN_NPR GPIO5
+#define PIN_LDR ADC
 
-#define WATCHDOG_TIMEOUT 30
+#ifdef USE_SOFT_SERIAL
+#define PIN_PI_RX GPIO2
+#define PIN_PI_TX GPIO1
+#endif
+
+#define WATCHDOG_TIMEOUT 255
 #define WATCHDOG_SAFETY_RESET 600
-#define LDR_ALARM_LEVEL 1000
+#define LDR_ALARM_LEVEL 99999 // 1000
 
 #define EEPROM_ADDRESS_WATCHDOG_SAFETY 0
 #define EEPROM_ADDRESS_APRS_DIGIPEATER 1
@@ -63,6 +71,19 @@
 #define EEPROM_ADDRESS_VERSION 0xFF
 #define EEPROM_VERSION 1
 
+#define COLOR_RED 0x500000
+#define COLOR_VIOLET 0x500050
+#define COLOR_BLUE 0x000050
+#define COLOR_YELLOW 0xcfcf02
+#define COLOR_GREEN 0x005000
+#define COLOR_CYAN 0x00bbff
+
+#ifdef USE_SOFT_SERIAL
+#include <softSerial.h>
+extern softSerial *SerialPi;
+#else
+extern HardwareSerial *SerialPi;
+#endif
 extern JsonWriter serialJsonWriter;
 extern char bufferText[255];
 

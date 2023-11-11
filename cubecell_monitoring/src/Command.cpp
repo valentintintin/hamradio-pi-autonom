@@ -20,7 +20,8 @@ Command::Command(System *system) {
     parser.registerCommand(PSTR("lora"), PSTR("s"), doLora);
     parser.registerCommand(PSTR("reset"), PSTR(""), doReset);
     parser.registerCommand(PSTR("set"), PSTR("uu"), doSetEeprom);
-//    parser.registerCommand(PSTR("time"), PSTR("u"), doSetTime);
+    parser.registerCommand(PSTR("time"), PSTR("u"), doSetTime);
+    parser.registerCommand(PSTR("sleep"), PSTR("u"), doSleep);
 }
 
 bool Command::processCommand(const char *command) {
@@ -112,12 +113,23 @@ void Command::doSetEeprom(MyCommandParser::Argument *args, char *response) {
     sprintf_P(response, EEPROM.read((int const) args[0].asUInt64) ? PSTR("OK") : PSTR("KO"));
 }
 
-//void Command::doSetTime(MyCommandParser::Argument *args, char *response) {
-//    uint64_t epoch = args[0].asUInt64;
-//
-//    system->RTC.setEpoch((long long) epoch, true);
-//    system->setTimeFromRTcToInternalRtc(epoch);
-//
-//    System::nowToString(response);
-//}
+void Command::doSetTime(MyCommandParser::Argument *args, char *response) {
+    uint64_t epoch = args[0].asUInt64;
 
+    system->RTC.setEpoch((long long) epoch, true);
+    system->setTimeFromRTcToInternalRtc(epoch);
+
+    System::nowToString(response);
+}
+
+void Command::doSleep(MyCommandParser::Argument *args, char *response) {
+    uint64_t time = args[0].asUInt64;
+
+    if (time > 1) {
+        system->sleep(time);
+        sprintf_P(response, PSTR("OK"));
+        return;
+    }
+
+    sprintf_P(response, PSTR("KO"));
+}

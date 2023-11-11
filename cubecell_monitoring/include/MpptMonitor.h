@@ -80,7 +80,7 @@ private:
     bool init = false, night = false, alert = false, watchdogEnabled = false, powerEnabled = false;
     uint8_t watchdogCounter = 0;
     uint16_t status = 0, watchdogPowerOffTime = 0, powerOffVoltage, powerOnVoltage;
-    int16_t vs = 0, is = 0, vb = 0, ib = 0;
+    int16_t vs = 0, is = 0, vb = 0, ib = 0, temperature = 0;
 
     bool useWatchdogSafety = false;
 

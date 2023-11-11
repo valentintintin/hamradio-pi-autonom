@@ -38,7 +38,9 @@ private:
 
     static void doSetEeprom(MyCommandParser::Argument *args, char *response);
 
-//    static void doSetTime(MyCommandParser::Argument *args, char *response);
+    static void doSetTime(MyCommandParser::Argument *args, char *response);
+
+    static void doSleep(MyCommandParser::Argument *args, char *response);
 };
 
 #endif //CUBECELL_MONITORING_COMMAND_H

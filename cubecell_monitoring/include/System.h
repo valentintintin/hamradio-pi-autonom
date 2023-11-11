@@ -3,7 +3,6 @@
 
 #include <cstdint>
 #include <CubeCell_NeoPixel.h>
-#include <HT_SH1107Wire.h>
 #include <DS3231.h>
 
 #include "Communication.h"
@@ -14,15 +13,24 @@
 #include "WeatherSensors.h"
 #include "Gpio.h"
 
+#ifdef USE_SCREEN
+#include <HT_SH1107Wire.h>
+#endif
+
 class System {
 public:
-    explicit System(SH1107Wire *display, CubeCell_NeoPixel *pixels);
+#ifdef USE_SCREEN
+    explicit System(SH1107Wire *display, CubeCell_NeoPixel *pixels, TimerEvent_t *wakeUpEvent);
+#else
+    explicit System(CubeCell_NeoPixel *pixels, TimerEvent_t *wakeUpEvent);
+#endif
 
     bool begin(RadioEvents_t *radioEvents);
     void update();
     void setTimeFromRTcToInternalRtc(uint64_t epoch);
     bool isBoxOpened() const;
     void setFunctionAllowed(byte function, bool allowed);
+    void sleep(uint64_t time);
 
     inline bool isFunctionAllowed(byte function) const {
         return functionsAllowed[function];
@@ -31,7 +39,7 @@ public:
     void turnOnRGB(uint32_t color);
     void turnOffRGB();
     void displayText(const char* title, const char* content, uint16_t pause = TIME_PAUSE_SCREEN) const;
-    void serialError(const char* content) const;
+    void serialError(const char* content);
 
     static DateTime nowToString(char *result);
 
@@ -47,8 +55,16 @@ public:
 private:
     bool screenOn = false;
     uint32_t ledColor = 0;
+
+    /*
+        EEPROM_ADDRESS_WATCHDOG_SAFETY
+        EEPROM_ADDRESS_APRS_DIGIPEATER
+        EEPROM_ADDRESS_APRS_TELEMETRY
+        EEPROM_ADDRESS_APRS_POSITION
+     */
     bool functionsAllowed[4] = {true, true, true, true};
 
+    Timer timerStatus = Timer(INTERVAL_STATUS_APRS, true);
     Timer timerPosition = Timer(INTERVAL_POSITION_APRS, true);
     Timer timerTelemetry = Timer(INTERVAL_TELEMETRY_APRS, false);
     Timer timerTime = Timer(INTERVAL_TIME, true);
@@ -57,13 +73,16 @@ private:
     Timer timerSecond = Timer(1000, true);
 
     CubeCell_NeoPixel *pixels;
+#ifdef USE_SCREEN
     SH1107Wire *display;
+#endif
+    TimerEvent_t *wakeUpEvent;
 
     void showTime();
     void turnScreenOn();
     void turnScreenOff();
 
-    void printJsonSystem(const char *state) const;
+    void printJsonSystem(const char *state);
 };
 
 #endif //CUBECELL_MONITORING_SYSTEM_H

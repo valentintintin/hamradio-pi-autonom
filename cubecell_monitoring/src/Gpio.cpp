@@ -25,10 +25,6 @@ void Gpio::setState(uint8_t pin, bool enabled, const char* name, bool &status, b
         Log.infoln(F("[GPIO] %s (%d) change to state %d"), name, pin, status);
 
         printJson();
-
-        // fixme bug freeze if display
-//        sprintf_P(buffer, PSTR("Pin %s (%d) changed to %d"), name, pin, status);
-//        system->displayText(PSTR("GPIO"), buffer);
     }
 }
 
@@ -68,5 +64,5 @@ void Gpio::printJson() const {
             .property(F("wifi"), isWifiEnabled())
             .property(F("npr"), isNprEnabled())
             .property(F("ldr"), getLdr())
-            .endObject(); SerialPiUsed.println();
+            .endObject(); SerialPi->println();
 }

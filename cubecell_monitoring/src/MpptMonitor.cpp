@@ -163,6 +163,15 @@ bool MpptMonitor::update() {
         Log.verboseln(F("[MPPT] Charger power on voltage : %d"), powerOnVoltage);
     }
 
+    if (!charger.getIndexedValue(VAL_INT_TEMP, &temperature)) {
+        system->serialError(PSTR("[MPPT] Fetch charger data temperature error"));
+        system->displayText(PSTR("Mttp error"), PSTR("Failed to fetch temperature"));
+        init = false;
+        return false;
+    } else {
+        Log.verboseln(F("[MPPT] Charger temperature : %d"), temperature);
+    }
+
     serialJsonWriter
             .beginObject()
             .property(F("type"), PSTR("mppt"))
@@ -171,6 +180,7 @@ bool MpptMonitor::update() {
             .property(F("solarVoltage"), vs)
             .property(F("solarCurrent"), is)
             .property(F("currentCharge"), getCurrentCharge())
+            .property(F("temperature"), temperature / 10.0)
             .property(F("status"), status)
             .property(F("statusString"), (char*) mpptChg::getStatusAsString(status))
             .property(F("night"), night)
@@ -181,9 +191,9 @@ bool MpptMonitor::update() {
             .property(F("powerEnabled"), powerEnabled)
             .property(F("powerOffVoltage"), powerOffVoltage)
             .property(F("powerOnVoltage"), powerOnVoltage)
-            .endObject(); SerialPiUsed.println();
+            .endObject(); SerialPi->println();
 
-    Log.infoln(F("[MPPT] Vb: %dmV Ib: %dmA Vs: %dmV Is: %dmA Ic: %dmA Status: %s Night: %d Alert: %d WD: %d WDOff: %ds WDCnt: %ds 5V: %d PowOffVolt: %d PowOnVolt: %d"), vb, ib, vs, is, getCurrentCharge(), mpptChg::getStatusAsString(status), night, alert, watchdogEnabled, watchdogPowerOffTime, watchdogCounter, powerEnabled, powerOffVoltage, powerOnVoltage);
+    Log.infoln(F("[MPPT] Vb: %dmV Ib: %dmA Vs: %dmV Is: %dmA Ic: %dmA Status: %s Night: %d Alert: %d WD: %d WDOff: %ds WDCnt: %ds 5V: %d PowOffVolt: %dV PowOnVolt: %dV Temperature: %dC"), vb, ib, vs, is, getCurrentCharge(), mpptChg::getStatusAsString(status), night, alert, watchdogEnabled, watchdogPowerOffTime, watchdogCounter, powerEnabled, powerOffVoltage, powerOnVoltage, temperature);
 
     sprintf_P(bufferText, PSTR("Vb:%dmV Ib:%dmA Vs:%dmV Is:%dmA Ic:%dmA Status:%s PowOnVolt: %d"), vb, ib, vs, is, getCurrentCharge(), mpptChg::getStatusAsString(status), powerOnVoltage);
     system->displayText(PSTR("MPPT"), bufferText, 3000);
