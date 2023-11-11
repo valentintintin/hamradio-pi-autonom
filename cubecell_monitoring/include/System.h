@@ -61,8 +61,9 @@ private:
         EEPROM_ADDRESS_APRS_DIGIPEATER
         EEPROM_ADDRESS_APRS_TELEMETRY
         EEPROM_ADDRESS_APRS_POSITION
+        EEPROM_ADDRESS_SLEEP
      */
-    bool functionsAllowed[4] = {true, true, true, true};
+    bool functionsAllowed[5] = {true, true, true, true, true};
 
     Timer timerStatus = Timer(INTERVAL_STATUS_APRS, true);
     Timer timerPosition = Timer(INTERVAL_POSITION_APRS, true);

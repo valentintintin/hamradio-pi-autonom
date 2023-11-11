@@ -41,6 +41,7 @@ bool System::begin(RadioEvents_t *radioEvents) {
         setFunctionAllowed(EEPROM_ADDRESS_APRS_DIGIPEATER, functionsAllowed[EEPROM_ADDRESS_APRS_DIGIPEATER]);
         setFunctionAllowed(EEPROM_ADDRESS_APRS_TELEMETRY, functionsAllowed[EEPROM_ADDRESS_APRS_TELEMETRY]);
         setFunctionAllowed(EEPROM_ADDRESS_APRS_POSITION, functionsAllowed[EEPROM_ADDRESS_APRS_POSITION]);
+        setFunctionAllowed(EEPROM_ADDRESS_SLEEP, functionsAllowed[EEPROM_ADDRESS_SLEEP]);
 
         EEPROM.write(EEPROM_ADDRESS_VERSION, EEPROM_VERSION);
         EEPROM.commit();
@@ -49,13 +50,15 @@ bool System::begin(RadioEvents_t *radioEvents) {
         functionsAllowed[EEPROM_ADDRESS_APRS_DIGIPEATER] = EEPROM.read(EEPROM_ADDRESS_APRS_DIGIPEATER);
         functionsAllowed[EEPROM_ADDRESS_APRS_TELEMETRY] = EEPROM.read(EEPROM_ADDRESS_APRS_TELEMETRY);
         functionsAllowed[EEPROM_ADDRESS_APRS_POSITION] = EEPROM.read(EEPROM_ADDRESS_APRS_POSITION);
+        functionsAllowed[EEPROM_ADDRESS_SLEEP] = EEPROM.read(EEPROM_ADDRESS_SLEEP);
     }
 
-    sprintf_P(bufferText, PSTR("Watchdog safety: %d Aprs Digi : %d Telem : %d Position : %d"),
+    sprintf_P(bufferText, PSTR("Watchdog safety: %d Aprs Digi : %d Telem : %d Position : %d Sleep : %d"),
             functionsAllowed[EEPROM_ADDRESS_WATCHDOG_SAFETY],
             functionsAllowed[EEPROM_ADDRESS_APRS_DIGIPEATER],
             functionsAllowed[EEPROM_ADDRESS_APRS_TELEMETRY],
-            functionsAllowed[EEPROM_ADDRESS_APRS_POSITION]
+            functionsAllowed[EEPROM_ADDRESS_APRS_POSITION],
+            functionsAllowed[EEPROM_ADDRESS_SLEEP]
     );
 
     Log.infoln(F("[SYSTEM] EEPROM %s"), bufferText);
@@ -137,6 +140,12 @@ void System::update() {
             if (gpio.isWifiEnabled()) {
                 gpio.setWifi(false);
             }
+
+            if (isFunctionAllowed(EEPROM_ADDRESS_SLEEP) && mpptMonitor.getVoltageBattery() < VOLTAGE_TO_SLEEP) {
+                Log.infoln(F("[SLEEP] Battery is %dV and under of %dV so sleep"), mpptMonitor.getVoltageBattery(), VOLTAGE_TO_SLEEP);
+                displayText(PSTR("Sleep"), PSTR("Battery too low so sleep"), 1000);
+                sleep(SLEEP_DURATION);
+            }
         }
 
         if (timerTelemetry.hasExpired() || timerPosition.hasExpired() || timerStatus.hasExpired()
@@ -189,6 +198,8 @@ void System::turnOnRGB(uint32_t color) {
         blue = (uint8_t) color;
         pixels->setPixelColor(0, CubeCell_NeoPixel::Color(red, green, blue));
         pixels->show();
+
+        delay(250);
     }
 }
 
@@ -305,15 +316,19 @@ void System::printJsonSystem(const char *state) {
             .property(F("aprsDigipeater"), functionsAllowed[EEPROM_ADDRESS_APRS_DIGIPEATER])
             .property(F("aprsTelemetry"), functionsAllowed[EEPROM_ADDRESS_APRS_TELEMETRY])
             .property(F("aprsPosition"), functionsAllowed[EEPROM_ADDRESS_APRS_POSITION])
+            .property(F("sleep"), functionsAllowed[EEPROM_ADDRESS_SLEEP])
             .endObject(); SerialPi->println();
 }
 
 void System::sleep(uint64_t time) {
+    turnOnRGB(COLOR_BLUE);
+
     sprintf_P(bufferText, PSTR("[SLEEP] Sleep during %dms"), time);
     Log.infoln(bufferText);
     displayText("Sleep", bufferText);
 
-    digitalWrite(Vext,HIGH); // 0V
+    turnScreenOff();
+    digitalWrite(Vext, HIGH); // 0V
     Radio.Sleep();
     TimerSetValue(wakeUpEvent, time);
     TimerStart(wakeUpEvent);
