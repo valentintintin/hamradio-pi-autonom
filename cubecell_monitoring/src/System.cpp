@@ -326,6 +326,9 @@ void System::sleep(uint64_t time) {
     sprintf_P(bufferText, PSTR("[SLEEP] Sleep during %dms"), time);
     Log.infoln(bufferText);
     displayText("Sleep", bufferText);
+    
+    gpio.setNpr(false);
+    gpio.setWifi(false);
 
     turnScreenOff();
     digitalWrite(Vext, HIGH); // 0V
