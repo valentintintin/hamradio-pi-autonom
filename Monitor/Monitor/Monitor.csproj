@@ -11,6 +11,7 @@
         <Platforms>x64;arm32</Platforms>
         <LangVersion>11</LangVersion>
         <PublishReadyToRun>true</PublishReadyToRun>
+        <SelfContained>False</SelfContained>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|arm32' ">
@@ -33,11 +34,15 @@
       <Content Include="Arial.ttf">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove=".dockerignore" />
+      <Content Include=".dockerignore">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="AntDesign" Version="0.16.1" />
-      <PackageReference Include="AntDesign.Charts" Version="0.3.2" />
+      <PackageReference Include="AntDesign" Version="0.16.2" />
+      <PackageReference Include="AntDesign.Charts" Version="0.4.0" />
       <PackageReference Include="AprsSharp.AprsIsClient" Version="0.3.1" />
       <PackageReference Include="JoySoftware.NetDaemon.Extensions.Scheduling" Version="23.44.1" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.13">
@@ -47,10 +52,7 @@
       <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.13" />
       <PackageReference Include="MQTTnet" Version="4.3.1.873" />
       <PackageReference Include="Seq.Extensions.Logging" Version="6.1.0" />
-      <PackageReference Include="SixLabors.ImageSharp" Version="3.0.2" />
-      <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.0.1" />
       <PackageReference Include="SunCalcNet" Version="1.2.2" />
-      <PackageReference Include="System.Device.Gpio" Version="3.0.0" />
       <PackageReference Include="System.IO.Ports" Version="7.0.0" />
       <PackageReference Include="System.Reactive" Version="6.0.0" />
     </ItemGroup>

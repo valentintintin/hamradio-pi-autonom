@@ -15,7 +15,7 @@ public class CameraController : AController
         _cameraService = cameraService;
     }
 
-    [HttpGet("last.webp")]
+    [HttpGet("last.jpg")]
     public ActionResult GetLast()
     {
         string? lastFullPath = _cameraService.GetFinalLast();
@@ -27,22 +27,22 @@ public class CameraController : AController
         
         Response.Headers.Add("Content-Disposition", new ContentDisposition
         {
-            FileName = "last.webp",
+            FileName = "last.jpg",
             Inline = true
         }.ToString());
 
-        return new PhysicalFileResult(lastFullPath, "image/webp");
+        return new PhysicalFileResult(lastFullPath, "image/jpeg");
     }
 
-    [HttpGet("current.webp")]
+    [HttpGet("current.jpg")]
     public async Task<FileStreamResult> GetCurrent([FromQuery] bool save = false)
     {
         Response.Headers.Add("Content-Disposition", new ContentDisposition
         {
-            FileName = "last.webp",
+            FileName = "last.jpg",
             Inline = true
         }.ToString());
         
-        return new FileStreamResult(await _cameraService.CreateFinalImageFromLasts(save), "image/webp");
+        return new FileStreamResult(await _cameraService.CreateFinalImageFromLasts(save), "image/jpeg");
     }
 }

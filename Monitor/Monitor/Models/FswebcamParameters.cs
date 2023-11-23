@@ -42,6 +42,24 @@ public class FswebcamParameters
     public required string SaveFile { get; set; }
     public string? ExecCommand { get; set; }
 
+    public int Width
+    {
+        get
+        {
+            string? width = Resolution.ToLower().Split('x')?.FirstOrDefault();
+            return string.IsNullOrWhiteSpace(width) ? 0 : int.Parse(width);
+        }
+    }
+
+    public int Height
+    {
+        get
+        {
+            string? height = Resolution.ToLower().Split('x')?.LastOrDefault();
+            return string.IsNullOrWhiteSpace(height) ? 0 : int.Parse(height);
+        }
+    }
+
     public override string ToString()
     {
         StringBuilder arguments = new();

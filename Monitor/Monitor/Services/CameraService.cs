@@ -1,13 +1,10 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.Reflection;
 using Monitor.Exceptions;
 using Monitor.Extensions;
 using Monitor.Models;
-using SixLabors.Fonts;
-using SixLabors.ImageSharp.Drawing.Processing;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Webp;
 
 namespace Monitor.Services;
 
@@ -17,46 +14,35 @@ public class CameraService : AService
 
     private readonly string _storagePath;
     private readonly string? _message;
-    private readonly Font _fontTitle, _fontInfo, _fontFooter;
-    private readonly ImageEncoder _imageEncoder;
     private readonly List<FswebcamParameters> _fswebcamParameters;
+
+    private readonly string _fontPath = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "Arial.ttf");
 
     private const int FrameToTakeDuringNight = 25;
     private const int WidthData = 700;
     private const int LegendSize = 70;
     private const int LegendMargin = 15;
+    private const int HeightProgressBar = 25;
     private readonly int _widthMaxProgressBar;
 
     public CameraService(ILogger<CameraService> logger, IConfiguration configuration) : base(logger)
     {
         IConfigurationSection configurationSection = configuration.GetSection("Cameras");
         _message = configurationSection.GetValue<string?>("Message");
-        _fswebcamParameters = configurationSection.GetSection("Devices").Get<List<FswebcamParameters>>()?.Distinct().ToList() ?? new List<FswebcamParameters>();
+        _fswebcamParameters = configurationSection.GetSection("Devices").Get<List<FswebcamParameters>>()?.ToList() ?? new List<FswebcamParameters>();
         
         _storagePath = Path.Combine(
             configuration.GetValueOrThrow<string>("StoragePath"), 
             configurationSection.GetValueOrThrow<string>("Path")
         );
         Directory.CreateDirectory($"{_storagePath}");
-
-        FontCollection collection = new();
-        FontFamily family = collection.Add("Arial.ttf");
-        _fontTitle = family.CreateFont(30, FontStyle.Bold);
-        _fontInfo = family.CreateFont(20, FontStyle.Regular);
-        _fontFooter = family.CreateFont(15, FontStyle.Regular);
-        _imageEncoder = new WebpEncoder
-        {
-            Quality = 80,
-            SkipMetadata = true,
-            Method = WebpEncodingMethod.Fastest,
-        };
-
+        
         _widthMaxProgressBar = WidthData - (LegendSize + LegendMargin) * 2;
     }
 
     public string? GetFinalLast()
     {
-        string path = $"{_storagePath}/last.webp";
+        string path = $"{_storagePath}/last.jpg";
 
         if (!File.Exists(path))
         {
@@ -86,148 +72,131 @@ public class CameraService : AService
 
         _isRunning = true;
         
-        List<Image> imagesCamera = new();
-
-        foreach (string file in CaptureAllCameras())
-        {
-            Logger.LogTrace("Load photo {file}", file);
-            
-            imagesCamera.Add(await Image.LoadAsync(file));
-        }
-
-        Logger.LogTrace("We have {count} photos", imagesCamera.Count);
-
-        int width = 0;
-        int height = 480;
-
-        if (imagesCamera.Any())
-        {
-            width = imagesCamera.Sum(i => i.Width);
-            height = imagesCamera.Max(i => i.Height);
-        }
-        
-        using Image resultImage = new Image<Rgb24>(width + WidthData, height);
-        using Image dataImage = new Image<Rgb24>(WidthData, height);
-
         DateTime now = DateTime.UtcNow;
-        
-        dataImage.Mutate(ctx =>
+        ImageMagickParameters imageMagickParameters = new();
+
+        try
         {
-            Logger.LogTrace("Draw title on image");
+            List<(string path, FswebcamParameters parameters)> imagesCamera = CaptureAllCameras();
 
-            ctx.DrawText(
-                $"{now.ToFrench():G}",
-                _fontTitle,
-                Color.White,
-                new PointF(LegendMargin + LegendSize, 10));
+            Logger.LogDebug("We have {count} photos", imagesCamera.Count);
+
+            int width = 0;
+            int height = 480;
+
+            if (imagesCamera.Any())
+            {
+                width = imagesCamera.Sum(i => i.parameters.Width);
+                height = imagesCamera.Max(i => i.parameters.Height);
+            }
+
+            imageMagickParameters.CreateCanvas(width + WidthData, height, "black");
             
-            DrawProgressBarwithInfo(ctx, 0, "Tension batterie", "mV", EntitiesManagerService.Entities.BatteryVoltage.Value, 11000, 13500, Color.IndianRed, Color.Black);
-            DrawProgressBarwithInfo(ctx, 1, "Courant batterie", "mA", EntitiesManagerService.Entities.BatteryCurrent.Value, 0, 1000, Color.Cyan, Color.Black);
-            DrawProgressBarwithInfo(ctx, 2, "Tension panneau", "mV", EntitiesManagerService.Entities.SolarVoltage.Value, 0, 25000, Color.Yellow, Color.Black);
-            DrawProgressBarwithInfo(ctx, 3, "Courant panneau", "mA", EntitiesManagerService.Entities.SolarCurrent.Value, 0, 3000, Color.LightGreen, Color.Black);
-            DrawProgressBarwithInfo(ctx, 4, "Température", "°C", EntitiesManagerService.Entities.WeatherTemperature.Value, -10, 40, Color.DarkOrange, Color.Black);
-            DrawProgressBarwithInfo(ctx, 5, "Humidité", "%", EntitiesManagerService.Entities.WeatherHumidity.Value, 0, 100, Color.LightBlue, Color.Black);
-            DrawProgressBarwithInfo(ctx, 6, "Pression", "hPa", EntitiesManagerService.Entities.WeatherPressure.Value, 800, 1200, Color.LightPink, Color.Black);
+            foreach ((string path, FswebcamParameters parameters) image in imagesCamera)
+            {
+                imageMagickParameters.OverlayImage(image.path, 0, 0).Translate(image.parameters.Width, 0);
+            }
 
+            imageMagickParameters.AddText(30, _fontPath, LegendMargin + LegendSize + 100, 30, $"{now.ToFrench():G}", "white");
+
+            DrawProgressBarwithInfo(imageMagickParameters, 0, "Tension batterie", "mV", EntitiesManagerService.Entities.BatteryVoltage.Value, 11000, 13500, "indianred");
+            DrawProgressBarwithInfo(imageMagickParameters, 1, "Courant batterie", "mA", EntitiesManagerService.Entities.BatteryCurrent.Value, 0, 1000, "cyan");
+            DrawProgressBarwithInfo(imageMagickParameters, 2, "Tension panneau", "mV", EntitiesManagerService.Entities.SolarVoltage.Value, 0, 25000, "yellow");
+            DrawProgressBarwithInfo(imageMagickParameters, 3, "Courant panneau", "mA", EntitiesManagerService.Entities.SolarCurrent.Value, 0, 4000, "lightgreen");
+            DrawProgressBarwithInfo(imageMagickParameters, 4, "Température", "°C", EntitiesManagerService.Entities.WeatherTemperature.Value, -10, 40, "darkorange");
+            DrawProgressBarwithInfo(imageMagickParameters, 5, "Humidité", "%", EntitiesManagerService.Entities.WeatherHumidity.Value, 0, 100, "lightblue");
+            DrawProgressBarwithInfo(imageMagickParameters, 6, "Pression", "hPa", EntitiesManagerService.Entities.WeatherPressure.Value, 950, 1050, "lightpink");
+            
             if (!string.IsNullOrWhiteSpace(_message))
             {
-                Logger.LogTrace("Draw footer on image");
-
-                ctx.DrawText(
-                    _message,
-                    _fontFooter,
-                    Color.White,
-                    new PointF(LegendMargin, height - 30));
+                imageMagickParameters.AddText(15, _fontPath, WidthData - 15 * _message.Length, height - 30, _message, "white");
             }
-        });
-        
-        resultImage.Mutate(ctx =>
-        {
-            int x = 0;
 
-            foreach (Image image in imagesCamera)
+            string tempOutputFile = $"{_storagePath}/output.jpg";
+            imageMagickParameters.SetQuality(80).SetFormat("jpeg").Output(tempOutputFile);
+
+            ImageMagick(imageMagickParameters);
+
+            MemoryStream stream = new();
+
+            await using (FileStream fileStream = new(tempOutputFile, FileMode.Open, FileAccess.Read))
             {
-                Logger.LogTrace("Draw image at {x} on image", x);
-
-                ctx.DrawImage(image, new Point(x, 0), 1);
-                x += image.Width;
+                await fileStream.CopyToAsync(stream);
+                stream.Seek(0, SeekOrigin.Begin);
             }
             
-            Logger.LogTrace("Draw date image on image");
-
-            ctx.DrawImage(dataImage, new Point(width, 0), 1);
-        });
-        
-        Logger.LogTrace("Saving image to stream");
-        
-        MemoryStream stream = new();
-        await resultImage.SaveAsync(stream, _imageEncoder);
-        stream.Seek(0, SeekOrigin.Begin);
-
-        if (save)
-        {
-            Directory.CreateDirectory($"{_storagePath}/{now:yyyy-MM-dd}");
+            Logger.LogDebug("Saving image to stream. Size : {size}", stream.Length);
             
-            string filePath = $"{_storagePath}/{now:yyyy-MM-dd}/{now:yyyy-MM-dd-HH-mm-ss}-{Random.Shared.NextInt64()}.webp";
-            string lastPath = $"{_storagePath}/last.webp";
-            
-            Logger.LogTrace("Save final image to {path}", filePath);
+            if (save)
+            {
+                Directory.CreateDirectory($"{_storagePath}/{now:yyyy-MM-dd}");
 
-            await resultImage.SaveAsync(filePath, _imageEncoder);
+                string filePath =
+                    $"{_storagePath}/{now:yyyy-MM-dd}/{now:yyyy-MM-dd-HH-mm-ss}-{Random.Shared.NextInt64()}.jpg";
+                string lastPath = $"{_storagePath}/last.jpg";
+
+                Logger.LogDebug("Save final image to {path}", filePath);
+
+                await using FileStream fileStream = File.Create(filePath);
+                await stream.CopyToAsync(fileStream);
+
+                File.Delete(lastPath);
+                File.CreateSymbolicLink(lastPath, filePath);
+            }
+
+            Logger.LogInformation("Create final image OK");
             
-            File.Delete(lastPath);
-            File.CreateSymbolicLink(lastPath, filePath);
+            return stream;
         }
-        
-        Logger.LogInformation("Create final image OK");
-        
-        _isRunning = false;
-        
-        return stream;
+        finally
+        {
+            _isRunning = false;
+        }
     }
 
-    private List<string> CaptureAllCameras()
+    private List<(string path, FswebcamParameters parameters)> CaptureAllCameras()
     {
         Logger.LogInformation("Will capture images from cameras : {cameras}", _fswebcamParameters.Select(j => j.Device).JoinString());
 
         return _fswebcamParameters.Select(parameters =>
         {
-            string cameraName = parameters.Device.Replace("/dev/v4l/by-id/", string.Empty);
+            string cameraName = parameters.Device
+                .Replace("/dev/v4l/by-id/", string.Empty)
+                .Replace("/dev/video_", string.Empty)
+                .Replace("/dev/video", string.Empty);
 
-            Logger.LogTrace("Capture image from {camera}", cameraName);
+            Logger.LogDebug("Capture image from {camera}", cameraName);
 
             parameters.Frames = MonitorService.State.Mppt.Night ? FrameToTakeDuringNight : null;
-            parameters.SaveFile = $"/{_storagePath}/{cameraName}.jpg";
+            parameters.SaveFile = $"{_storagePath}/{cameraName}.jpg";
             
-            return CaptureImage(parameters);
+            return (CaptureImage(parameters), parameters);
         }).ToList()!;
     }
     
-    private void DrawProgressBarwithInfo(IImageProcessingContext ctx, int indexValue, string label, string unit, double value, double min, double max, Color colorBar, Color colorText)
+    private void DrawProgressBarwithInfo(ImageMagickParameters parameters, int indexValue, string label, string unit, double value, double min, double max, string colorBar)
     {
-        Logger.LogTrace("Draw bar on image for {label}", label);
-
-        int y = indexValue * 50 + 60;
+        int y = indexValue * 50 + 80;
+        double valueBar = value;
         
-        ctx.Fill(Color.LightGray, new Rectangle(LegendMargin + LegendSize, y, _widthMaxProgressBar, 24));
-        ctx.Fill(colorBar, new Rectangle(LegendMargin + LegendSize, y, 
-            (int) Math.Round((double) MapValue(value, min, max, 0, _widthMaxProgressBar), 2),
-            24));
-        ctx.DrawText(
-            $"{label}: {value} {unit}",
-            _fontInfo,
-            colorText,
-            new PointF(LegendMargin + LegendSize + 50, y + 2));
-        ctx.DrawText(
-            $"{min.ToString(CultureInfo.CurrentCulture)}",
-            _fontInfo,
-            Color.White,
-            new PointF(LegendMargin, y + 2));
-        ctx.DrawText(
-            $"{max.ToString(CultureInfo.CurrentCulture)}",
-            _fontInfo,
-            Color.White,
-            new PointF(LegendMargin + LegendSize + _widthMaxProgressBar + 5, y + 2));
+        if (valueBar > max)
+        {
+            valueBar = max;
+        } 
+        else if (value < min)
+        {
+            valueBar = min;
+        }
+
+        valueBar = (int)Math.Round((double)MapValue(valueBar, min, max, 0, _widthMaxProgressBar), 2);
+        
+        parameters
+            .DrawRectangle(LegendMargin + LegendSize, y + 5, _widthMaxProgressBar, HeightProgressBar, "lightgray")
+            .DrawRectangle(LegendMargin + LegendSize, y + 5, (int) valueBar, HeightProgressBar, colorBar)
+            .AddText(20, _fontPath, LegendMargin + LegendSize + 50, y, $"{label} : {value} {unit}", "black")
+            .AddText(20, _fontPath, LegendMargin, y, $"{min.ToString(CultureInfo.CurrentCulture)}", colorBar)
+            .AddText(20, _fontPath, LegendMargin + LegendSize + _widthMaxProgressBar + 5, y, $"{max.ToString(CultureInfo.CurrentCulture)}", colorBar)
+            ;
     }
     
     private int MapValue(double value, double inMin, double inMax, double outMin, double outMax)
@@ -249,21 +218,27 @@ public class CameraService : AService
                 CreateNoWindow = true
             }
         };
+        
+        Logger.LogDebug("Start process: fswebcam for {video}", parameters.Device);
+        Logger.LogTrace("fswebcam {parameter}", parameters.ToString());
 
         process.Start();
-        process.WaitForExit();
+        if (!process.WaitForExit(TimeSpan.FromSeconds(10)))
+        {
+            process.Kill();
+        }
 
         string errorStream = process.StandardError.ReadToEnd();
         string standardStream = process.StandardOutput.ReadToEnd();
         string stream = standardStream + " " + errorStream;
         
-        Logger.LogTrace("Image capture output for {device} : {stream}", parameters.Device, stream);
+        Logger.LogDebug("Image capture output for {device} : {stream}", parameters.Device, stream);
         
         if (process.ExitCode == 0)
         {
-            if (errorStream.Length > 0 || standardStream.Contains("No frames captured"))
+            if (stream.Contains("No frames captured"))
             {
-                // throw new WebcamException(stream); // TODO uncomment
+                throw new WebcamException(stream);
             }
             
             Logger.LogInformation("Image captured successfully for device {device}", parameters.Device);
@@ -274,5 +249,39 @@ public class CameraService : AService
         Logger.LogError("Error capturing image for device {device}. Exit code: {exitCode}", parameters.Device, process.ExitCode);
             
         throw new WebcamException(stream);
+    }
+    
+    private void ImageMagick(ImageMagickParameters parameters)
+    {
+        Process process = new()
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "convert",
+                Arguments = parameters.ToString(),
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
+        
+        Logger.LogDebug("Start process: convert");
+        Logger.LogTrace("convert {command}", parameters.ToString());
+
+        process.Start();
+        if (!process.WaitForExit(TimeSpan.FromMinutes(1)))
+        {
+            process.Kill();
+        }
+        
+        string errorStream = process.StandardError.ReadToEnd();
+        string standardStream = process.StandardOutput.ReadToEnd();
+        string streamString = standardStream + " " + errorStream;
+        
+        if (!string.IsNullOrWhiteSpace(errorStream))
+        {
+            throw new WebcamException($"ImageMagick error with exit code {process.ExitCode}.\n\nCommand:\n\nconvert {parameters}.\n\nOutput:\n\n{streamString}");
+        }
     }
 }
