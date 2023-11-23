@@ -41,13 +41,17 @@ public class SystemService : AService
     {
         Logger.LogInformation("Send shutdown command");
 
+        WillShutdown = true;
+
+        File.WriteAllText("/proc/sys/kernel/sysrq", "1");
+        File.WriteAllText("/proc/sysrq-trigger", "s");
+        File.WriteAllText("/proc/sysrq-trigger", "u");
+        File.WriteAllText("/proc/sysrq-trigger", "o");
+        
         if (WillShutdown)
         {
             Logger.LogWarning("Will already shutdown");
-            return;
         }
-
-        WillShutdown = true;
     }
 
     public void SetTime(DateTime dateTime)
