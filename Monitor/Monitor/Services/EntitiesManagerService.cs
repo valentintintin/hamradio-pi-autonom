@@ -137,7 +137,7 @@ public class EntitiesManagerService : AService, IAsyncDisposable
         Config? config = _context.Configs.FirstOrDefault(c => c.Name == configEntity.Id);
         if (config == null && configEntity.Retain)
         {
-            Logger.LogTrace("Add entity {entity} with value {value}", configEntity.Id, configEntity.ValueAsString());
+            Logger.LogDebug("Add entity {entity} with value {value}", configEntity.Id, configEntity.ValueAsString());
 
             config = new Config
             {
@@ -157,7 +157,7 @@ public class EntitiesManagerService : AService, IAsyncDisposable
         configEntity.ValueStringAsync()
             .SubscribeAsync(async value =>
             {
-                Logger.LogTrace("Update {entityId} to {state}", configEntity.Id, value);
+                Logger.LogDebug("Update {entityId} to {state}", configEntity.Id, value);
 
                 if (config != null)
                 {
@@ -167,7 +167,7 @@ public class EntitiesManagerService : AService, IAsyncDisposable
                 
                 if (configEntity.Mqtt && _mqttClient.IsConnected)
                 {
-                    Logger.LogTrace("Send MQTT {entityId} to {state}", configEntity.Id, value);
+                    Logger.LogDebug("Send MQTT {entityId} to {state}", configEntity.Id, value);
 
                     MqttApplicationMessageBuilder mqttApplicationMessage = new MqttApplicationMessageBuilder()
                         .WithTopic($"{_topicBase}/{configEntity.Id}")

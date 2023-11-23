@@ -56,12 +56,12 @@ public class AprsIsApp : AEnabledWorker
 
     private void ComputeReceivedPacket(Packet packet)
     {
-        Logger.LogTrace("Received APRS-IS Packet {packet}", packet.EncodeTnc2());
+        Logger.LogDebug("Received APRS-IS Packet from {from} to {to} of type {type}", packet.Sender, packet.Destination, packet.InfoField.Type);
         
         if (packet.Path.Contains("?") || packet.Path.Contains("qAX") || packet.Path.Contains("RFONLY") ||
             packet.Path.Contains("NOGATE") || packet.Path.Contains("TCPXX"))
         {
-            Logger.LogTrace("Packet {packet} has not the correct path for RF", packet.EncodeTnc2());
+            Logger.LogDebug("Packet from {from} to {to} has not the correct path {path} for RF", packet.Sender, packet.Destination, packet.Path);
             
             return;
         }
@@ -72,12 +72,19 @@ public class AprsIsApp : AEnabledWorker
             return;
         }
 
-        Packet packetToSend = new(_callsign, new List<string> { "TCPIP", _callsign }, packet.InfoField);
-        string packetToSendTnc2 = packetToSend.EncodeTnc2();
-        
-        Logger.LogInformation("Packet {packet} ready to be send to RF", packetToSendTnc2);
-        
-        _serialMessageService.SendLora(packetToSendTnc2);
+        try
+        {
+            Packet packetToSend = new(_callsign, new List<string> { "TCPIP", _callsign }, packet.InfoField);
+            string packetToSendTnc2 = packetToSend.EncodeTnc2();
+
+            Logger.LogInformation("Packet {packet} ready to be send to RF", packetToSendTnc2);
+
+            _serialMessageService.SendLora(packetToSendTnc2);
+        }
+        catch (Exception e)
+        {
+            Logger.LogWarning(e, "Impossible to compute packet from {from} to {to} of type {type}", packet.Sender, packet.Destination, packet.InfoField.Type);
+        }
     }
 
     private bool HasStationHeard()

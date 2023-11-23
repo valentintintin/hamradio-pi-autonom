@@ -134,11 +134,11 @@ public class BatteryApp : AWorker
         }
         else
         {
-            Logger.LogTrace("We do not use sun");
+            Logger.LogDebug("We do not use sun");
             
             if (!turnOn)
             {
-                Logger.LogTrace("We do not turn on during night");
+                Logger.LogDebug("We do not turn on during night");
                 
                 timeSleep = TimeSpan.FromHours(10);
             }

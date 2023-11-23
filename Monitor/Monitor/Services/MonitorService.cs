@@ -29,7 +29,7 @@ public class MonitorService : AService
         switch (message)
         {
             case McuSystemData systemData:
-                Logger.LogTrace("New system data received : {message}", systemData);
+                Logger.LogDebug("New system data received : {message}", systemData);
                 
                 State.McuSystem = systemData;
                 
@@ -43,7 +43,7 @@ public class MonitorService : AService
                 EntitiesManagerService.Entities.TemperatureRtc.SetValue(systemData.TemperatureRtc);
                 break;
             case WeatherData weatherData:
-                Logger.LogTrace("New weather data received : {message}", weatherData);
+                Logger.LogDebug("New weather data received : {message}", weatherData);
 
                 State.Weather = weatherData;
                 
@@ -60,7 +60,7 @@ public class MonitorService : AService
                 await context.SaveChangesAsync();
                 break;
             case MpptData mpptData:
-                Logger.LogTrace("New MPPT data received : {message}", mpptData);
+                Logger.LogDebug("New MPPT data received : {message}", mpptData);
 
                 State.Mppt = mpptData;
                 
@@ -98,7 +98,7 @@ public class MonitorService : AService
                 await context.SaveChangesAsync();
                 break;
             case TimeData timeData:
-                Logger.LogTrace("New time data received : {message}", timeData);
+                Logger.LogDebug("New time data received : {message}", timeData);
 
                 State.Time = timeData;
                 
@@ -107,7 +107,7 @@ public class MonitorService : AService
                 _systemService.SetTime(State.Time.DateTime.DateTime);
                 break;
             case GpioData gpioData:
-                Logger.LogTrace("New GPIO data received : {message}", gpioData);
+                Logger.LogDebug("New GPIO data received : {message}", gpioData);
 
                 State.Gpio = gpioData;
                 
@@ -127,7 +127,7 @@ public class MonitorService : AService
                 await context.SaveChangesAsync();
                 break;
             case LoraData loraData:
-                Logger.LogTrace("New LoRa data received : {message}", loraData);
+                Logger.LogDebug("New LoRa data received : {message}", loraData);
                 
                 if (loraData.IsTx)
                 {

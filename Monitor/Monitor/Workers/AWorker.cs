@@ -73,7 +73,14 @@ public abstract class AWorker : IHostedService, IAsyncDisposable
     {
         foreach (IDisposable disposable in _disposables)
         {
-            disposable.Dispose();
+            try
+            {
+                disposable.Dispose();
+            }
+            catch
+            {
+                // Ignored
+            }
         }
 
         Started = false;

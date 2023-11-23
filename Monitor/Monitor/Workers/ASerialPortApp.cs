@@ -42,7 +42,7 @@ public abstract class ASerialPortApp : AWorker
             {
                 string input = lines[currentLine++];
                 
-                Logger.LogTrace("Received serial message : {input}", input);
+                Logger.LogDebug("Received serial message : {input}", input);
                 
                 MessageReceived(input);
                 
@@ -66,7 +66,7 @@ public abstract class ASerialPortApp : AWorker
                 {
                     string input = SerialPort.ReadLine();
                 
-                    Logger.LogTrace("Received serial : {input}", input);
+                    Logger.LogDebug("Received serial : {input}", input);
 
                     MessageReceived(input);
                 }

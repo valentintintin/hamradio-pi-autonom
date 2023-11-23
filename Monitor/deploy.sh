@@ -19,7 +19,7 @@ set -x
 
 rm -Rf published/*
 cd Monitor || exit
-dotnet publish -c Release --no-restore --no-self-contained --nologo --output ../published/ -r linux-arm
+dotnet publish -c Release --no-restore --nologo --output ../published/ -r linux-arm
 cd ..
 
 rsync -e "ssh -p $port" -r --info=progress2 published/ debian@$server:/home/debian/docker/Monitor

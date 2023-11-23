@@ -24,7 +24,7 @@ public class StateController : AController
     [HttpGet("shutdown")]
     public IActionResult NeedShutdown()
     {
-        Logger.LogTrace("Request if shutdown asked from API. ShutdownAsked : {shutdownAsked}", _systemService.IsShutdownAsked());
+        Logger.LogDebug("Request if shutdown asked from API. ShutdownAsked : {shutdownAsked}", _systemService.IsShutdownAsked());
 
         if (_systemService.IsShutdownAsked()) // TODO fixme !!
         {
@@ -41,7 +41,7 @@ public class StateController : AController
 
         _systemService.ChangeDateTime = null;
 
-        Logger.LogTrace("Request if change datetime needed from API. DateTime to set : {DateTime}", dateTime);
+        Logger.LogDebug("Request if change datetime needed from API. DateTime to set : {DateTime}", dateTime);
 
         if (dateTime.HasValue)
         {        
