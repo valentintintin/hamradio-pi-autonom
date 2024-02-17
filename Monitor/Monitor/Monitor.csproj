@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
     <PropertyGroup>
-        <TargetFramework>net7.0</TargetFramework>
+        <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <RuntimeIdentifiers>linux-arm;linux-x64</RuntimeIdentifiers>
@@ -9,7 +9,7 @@
         <RootNamespace>Monitor</RootNamespace>
         <Configurations>Debug;Release</Configurations>
         <Platforms>x64;arm32</Platforms>
-        <LangVersion>11</LangVersion>
+        <LangVersion>default</LangVersion>
         <PublishReadyToRun>true</PublishReadyToRun>
         <SelfContained>False</SelfContained>
     </PropertyGroup>
@@ -41,19 +41,19 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="AntDesign" Version="0.16.2" />
-      <PackageReference Include="AntDesign.Charts" Version="0.4.0" />
+      <PackageReference Include="AntDesign" Version="0.17.4" />
+      <PackageReference Include="AntDesign.Charts" Version="0.5.1" />
       <PackageReference Include="AprsSharp.AprsIsClient" Version="0.3.1" />
       <PackageReference Include="JoySoftware.NetDaemon.Extensions.Scheduling" Version="23.44.1" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.13">
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.2">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.13" />
-      <PackageReference Include="MQTTnet" Version="4.3.1.873" />
-      <PackageReference Include="Seq.Extensions.Logging" Version="6.1.0" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.2" />
+      <PackageReference Include="MQTTnet" Version="4.3.3.952" />
+      <PackageReference Include="Seq.Extensions.Logging" Version="8.0.0" />
       <PackageReference Include="SunCalcNet" Version="1.2.2" />
-      <PackageReference Include="System.IO.Ports" Version="7.0.0" />
+      <PackageReference Include="System.IO.Ports" Version="8.0.0" />
       <PackageReference Include="System.Reactive" Version="6.0.0" />
     </ItemGroup>
 

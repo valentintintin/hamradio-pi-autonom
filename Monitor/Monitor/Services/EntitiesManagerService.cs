@@ -35,9 +35,9 @@ public class EntitiesManagerService : AService, IAsyncDisposable
         _scheduler = serviceProvider.CreateScope().ServiceProvider.GetRequiredService<IScheduler>();
         _context = contextFactory.CreateDbContext();
         
-        foreach (PropertyInfo property in typeof(MqttEntities).GetProperties())
+        foreach (var property in typeof(MqttEntities).GetProperties())
         {
-            IStringConfigEntity? entity = (IStringConfigEntity?)property.GetValue(Entities);
+            var entity = (IStringConfigEntity?)property.GetValue(Entities);
             Add(entity ?? throw new InvalidOperationException());
         }
 
@@ -134,7 +134,7 @@ public class EntitiesManagerService : AService, IAsyncDisposable
     {
         _entities.Add(configEntity);
         
-        Config? config = _context.Configs.FirstOrDefault(c => c.Name == configEntity.Id);
+        var config = _context.Configs.FirstOrDefault(c => c.Name == configEntity.Id);
         if (config == null && configEntity.Retain)
         {
             Logger.LogDebug("Add entity {entity} with value {value}", configEntity.Id, configEntity.ValueAsString());
@@ -169,7 +169,7 @@ public class EntitiesManagerService : AService, IAsyncDisposable
                 {
                     Logger.LogDebug("Send MQTT {entityId} to {state}", configEntity.Id, value);
 
-                    MqttApplicationMessageBuilder mqttApplicationMessage = new MqttApplicationMessageBuilder()
+                    var mqttApplicationMessage = new MqttApplicationMessageBuilder()
                         .WithTopic($"{_topicBase}/{configEntity.Id}")
                         .WithPayload(value)
                         .WithRetainFlag(configEntity.Retain);

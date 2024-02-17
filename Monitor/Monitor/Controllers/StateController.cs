@@ -6,48 +6,31 @@ namespace Monitor.Controllers;
 
 [ApiController]
 [Route("states")]
-public class StateController : AController
+public class StateController(
+    ILogger<StateController> logger,
+    SystemService systemService,
+    MonitorService monitorService)
+    : AController(logger)
 {
-    private readonly SystemService _systemService;
-
-    public StateController(ILogger<StateController> logger, SystemService systemService) : base(logger)
-    {
-        _systemService = systemService;
-    }
-
     [HttpGet]
     public MonitorState Index()
     {
         return MonitorService.State;
     }
 
-    [HttpGet("shutdown")]
-    public IActionResult NeedShutdown()
+    [HttpPost("system_info")]
+    public NoContentResult Post(SystemState? systemState)
     {
-        Logger.LogDebug("Request if shutdown asked from API. ShutdownAsked : {shutdownAsked}", _systemService.IsShutdownAsked());
+        monitorService.UpdateSystemState(systemState);
 
-        if (_systemService.IsShutdownAsked()) // TODO fixme !!
-        {
-            return NoContent();
-        }
-
-        return BadRequest();
+        return NoContent();
     }
 
     [HttpGet("datetime")]
-    public IActionResult DateTime()
+    public DateTime DateTime(DateTime datetime)
     {
-        DateTime? dateTime = _systemService.ChangeDateTime;
+        systemService.SetTime(datetime);
 
-        _systemService.ChangeDateTime = null;
-
-        Logger.LogDebug("Request if change datetime needed from API. DateTime to set : {DateTime}", dateTime);
-
-        if (dateTime.HasValue)
-        {        
-            return Ok(dateTime.Value.ToString("s"));   
-        }
-
-        return BadRequest();
+        return System.DateTime.UtcNow;
     }
 }

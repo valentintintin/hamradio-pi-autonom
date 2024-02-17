@@ -7,22 +7,17 @@ using Monitor.Models.SerialMessages;
 
 namespace Monitor.Services;
 
-public class MonitorService : AService
+public class MonitorService(
+    ILogger<MonitorService> logger,
+    IDbContextFactory<DataContext> contextFactory,
+    SystemService systemService)
+    : AService(logger)
 {
     public static readonly MonitorState State = new();
 
-    private readonly IDbContextFactory<DataContext> _contextFactory;
-    private readonly SystemService _systemService;
-    
-    public MonitorService(ILogger<MonitorService> logger, IDbContextFactory<DataContext> contextFactory, SystemService systemService) : base(logger)
-    {
-        _contextFactory = contextFactory;
-        _systemService = systemService;
-    }
-
     public async Task UpdateStateFromMessage(Message message)
     {
-        DataContext context = await _contextFactory.CreateDbContextAsync();
+        var context = await contextFactory.CreateDbContextAsync();
 
         State.LastMessagesReceived.Add(message);
         
@@ -104,7 +99,7 @@ public class MonitorService : AService
                 
                 EntitiesManagerService.Entities.McuUptime.SetValue(timeData.UptimeTimeSpan);
                 
-                _systemService.SetTime(State.Time.DateTime.DateTime);
+                systemService.SetTime(State.Time.DateTime.DateTime);
                 break;
             case GpioData gpioData:
                 Logger.LogDebug("New GPIO data received : {message}", gpioData);

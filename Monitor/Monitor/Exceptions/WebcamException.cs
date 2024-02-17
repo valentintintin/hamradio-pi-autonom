@@ -1,6 +1,3 @@
 namespace Monitor.Exceptions;
 
-public class WebcamException : Exception
-{
-    public WebcamException(string error, Exception? innerException = null) : base(error, innerException) {}
-}
+public class WebcamException(string error, Exception? innerException = null) : Exception(error, innerException);

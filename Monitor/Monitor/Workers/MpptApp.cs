@@ -18,15 +18,15 @@ public class MpptApp : AWorker
 
     protected override Task Start()
     {
-        ConfigEntity<int> powerOnVoltageConfigEntity = EntitiesManagerService.Entities.MpptPowerOnVoltage;
-        ConfigEntity<int> powerOffVoltageConfigEntity = EntitiesManagerService.Entities.MpptPowerOffVoltage;
+        var powerOnVoltageConfigEntity = EntitiesManagerService.Entities.MpptPowerOnVoltage;
+        var powerOffVoltageConfigEntity = EntitiesManagerService.Entities.MpptPowerOffVoltage;
 
         AddDisposable(EntitiesManagerService.Entities.MpptAlertShutdown.ValueChanges()
             .Select(v => v.value)
             .Do(_ => Logger.LogWarning("Alert so shutdown"))
-            .Subscribe(_ =>
+            .SubscribeAsync(async _ =>
             {
-                _systemService.Shutdown();
+                await _systemService.Shutdown();
             }));
 
         AddDisposable(powerOffVoltageConfigEntity.ValueChanges()

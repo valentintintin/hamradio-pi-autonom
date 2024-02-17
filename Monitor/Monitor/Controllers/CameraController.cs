@@ -6,26 +6,20 @@ namespace Monitor.Controllers;
 
 [ApiController]
 [Route("camera")]
-public class CameraController : AController
+public class CameraController(ILogger<CameraController> logger, CameraService cameraService)
+    : AController(logger)
 {
-    private readonly CameraService _cameraService;
-
-    public CameraController(ILogger<CameraController> logger, CameraService cameraService) : base(logger)
-    {
-        _cameraService = cameraService;
-    }
-
     [HttpGet("last.jpg")]
     public ActionResult GetLast()
     {
-        string? lastFullPath = _cameraService.GetFinalLast();
+        var lastFullPath = cameraService.GetFinalLast();
 
         if (string.IsNullOrWhiteSpace(lastFullPath))
         {
             return new NotFoundResult();
         }
         
-        Response.Headers.Add("Content-Disposition", new ContentDisposition
+        Response.Headers.Append("Content-Disposition", new ContentDisposition
         {
             FileName = "last.jpg",
             Inline = true
@@ -37,12 +31,12 @@ public class CameraController : AController
     [HttpGet("current.jpg")]
     public async Task<FileStreamResult> GetCurrent([FromQuery] bool save = false)
     {
-        Response.Headers.Add("Content-Disposition", new ContentDisposition
+        Response.Headers.Append("Content-Disposition", new ContentDisposition
         {
             FileName = "last.jpg",
             Inline = true
         }.ToString());
         
-        return new FileStreamResult(await _cameraService.CreateFinalImageFromLasts(save), "image/jpeg");
+        return new FileStreamResult(await cameraService.CreateFinalImageFromLasts(save), "image/jpeg");
     }
 }

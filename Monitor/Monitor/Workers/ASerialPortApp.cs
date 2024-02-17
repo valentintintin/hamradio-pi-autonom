@@ -22,7 +22,7 @@ public abstract class ASerialPortApp : AWorker
         MonitorService = Services.GetRequiredService<MonitorService>();
         _fakeInput = fakeInput;
         
-        IConfigurationSection configurationSection = configuration.GetSection(configSectionName);
+        var configurationSection = configuration.GetSection(configSectionName);
 
         _path = configurationSection.GetValueOrThrow<string>("Path");
         _speed = configurationSection.GetValueOrThrow<int>("Speed");
@@ -36,11 +36,11 @@ public abstract class ASerialPortApp : AWorker
         if (_simulate)
         {
             string[] lines = _fakeInput.Split('\n');
-            int currentLine = 0;
+            var currentLine = 0;
 
             AddDisposable(Scheduler.SchedulePeriodic(TimeSpan.FromMilliseconds(2500), () => 
             {
-                string input = lines[currentLine++];
+                var input = lines[currentLine++];
                 
                 Logger.LogDebug("Received serial message : {input}", input);
                 
@@ -64,7 +64,7 @@ public abstract class ASerialPortApp : AWorker
             {
                 try
                 {
-                    string input = SerialPort.ReadLine();
+                    var input = SerialPort.ReadLine();
                 
                     Logger.LogDebug("Received serial : {input}", input);
 

@@ -144,7 +144,7 @@
                 <Empty></Empty>
             }
             <Timeline>
-                @foreach (LoraData message in _loraLastHeards)
+                @foreach (var message in _loraLastHeards)
                 {
                     <TimelineItem>
                         <strong>@message.Sender - @message.ReceivedAt.ToFrench().ToString(CultureInfo.CurrentCulture)</strong>
@@ -161,7 +161,7 @@
                 <Empty></Empty>
             }
             <Timeline>
-                @foreach (LoraData message in _loras)
+                @foreach (var message in _loras)
                 {
                     <TimelineItem  Color="@(message.IsTx ? "red" : "green")">
                         <strong>@message.ReceivedAt.ToFrench().ToString(CultureInfo.CurrentCulture) - @(message.IsTx ? "TX" : "RX")</strong>
@@ -180,7 +180,7 @@
                 <Empty></Empty>
             }
             <Timeline Reverse="true">
-                @foreach (Message message in MonitorService.State.LastMessagesReceived)
+                @foreach (var message in MonitorService.State.LastMessagesReceived)
                 {
                     <TimelineItem>
                         <strong>@message.ReceivedAt.ToFrench().ToString(CultureInfo.CurrentCulture) - @message.Type.ToUpper()</strong>
@@ -202,7 +202,7 @@
 
     private async Task UpdateData()
     {
-        DataContext context = await DbContextFactory.CreateDbContextAsync();
+        var context = await DbContextFactory.CreateDbContextAsync();
         _loras = await context.LoRas
             .OrderByDescending(l => l.Id)
             .Take(10)

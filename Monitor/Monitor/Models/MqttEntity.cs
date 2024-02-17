@@ -71,7 +71,7 @@ public class ConfigEntity<T> : IStringConfigEntity
     {
         HasReceivedFromElsewere = true;
         
-        T? newValue = string.IsNullOrWhiteSpace(payload) ? default : JsonSerializer.Deserialize<T?>(payload);
+        var newValue = string.IsNullOrWhiteSpace(payload) ? default : JsonSerializer.Deserialize<T?>(payload);
 
         if (newValue?.Equals(ValuePrivate) != true)
         {

@@ -33,7 +33,7 @@
     {
         Loading = true;
         
-        DataContext context = await DbContextFactory.CreateDbContextAsync();
+        var context = await DbContextFactory.CreateDbContextAsync();
 
         List<Mppt> mpptData = await context.Mppts.OrderByDescending(m => m.Id)
             .Take(500)

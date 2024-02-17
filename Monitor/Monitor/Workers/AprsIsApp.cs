@@ -26,8 +26,8 @@ public class AprsIsApp : AEnabledWorker
         _aprsIsClient = new AprsIsClient(Services.GetRequiredService<ILogger<AprsIsClient>>());
         _aprsIsClient.ReceivedPacket += ComputeReceivedPacket;
         
-        IConfigurationSection configurationSection = configuration.GetSection("AprsIs");
-        IConfigurationSection positionSection = configuration.GetSection("Position");
+        var configurationSection = configuration.GetSection("AprsIs");
+        var positionSection = configuration.GetSection("Position");
         
         _callsign = configurationSection.GetValueOrThrow<string>("Callsign");
         _passcode = configurationSection.GetValueOrThrow<string>("Passcode");
@@ -75,7 +75,7 @@ public class AprsIsApp : AEnabledWorker
         try
         {
             Packet packetToSend = new(_callsign, new List<string> { "TCPIP", _callsign }, packet.InfoField);
-            string packetToSendTnc2 = packetToSend.EncodeTnc2();
+            var packetToSendTnc2 = packetToSend.EncodeTnc2();
 
             Logger.LogInformation("Packet {packet} ready to be send to RF", packetToSendTnc2);
 
@@ -94,7 +94,7 @@ public class AprsIsApp : AEnabledWorker
             return true;
         }
         
-        DateTime lastHeard = DateTime.UtcNow - _durationHeard.Value;
+        var lastHeard = DateTime.UtcNow - _durationHeard.Value;
         return _context.LoRas.Any(e => !e.IsTx && e.CreatedAt >= lastHeard);
     }
 }

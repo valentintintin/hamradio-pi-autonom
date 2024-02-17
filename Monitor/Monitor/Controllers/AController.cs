@@ -2,12 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Monitor.Controllers;
 
-public abstract class AController : Controller
+public abstract class AController(ILogger<AController> logger) : Controller
 {
-    protected readonly ILogger<AController> Logger;
-
-    protected AController(ILogger<AController> logger)
-    {
-        Logger = logger;
-    }
+    protected readonly ILogger<AController> Logger = logger;
 }

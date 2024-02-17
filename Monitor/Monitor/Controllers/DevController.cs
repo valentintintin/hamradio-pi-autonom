@@ -8,17 +8,13 @@ namespace Monitor.Controllers;
 
 [ApiController]
 [Route("dev")]
-public class DevController : AController
+public class DevController(
+    ILogger<DevController> logger,
+    IDbContextFactory<DataContext> contextFactory,
+    SystemService systemService)
+    : AController(logger)
 {
-    private readonly SystemService _systemService;
-    private readonly DataContext _context;
-    
-    public DevController(ILogger<DevController> logger, IDbContextFactory<DataContext> contextFactory,
-        SystemService systemService) : base(logger)
-    {
-        _systemService = systemService;
-        _context = contextFactory.CreateDbContext();
-    }
+    private readonly DataContext _context = contextFactory.CreateDbContext();
 
     [HttpGet("test")]
     public object? Test()
@@ -45,6 +41,6 @@ public class DevController : AController
     {
         Logger.LogInformation("Shutdown asked by route");
         
-        _systemService.Shutdown();
+        systemService.Shutdown().ConfigureAwait(false);
     }
 }

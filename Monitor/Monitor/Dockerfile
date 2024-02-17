@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/aspnet:7.0-bullseye-slim-arm32v7
+FROM mcr.microsoft.com/dotnet/aspnet:8.0.2-bookworm-slim-arm32v7
 RUN apt -y update && apt -y install fswebcam imagemagick
 WORKDIR /App
 #COPY . .

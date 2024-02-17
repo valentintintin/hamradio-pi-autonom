@@ -1,11 +1,6 @@
 namespace Monitor.Services;
 
-public abstract class AService
+public abstract class AService(ILogger<AService> logger)
 {
-    protected readonly ILogger<AService> Logger;
-    
-    protected AService(ILogger<AService> logger)
-    {
-        Logger = logger;
-    }
+    protected readonly ILogger<AService> Logger = logger;
 }

@@ -29,7 +29,7 @@ public class BatteryApp : AWorker
         EntitiesManagerService.Add(LowBatteryVoltage);
         EntitiesManagerService.Add(LowBatteryTimeOff);
         
-        IConfigurationSection configurationSection = configuration.GetSection("Position");
+        var configurationSection = configuration.GetSection("Position");
 
         _position = (
             configurationSection.GetValueOrThrow<double>("Latitude"),
@@ -83,11 +83,11 @@ public class BatteryApp : AWorker
             return;
         }
 
-        TimeSpan timeSleep = NightTimeOff.Value;
-        bool turnOn = NightTurnOn.IsTrue();
-        int batteryVoltage = EntitiesManagerService.Entities.BatteryVoltage.Value;
-        int limitVoltage = NightLimitVoltage.Value;
-        DateTime sunRisingDateTime = SunCalc.GetSunPhases(DateTime.UtcNow, _position.latitude, _position.longitude, _position.altitude).First(e => e.Name.Value == SunPhaseName.Sunrise.Value).PhaseTime;
+        var timeSleep = NightTimeOff.Value;
+        var turnOn = NightTurnOn.IsTrue();
+        var batteryVoltage = EntitiesManagerService.Entities.BatteryVoltage.Value;
+        var limitVoltage = NightLimitVoltage.Value;
+        var sunRisingDateTime = SunCalc.GetSunPhases(DateTime.UtcNow, _position.latitude, _position.longitude, _position.altitude).First(e => e.Name.Value == SunPhaseName.Sunrise.Value).PhaseTime;
 
         if (sunRisingDateTime < DateTime.UtcNow)
         {
@@ -103,7 +103,7 @@ public class BatteryApp : AWorker
         
         if (NightUseSun.IsTrue())
         {
-            TimeSpan durationBeforeSunRinsing = sunRisingDateTime - DateTime.UtcNow;
+            var durationBeforeSunRinsing = sunRisingDateTime - DateTime.UtcNow;
             Logger.LogDebug("Sun rising is in {duration} ==> {sunRisingDateTime}", durationBeforeSunRinsing,
                 sunRisingDateTime);
             

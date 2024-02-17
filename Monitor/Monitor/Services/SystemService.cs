@@ -1,57 +1,34 @@
-using System.Globalization;
-using System.Reactive.Subjects;
-using System.Text.Json;
-using Monitor.Extensions;
-using Monitor.Models;
+using System.Diagnostics;
 
 namespace Monitor.Services;
 
-public class SystemService : AService
+public class SystemService(ILogger<SystemService> logger, SerialMessageService serialMessageService)
+    : AService(logger)
 {
-    private readonly SerialMessageService _serialMessageService;
-    public DateTime? ChangeDateTime { get; set; }
     private TimeSpan? WillSleep { get; set; }
-    private bool WillShutdown { get; set; }
-
-    public SystemService(ILogger<SystemService> logger, SerialMessageService serialMessageService) : base(logger)
-    {
-        _serialMessageService = serialMessageService;
-    }
 
     public void AskForShutdown(TimeSpan sleepTime)
     {
         Logger.LogInformation("Ask for shutdown during {time}", sleepTime);
         
-        if (WillShutdown)
-        {
-            Logger.LogWarning("Ask for shutdown during {time} KO because already shutdown order given", sleepTime);
-            
-            return;
-        }
-        
         WillSleep = sleepTime;
 
         if (WillSleep.HasValue)
         {
-            _serialMessageService.SetWatchdog(WillSleep.Value);
+            serialMessageService.SetWatchdog(WillSleep.Value);
         }
     }
 
-    public void Shutdown()
+    public async Task Shutdown()
     {
         Logger.LogInformation("Send shutdown command");
 
-        WillShutdown = true;
-
-        File.WriteAllText("/proc/sys/kernel/sysrq", "1");
-        File.WriteAllText("/proc/sysrq-trigger", "s");
-        File.WriteAllText("/proc/sysrq-trigger", "u");
-        File.WriteAllText("/proc/sysrq-trigger", "o");
+        await Task.Delay(2500);
         
-        if (WillShutdown)
-        {
-            Logger.LogWarning("Will already shutdown");
-        }
+        await File.WriteAllTextAsync("/proc/sys/kernel/sysrq", "1");
+        await File.WriteAllTextAsync("/proc/sysrq-trigger", "s");
+        await File.WriteAllTextAsync("/proc/sysrq-trigger", "u");
+        await File.WriteAllTextAsync("/proc/sysrq-trigger", "o");
     }
 
     public void SetTime(DateTime dateTime)
@@ -70,11 +47,31 @@ public class SystemService : AService
         
         Logger.LogInformation("Change dateTime {dateTime}. Old : {now}", dateTime, DateTime.UtcNow);
 
-        ChangeDateTime = dateTime;
+        ProcessStartInfo processStartInfo = new()
+        {
+            FileName = "/bin/date",
+            Arguments = $"-s \"{dateTime:u}\"",
+            UseShellExecute = false,
+            RedirectStandardOutput = false,
+            CreateNoWindow = true
+        };
+
+        using Process process = new();
+        process.StartInfo = processStartInfo;
+
+        try
+        {
+            process.Start();
+            process.WaitForExit();
+        }
+        catch (Exception e)
+        {
+            Logger.LogWarning(e, "Change datetime in error");
+        }
     }
     
     public bool IsShutdownAsked()
     {
-        return WillSleep.HasValue || WillShutdown;
+        return WillSleep.HasValue;
     }
 }

@@ -11,7 +11,7 @@ using NetDaemon.Extensions.Scheduler;
 
 Console.WriteLine("Starting");
 
-WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddLogging(loggingBuilder =>
 {
@@ -64,7 +64,7 @@ builder.Services.AddSingleton<SystemService>();
 builder.Services.AddSingleton<CameraService>();
 builder.Services.AddSingleton<EntitiesManagerService>();
 
-WebApplication app = builder.Build();
+var app = builder.Build();
 
 app.UseMiddleware<PerformanceAndCultureMiddleware>();
 app.UseResponseCompression();
@@ -77,7 +77,7 @@ app.MapControllers();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
-string storagePath = app.Configuration.GetValueOrThrow<string>("StoragePath");
+var storagePath = app.Configuration.GetValueOrThrow<string>("StoragePath");
 
 Directory.CreateDirectory(storagePath);
 
@@ -93,7 +93,7 @@ await scope.ServiceProvider.GetRequiredService<DataContext>().Database.MigrateAs
 LocaleProvider.DefaultLanguage = "fr-FR";
 LocaleProvider.SetLocale(LocaleProvider.DefaultLanguage);
 
-CultureInfo culture = CultureInfo.GetCultureInfo(LocaleProvider.DefaultLanguage);
+var culture = CultureInfo.GetCultureInfo(LocaleProvider.DefaultLanguage);
 
 CultureInfo.DefaultThreadCurrentCulture = culture;
 CultureInfo.DefaultThreadCurrentUICulture = culture;
@@ -108,17 +108,10 @@ await app.RunAsync();
 Console.WriteLine("Stopped");
 
 
-public class MqttConnect : BackgroundService
+public class MqttConnect(EntitiesManagerService entitiesManagerService) : BackgroundService
 {
-    private readonly EntitiesManagerService _entitiesManagerService;
-
-    public MqttConnect(EntitiesManagerService entitiesManagerService)
-    {
-        _entitiesManagerService = entitiesManagerService;
-    }
-
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
-        await _entitiesManagerService.ConnectMqtt();
+        await entitiesManagerService.ConnectMqtt();
     }
 }

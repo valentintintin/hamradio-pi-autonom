@@ -1,8 +1,3 @@
 namespace Monitor.Exceptions;
 
-public class MqttEntityNotFoundException : Exception
-{
-    public MqttEntityNotFoundException(string topic) : base($"MqttEntity topic {topic} not found")
-    {
-    }
-}
+public class MqttEntityNotFoundException(string topic) : Exception($"MqttEntity topic {topic} not found");

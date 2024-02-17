@@ -27,7 +27,7 @@ public class CameraService : AService
 
     public CameraService(ILogger<CameraService> logger, IConfiguration configuration) : base(logger)
     {
-        IConfigurationSection configurationSection = configuration.GetSection("Cameras");
+        var configurationSection = configuration.GetSection("Cameras");
         _message = configurationSection.GetValue<string?>("Message");
         _fswebcamParameters = configurationSection.GetSection("Devices").Get<List<FswebcamParameters>>()?.ToList() ?? new List<FswebcamParameters>();
         
@@ -42,7 +42,7 @@ public class CameraService : AService
 
     public string? GetFinalLast()
     {
-        string path = $"{_storagePath}/last.jpg";
+        var path = $"{_storagePath}/last.jpg";
 
         if (!File.Exists(path))
         {
@@ -51,7 +51,7 @@ public class CameraService : AService
             return null;
         }
         
-        FileSystemInfo? resolveLinkTarget = File.ResolveLinkTarget(path, true);
+        var resolveLinkTarget = File.ResolveLinkTarget(path, true);
 
         if (resolveLinkTarget == null)
         {
@@ -72,7 +72,7 @@ public class CameraService : AService
 
         _isRunning = true;
         
-        DateTime now = DateTime.UtcNow;
+        var now = DateTime.UtcNow;
         ImageMagickParameters imageMagickParameters = new();
 
         try
@@ -81,8 +81,8 @@ public class CameraService : AService
 
             Logger.LogDebug("We have {count} photos", imagesCamera.Count);
 
-            int width = 0;
-            int height = 480;
+            var width = 0;
+            var height = 480;
 
             if (imagesCamera.Any())
             {
@@ -112,7 +112,7 @@ public class CameraService : AService
                 imageMagickParameters.AddText(15, _fontPath, WidthData - 15 * _message.Length, height - 30, _message, "white");
             }
 
-            string tempOutputFile = $"{_storagePath}/output.jpg";
+            var tempOutputFile = $"{_storagePath}/output.jpg";
             imageMagickParameters.SetQuality(80).SetFormat("jpeg").Output(tempOutputFile);
 
             ImageMagick(imageMagickParameters);
@@ -131,13 +131,13 @@ public class CameraService : AService
             {
                 Directory.CreateDirectory($"{_storagePath}/{now:yyyy-MM-dd}");
 
-                string filePath =
+                var filePath =
                     $"{_storagePath}/{now:yyyy-MM-dd}/{now:yyyy-MM-dd-HH-mm-ss}-{Random.Shared.NextInt64()}.jpg";
-                string lastPath = $"{_storagePath}/last.jpg";
+                var lastPath = $"{_storagePath}/last.jpg";
 
                 Logger.LogDebug("Save final image to {path}", filePath);
 
-                await using FileStream fileStream = File.Create(filePath);
+                await using var fileStream = File.Create(filePath);
                 await stream.CopyToAsync(fileStream);
 
                 File.Delete(lastPath);
@@ -160,7 +160,7 @@ public class CameraService : AService
 
         return _fswebcamParameters.Select(parameters =>
         {
-            string cameraName = parameters.Device
+            var cameraName = parameters.Device
                 .Replace("/dev/v4l/by-id/", string.Empty)
                 .Replace("/dev/video_", string.Empty)
                 .Replace("/dev/video", string.Empty);
@@ -176,8 +176,8 @@ public class CameraService : AService
     
     private void DrawProgressBarwithInfo(ImageMagickParameters parameters, int indexValue, string label, string unit, double value, double min, double max, string colorBar)
     {
-        int y = indexValue * 50 + 80;
-        double valueBar = value;
+        var y = indexValue * 50 + 80;
+        var valueBar = value;
         
         if (valueBar > max)
         {
@@ -228,9 +228,9 @@ public class CameraService : AService
             process.Kill();
         }
 
-        string errorStream = process.StandardError.ReadToEnd();
-        string standardStream = process.StandardOutput.ReadToEnd();
-        string stream = standardStream + " " + errorStream;
+        var errorStream = process.StandardError.ReadToEnd();
+        var standardStream = process.StandardOutput.ReadToEnd();
+        var stream = standardStream + " " + errorStream;
         
         Logger.LogDebug("Image capture output for {device} : {stream}", parameters.Device, stream);
         
@@ -275,9 +275,9 @@ public class CameraService : AService
             process.Kill();
         }
         
-        string errorStream = process.StandardError.ReadToEnd();
-        string standardStream = process.StandardOutput.ReadToEnd();
-        string streamString = standardStream + " " + errorStream;
+        var errorStream = process.StandardError.ReadToEnd();
+        var standardStream = process.StandardOutput.ReadToEnd();
+        var streamString = standardStream + " " + errorStream;
         
         if (!string.IsNullOrWhiteSpace(errorStream))
         {

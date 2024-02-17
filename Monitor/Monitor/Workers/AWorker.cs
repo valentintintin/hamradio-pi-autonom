@@ -71,7 +71,7 @@ public abstract class AWorker : IHostedService, IAsyncDisposable
 
     protected virtual Task Stop()
     {
-        foreach (IDisposable disposable in _disposables)
+        foreach (var disposable in _disposables)
         {
             try
             {

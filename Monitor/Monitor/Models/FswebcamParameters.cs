@@ -46,7 +46,7 @@ public class FswebcamParameters
     {
         get
         {
-            string? width = Resolution.ToLower().Split('x')?.FirstOrDefault();
+            var width = Resolution.ToLower().Split('x')?.FirstOrDefault();
             return string.IsNullOrWhiteSpace(width) ? 0 : int.Parse(width);
         }
     }
@@ -55,7 +55,7 @@ public class FswebcamParameters
     {
         get
         {
-            string? height = Resolution.ToLower().Split('x')?.LastOrDefault();
+            var height = Resolution.ToLower().Split('x')?.LastOrDefault();
             return string.IsNullOrWhiteSpace(height) ? 0 : int.Parse(height);
         }
     }

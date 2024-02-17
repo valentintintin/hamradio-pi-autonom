@@ -4,7 +4,7 @@ public static class StringExtensions
 {
     public static int ToInt(this string? value, int? defaultValue = null)
     {
-        if (!int.TryParse(value, out int valueLong))
+        if (!int.TryParse(value, out var valueLong))
         {
             if (defaultValue.HasValue)
             {
@@ -19,7 +19,7 @@ public static class StringExtensions
     
     public static int? ToIntNullable(this string? value)
     {
-        if (!int.TryParse(value, out int valueLong))
+        if (!int.TryParse(value, out var valueLong))
         {
             return null;
         }
@@ -29,7 +29,7 @@ public static class StringExtensions
     
     public static long ToLong(this string? value, long? defaultValue = null)
     {
-        if (!long.TryParse(value, out long valueLong))
+        if (!long.TryParse(value, out var valueLong))
         {
             if (defaultValue.HasValue)
             {
@@ -44,7 +44,7 @@ public static class StringExtensions
     
     public static long? ToLongNullable(this string? value)
     {
-        if (!long.TryParse(value, out long valueLong))
+        if (!long.TryParse(value, out var valueLong))
         {
             return null;
         }

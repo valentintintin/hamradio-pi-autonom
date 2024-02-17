@@ -5,14 +5,10 @@ using Monitor.Models.SerialMessages;
 
 namespace Monitor.Services;
 
-public class SerialMessageService : AService
+public class SerialMessageService(ILogger<SerialMessageService> logger) : AService(logger)
 {
     public static SerialPort? SerialPort;
-    
-    public SerialMessageService(ILogger<SerialMessageService> logger) : base(logger)
-    {
-    }
-    
+
     public Message ParseMessage(string input)
     {
         Message? message, messageTyped;
@@ -25,7 +21,7 @@ public class SerialMessageService : AService
         {
             if (input.Contains("lora")) // because APRS can have char " in string and we do not escape it in C++
             {
-                string payloadString = "payload\":\"";
+                var payloadString = "payload\":\"";
                 
                 message = new LoraData
                 {

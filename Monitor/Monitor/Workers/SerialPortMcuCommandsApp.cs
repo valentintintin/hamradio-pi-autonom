@@ -33,7 +33,7 @@ public class SerialPortMcuCommandsApp : ASerialPortApp
             return;
         }
         
-        Message message = _serialMessageService.ParseMessage(input);
+        var message = _serialMessageService.ParseMessage(input);
         await MonitorService.UpdateStateFromMessage(message);
     }
 }
