@@ -1,4 +1,10 @@
-﻿@inherits Microsoft.AspNetCore.Components.LayoutComponentBase
+﻿@using Microsoft.AspNetCore.WebUtilities
+@using Monitor.Extensions
+@using Monitor.Services
+@using System.Reactive.Linq
+@inherits Microsoft.AspNetCore.Components.LayoutComponentBase
+@inject NavigationManager NavManager
+@inject INotificationService NotificationService
 
 <Layout Class="layout">
     <Header Style="height: auto; min-height: 64px; display: flex; flex-wrap: wrap; align-items: center; color: white;">
@@ -6,15 +12,18 @@
         <Menu Theme="MenuTheme.Dark" Mode="MenuMode.Horizontal">
             <MenuItem RouterLink="/" RouterMatch="NavLinkMatch.All">Tableau de bord</MenuItem>
             <MenuItem RouterLink="/history" RouterMatch="NavLinkMatch.All">Historique</MenuItem>
-            <SubMenu Title="Outils">
-                <MenuItemGroup Title="">
-                    <MenuItem RouterLink="/settings" RouterMatch="NavLinkMatch.All">Paramètres</MenuItem>
-                </MenuItemGroup>
-                <MenuItemGroup Title="Dev">
-                    <MenuItem RouterLink="/states">État JSON</MenuItem>
-                    <MenuItem RouterLink="/camera/current.jpg">Caméras</MenuItem>
-                </MenuItemGroup>
-            </SubMenu>
+            @if (_isAdmin)
+            {
+                <SubMenu Title="Outils">
+                    <MenuItemGroup Title="">
+                        <MenuItem RouterLink="/settings" RouterMatch="NavLinkMatch.All">Paramètres</MenuItem>
+                    </MenuItemGroup>
+                    <MenuItemGroup Title="Dev">
+                        <MenuItem RouterLink="/states">État JSON</MenuItem>
+                        <MenuItem RouterLink="/camera/current.jpg">Caméras</MenuItem>
+                    </MenuItemGroup>
+                </SubMenu>
+            }
         </Menu>
     </Header>
     
@@ -26,3 +35,48 @@
         <a href="https://f4hvv.valentin-saugnier.fr" target="_blank">Valentin Saugnier - F4HVV</a> - <a href="mailto:valentin.s.10@gmail.com">valentin.s.10@gmail.com</a>
     </Footer>
 </Layout>
+
+@code
+{
+    private bool _isAdmin;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        
+        var uri = NavManager.ToAbsoluteUri(NavManager.Uri);
+        _isAdmin = QueryHelpers.ParseQuery(uri.Query).ContainsKey("admin");
+
+        EntitiesManagerService.Entities.GpioWifi.ValueChanges()
+            .Merge(EntitiesManagerService.Entities.GpioNpr.ValueChanges())
+            .Merge(EntitiesManagerService.Entities.StatusBoxOpened.ValueChanges())
+            .Merge(EntitiesManagerService.Entities.FeatureSleepEnabled.ValueChanges())
+            .Merge(EntitiesManagerService.Entities.MpptPowerEnabled.ValueChanges())
+            .Merge(EntitiesManagerService.Entities.FeatureAprsDigipeaterEnabled.ValueChanges())
+            .Merge(EntitiesManagerService.Entities.FeatureSleepEnabled.ValueChanges())
+            .Merge(EntitiesManagerService.Entities.FeatureAprsPositionEnabled.ValueChanges())
+            .Merge(EntitiesManagerService.Entities.FeatureAprsTelemetryEnabled.ValueChanges())
+            .Merge(EntitiesManagerService.Entities.FeatureWatchdogSafetyEnabled.ValueChanges())
+            .Merge(EntitiesManagerService.Entities.WatchdogEnabled.ValueChanges())
+            .SubscribeAsync(Notify);
+
+        EntitiesManagerService.Entities.McuStatus.ValueChanges()
+            .Merge(EntitiesManagerService.Entities.MpptStatus.ValueChanges())
+            .SubscribeAsync(Notify);
+
+        EntitiesManagerService.Entities.WatchdogPowerOffTime.ValueChanges()
+            .Merge(EntitiesManagerService.Entities.WatchdogCounter.ValueChanges()
+                .Where(v => v.value - v.old >= TimeSpan.FromSeconds(15))
+            ).SubscribeAsync(Notify);
+    }
+
+    private async Task Notify<T>((T? old, T? value, string id) val)
+    {
+        await NotificationService.Info(new NotificationConfig
+        {
+            Key = val.id,
+            Message = $"Changement d'état pour {val.id.ToUpper().Replace("/", " ")}",
+            Description = $"Passage de {(val.old != null ? val.old : "-")} à {val.value}.",
+        });
+    }
+}

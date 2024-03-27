@@ -14,7 +14,7 @@ public:
     explicit WeatherSensors(System *system);
 
     bool begin();
-    bool update();
+    bool update(bool force = false);
 
     inline float getTemperature() const {
         return temperature;

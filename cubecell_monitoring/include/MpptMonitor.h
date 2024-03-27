@@ -11,7 +11,7 @@ public:
     explicit MpptMonitor(System *system, TwoWire &wire);
 
     bool begin();
-    bool update();
+    bool update(bool force = false);
     bool setWatchdog(uint16_t powerOffTime, uint8_t timeoutTime = WATCHDOG_TIMEOUT);
     bool setPowerOnOff(uint16_t powerOnVoltage, uint16_t powerOffVoltage);
 

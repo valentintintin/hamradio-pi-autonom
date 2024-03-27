@@ -9,8 +9,8 @@ bool WeatherSensors::begin() {
     return sensor.begin();
 }
 
-bool WeatherSensors::update() {
-    if (!timer.hasExpired()) {
+bool WeatherSensors::update(bool force) {
+    if (!force && !timer.hasExpired()) {
         return false;
     }
 

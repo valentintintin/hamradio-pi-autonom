@@ -7,7 +7,6 @@ namespace Monitor.Models.SerialMessages;
 [JsonDerivedType(typeof(LoraData))]
 [JsonDerivedType(typeof(McuSystemData))]
 [JsonDerivedType(typeof(MpptData))]
-[JsonDerivedType(typeof(TimeData))]
 [JsonDerivedType(typeof(WeatherData))]
 public class Message
 {

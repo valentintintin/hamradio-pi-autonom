@@ -1,0 +1,83 @@
+@using Monitor.Models
+@using System.Globalization
+
+<Card Title="@Title">
+    <Body>
+    <GridRow Align="center">
+        @if (ShowMin)
+        {
+            <GridCol Xs="24" Sm="@SizeMd">
+                <Statistic Title="Min aujourd'hui" Value="@GetValue(Data.TotalToday.Min)" Suffix="@Suffix" />
+            </GridCol>
+        }
+        <GridCol Xs="24" Sm="@SizeMd">
+            <Statistic Title="Moyenne aujourd'hui" Value="@GetValue(Data.TotalToday.Average)" Suffix="@Suffix" />
+        </GridCol>
+        <GridCol Xs="24" Sm="@SizeMd">
+            <Statistic Title="Max aujourd'hui" Value="@GetValue(Data.TotalToday.Max)" Suffix="@Suffix" />
+        </GridCol>
+    </GridRow>
+    <GridRow>
+        @if (ShowMin)
+        {
+            <GridCol Xs="24" Sm="@SizeMd">
+                <Statistic Title="Min hier" Value="@GetValue(Data.TotalYesterday.Min)" Suffix="@Suffix" />
+            </GridCol>
+        }
+        <GridCol Xs="24" Sm="@SizeMd">
+            <Statistic Title="Moyenne hier" Value="@GetValue(Data.TotalYesterday.Average)" Suffix="@Suffix" />
+        </GridCol>
+        <GridCol Xs="24" Sm="@SizeMd">
+            <Statistic Title="Max hier" Value="@GetValue(Data.TotalYesterday.Max)" Suffix="@Suffix" />
+        </GridCol>
+    </GridRow>
+    <GridRow>
+        @if (ShowMin)
+        {
+            <GridCol Xs="24" Sm="@SizeMd">
+                <Statistic Title="Min" Value="@GetValue(Data.Total.Min)" Suffix="@Suffix" />
+            </GridCol>
+        }
+        <GridCol Xs="24" Sm="@SizeMd">
+            <Statistic Title="Moyenne" Value="@GetValue(Data.Total.Average)" Suffix="@Suffix" />
+        </GridCol>
+        <GridCol Xs="24" Sm="@SizeMd">
+            <Statistic Title="Max" Value="@GetValue(Data.Total.Max)" Suffix="@Suffix" />
+        </GridCol>
+    </GridRow>
+    </Body>
+</Card>
+
+@code {
+    [Parameter]
+    public required StatsView Data { get; set; }
+    
+    [Parameter]
+    public required string Title { get; set; }
+    
+    [Parameter]
+    public string? Suffix { get; set; }
+
+    [Parameter] 
+    public bool ShowMin { get; set; } = true;
+
+    [Parameter]
+    public Type Type { get; set; } = typeof(double);
+
+    private int SizeMd => ShowMin ? 8 : 12;
+    
+    private string GetValue(double value)
+    {
+        if (Type == typeof(DateTime))
+        {
+            return DateTimeOffset.FromUnixTimeSeconds((long)value).ToString("dd/MM HH:mm:ss", CultureInfo.CurrentCulture);
+        }
+        
+        if (Type == typeof(TimeSpan))
+        {
+            return TimeSpan.FromSeconds(value).ToString();
+        }
+
+        return value.ToString(CultureInfo.CurrentCulture);
+    }
+}

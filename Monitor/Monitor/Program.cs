@@ -106,12 +106,3 @@ Console.WriteLine("Started");
 await app.RunAsync();
 
 Console.WriteLine("Stopped");
-
-
-public class MqttConnect(EntitiesManagerService entitiesManagerService) : BackgroundService
-{
-    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
-    {
-        await entitiesManagerService.ConnectMqtt();
-    }
-}

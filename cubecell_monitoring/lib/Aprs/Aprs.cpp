@@ -59,7 +59,7 @@ uint8_t Aprs::encode(AprsPacket* aprsPacket, char* aprsResult) {
         sprintf_P(&aprsResult[strlen(aprsResult)], PSTR(" %s"), aprsPacket->comment); // Normally, 40 max for position
     }
 
-    if (aprsPacket->type == Position && aprsPacket->position.withTelemetry) {
+    if (aprsPacket->type == Position && aprsPacket->position.withTelemetry && !aprsPacket->telemetries.legacy) {
         appendTelemetries(aprsPacket, aprsResult);
     }
 
@@ -224,7 +224,7 @@ void Aprs::appendTelemetries(AprsPacket *aprsPacket, char* aprsResult) {
             strcpy(&aprsResult[strlen(aprsResult)], bufferBase91);
 
             for (auto telemetry : aprsPacket->telemetries.telemetriesAnalog) {
-                ax25Base91Enc(bufferBase91, 2, abs(telemetry.value));
+                ax25Base91Enc(bufferBase91, 2, (uint16_t) abs(telemetry.value));
                 strcpy(&aprsResult[strlen(aprsResult)], bufferBase91);
             }
 
@@ -241,14 +241,18 @@ void Aprs::appendTelemetries(AprsPacket *aprsPacket, char* aprsResult) {
             strcat_P(aprsResult, PSTR("|"));
             break;
         case Telemetry:
-            if (aprsPacket->telemetries.telemetrySequenceNumber > 999) {
+            if (aprsPacket->telemetries.legacy && aprsPacket->telemetries.telemetrySequenceNumber > 999) {
                 aprsPacket->telemetries.telemetrySequenceNumber = 0;
             }
 
             sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("T#%d,"), aprsPacket->telemetries.telemetrySequenceNumber);
 
             for (auto telemetry : aprsPacket->telemetries.telemetriesAnalog) {
-                sprintf_P(&aprsResult[strlen(aprsResult)], formatDouble(telemetry.value), telemetry.value);
+                if (aprsPacket->telemetries.legacy) {
+                    sprintf_P(&aprsResult[strlen(aprsResult)], PSTR("%d"), (uint8_t) abs(telemetry.value));
+                } else {
+                    sprintf_P(&aprsResult[strlen(aprsResult)], formatDouble(telemetry.value), telemetry.value);
+                }
                 strcat_P(aprsResult, PSTR(","));
             }
 
@@ -410,7 +414,7 @@ void Aprs::appendWeather(AprsWeather *weather, char* aprsResult) {
         strcat_P(aprsResult, PSTR("....."));
     }
 
-    strcat_P(aprsResult, weather->device);
+//    strcat_P(aprsResult, weather->device);
 }
 
 char* Aprs::ax25Base91Enc(char *destination, uint8_t width, uint32_t value) {
@@ -491,7 +495,7 @@ void Aprs::reset(AprsPacket *aprsPacket) {
     aprsPacket->message.ackToReject[0] = '\0';
     aprsPacket->message.destination[0] = '\0';
 
-    aprsPacket->weather.device[0] = '\0';
+//    aprsPacket->weather.device[0] = '\0';
     aprsPacket->weather.temperatureFahrenheit = 0;
     aprsPacket->weather.humidity = 0;
     aprsPacket->weather.pressure = 0;

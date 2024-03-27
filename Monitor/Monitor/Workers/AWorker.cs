@@ -14,7 +14,7 @@ public abstract class AWorker : IHostedService, IAsyncDisposable
     protected readonly IServiceProvider Services;
     protected readonly IScheduler Scheduler;
     protected readonly EntitiesManagerService EntitiesManagerService;
-    private readonly List<IDisposable> _disposables = new();
+    private readonly List<IDisposable> _disposables = [];
     
     protected static readonly TimeSpan RetryDuration = TimeSpan.FromSeconds(5);
 

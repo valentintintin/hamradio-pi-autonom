@@ -9,6 +9,12 @@ public class McuSystemData : Message
 
     [JsonPropertyName("boxOpened")]
     public bool BoxOpened { get; set; }
+    
+    [JsonPropertyName("time")]
+    public long Timestamp { get; set; }
+
+    [JsonPropertyName("uptime")] 
+    public long Uptime { get; set; }
 
     [JsonPropertyName("watchdogSafety")]
     public bool WatchdogSafetyEnabled { get; set; }
@@ -30,4 +36,9 @@ public class McuSystemData : Message
 
     [JsonIgnore]
     public bool IsAlert => State == "alert";
+
+    [JsonIgnore]
+    public DateTimeOffset DateTime => DateTimeOffset.FromUnixTimeSeconds(Timestamp);
+    [JsonIgnore]
+    public TimeSpan UptimeTimeSpan => TimeSpan.FromSeconds(Uptime);
 }

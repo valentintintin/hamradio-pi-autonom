@@ -36,7 +36,7 @@
 
 #define INTERVAL_WEATHER 30000
 #define INTERVAL_MPPT 30000
-#define INTERVAL_TIME 30000
+#define INTERVAL_STATE 30000
 #define TIME_PAUSE_SCREEN 1500
 #define TIME_SCREEN_ON 30000
 
@@ -80,6 +80,8 @@
 #define COLOR_YELLOW 0xcfcf02
 #define COLOR_GREEN 0x005000
 #define COLOR_CYAN 0x00bbff
+
+#define CURRENT_YEAR 2024
 
 #ifdef USE_SOFT_SERIAL
 #include <softSerial.h>

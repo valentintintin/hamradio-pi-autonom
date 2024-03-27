@@ -53,7 +53,6 @@ public class SerialMessageService(ILogger<SerialMessageService> logger) : AServi
             {
                 "system" => JsonSerializer.Deserialize<McuSystemData>(input),
                 "weather" => JsonSerializer.Deserialize<WeatherData>(input),
-                "time" => JsonSerializer.Deserialize<TimeData>(input),
                 "mppt" => JsonSerializer.Deserialize<MpptData>(input),
                 "lora" => JsonSerializer.Deserialize<LoraData>(input),
                 "gpio" => JsonSerializer.Deserialize<GpioData>(input),
@@ -150,6 +149,11 @@ public class SerialMessageService(ILogger<SerialMessageService> logger) : AServi
         }
         
         SendCommand($"lora \"{message}\"");
+    }
+
+    public void GetDataJson()
+    {
+        SendCommand($"jsons");
     }
 
     private void SetEepromMcu(int address, int value)

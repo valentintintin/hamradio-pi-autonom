@@ -2,7 +2,7 @@ namespace Monitor.Models;
 
 public class ImageMagickParameters
 {
-    private readonly List<string> _commands = new();
+    private readonly List<string> _commands = [];
     
     private int? _translateX = 0;
     private int? _translateY = 0;

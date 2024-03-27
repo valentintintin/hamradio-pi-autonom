@@ -1,3 +1,5 @@
+using AprsSharp.AprsParser;
+
 namespace Monitor.Extensions;
 
 public static class StringExtensions
@@ -50,5 +52,17 @@ public static class StringExtensions
         }
 
         return valueLong;
+    }
+
+    public static Packet ToAprsPacket(this string value)
+    {
+        try
+        {
+            return new Packet(value);
+        }
+        catch (Exception)
+        {
+            return new Packet($"{value.Split(":")[0]}: ");
+        }
     }
 }

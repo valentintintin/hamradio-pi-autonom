@@ -14,11 +14,6 @@ public class MonitorState
         Type = "weather"
     };
 
-    public TimeData Time { get; set; } = new()
-    {
-        Type = "time"
-    };
-
     public McuSystemData McuSystem { get; set; } = new()
     {
         State = "no data",

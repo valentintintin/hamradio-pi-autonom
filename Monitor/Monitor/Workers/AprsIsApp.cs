@@ -74,10 +74,10 @@ public class AprsIsApp : AEnabledWorker
 
         try
         {
-            Packet packetToSend = new(_callsign, new List<string> { "TCPIP", _callsign }, packet.InfoField);
+            Packet packetToSend = new(packet.Sender, new List<string> { "TCPIP", _callsign }, packet.InfoField);
             var packetToSendTnc2 = packetToSend.EncodeTnc2();
 
-            Logger.LogInformation("Packet {packet} ready to be send to RF", packetToSendTnc2);
+            Logger.LogInformation("Packet ready to be send to RF: {packet}", packetToSendTnc2);
 
             _serialMessageService.SendLora(packetToSendTnc2);
         }

@@ -44,9 +44,11 @@ public class ConfigEntity<T> : IStringConfigEntity
         SetValue(initialValue);
     }
 
-    public IObservable<(T? old, T? value)> ValueChanges(bool onlyIfDifferent = true)
+    public IObservable<(T? old, T? value, string id)> ValueChanges(bool onlyIfDifferent = true)
     {
-        return _valueSubject.AsObservable().Where(v => !onlyIfDifferent || v.old?.Equals(v.value) != true);
+        return _valueSubject.AsObservable()
+            .Where(v => !onlyIfDifferent || v.old?.Equals(v.value) != true)
+            .Select(v => (v.old, v.value, Id));
     }
 
     public IObservable<string> ValueStringAsync()

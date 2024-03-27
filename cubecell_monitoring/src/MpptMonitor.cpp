@@ -20,8 +20,8 @@ bool MpptMonitor::begin() {
     return true;
 }
 
-bool MpptMonitor::update() {
-    if (!timer.hasExpired()) {
+bool MpptMonitor::update(bool force) {
+    if (!force && !timer.hasExpired()) {
         return false;
     }
 

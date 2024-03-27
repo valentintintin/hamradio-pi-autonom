@@ -164,6 +164,9 @@
                 <DescriptionsItem Title="Sleep">
                     <Switch @bind-Checked="EntitiesManagerService.Entities.FeatureSleepEnabled.Value"></Switch>
                 </DescriptionsItem>
+                <DescriptionsItem Title="Données">
+                    <Button Type="@ButtonType.Primary" OnClick="RefreshMcuData">Raffraîchir</Button>
+                </DescriptionsItem>
             </Descriptions>
             </Body>
         </Card>
@@ -208,6 +211,11 @@
             SerialMessageService.SendCommand(SerialTxPayload);
             SerialTxPayload = null;
         }
+    }
+
+    private void RefreshMcuData()
+    {
+        SerialMessageService.GetDataJson();
     }
 
     public void Dispose()

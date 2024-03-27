@@ -31,6 +31,7 @@ public:
     bool isBoxOpened() const;
     void setFunctionAllowed(byte function, bool allowed);
     void sleep(uint64_t time);
+    void resetTimerJson();
 
     inline bool isFunctionAllowed(byte function) const {
         return functionsAllowed[function];
@@ -68,7 +69,7 @@ private:
     Timer timerStatus = Timer(INTERVAL_STATUS_APRS, true);
     Timer timerPosition = Timer(INTERVAL_POSITION_APRS, true);
     Timer timerTelemetry = Timer(INTERVAL_TELEMETRY_APRS, false);
-    Timer timerTime = Timer(INTERVAL_TIME, true);
+    Timer timerState = Timer(INTERVAL_STATE, true);
     Timer timerScreen = Timer(TIME_SCREEN_ON);
     Timer timerBoxOpened = Timer(INTERVAL_ALARM_BOX_OPENED_APRS, true);
     Timer timerSecond = Timer(1000, true);
@@ -79,7 +80,6 @@ private:
 #endif
     TimerEvent_t *wakeUpEvent;
 
-    void showTime();
     void turnScreenOn();
     void turnScreenOff();
 

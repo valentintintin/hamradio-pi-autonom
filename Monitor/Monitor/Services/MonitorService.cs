@@ -2,6 +2,7 @@ using AprsSharp.AprsParser;
 using Microsoft.EntityFrameworkCore;
 using Monitor.Context;
 using Monitor.Context.Entities;
+using Monitor.Extensions;
 using Monitor.Models;
 using Monitor.Models.SerialMessages;
 
@@ -36,6 +37,9 @@ public class MonitorService(
                 EntitiesManagerService.Entities.FeatureAprsPositionEnabled.SetValue(systemData.AprsPositionEnabled);
                 EntitiesManagerService.Entities.FeatureSleepEnabled.SetValue(systemData.Sleep);
                 EntitiesManagerService.Entities.TemperatureRtc.SetValue(systemData.TemperatureRtc);
+                EntitiesManagerService.Entities.McuUptime.SetValue(systemData.UptimeTimeSpan);
+                
+                systemService.SetTime(State.McuSystem.DateTime.DateTime);
                 break;
             case WeatherData weatherData:
                 Logger.LogDebug("New weather data received : {message}", weatherData);
@@ -92,15 +96,6 @@ public class MonitorService(
                 });
                 await context.SaveChangesAsync();
                 break;
-            case TimeData timeData:
-                Logger.LogDebug("New time data received : {message}", timeData);
-
-                State.Time = timeData;
-                
-                EntitiesManagerService.Entities.McuUptime.SetValue(timeData.UptimeTimeSpan);
-                
-                systemService.SetTime(State.Time.DateTime.DateTime);
-                break;
             case GpioData gpioData:
                 Logger.LogDebug("New GPIO data received : {message}", gpioData);
 
@@ -116,7 +111,7 @@ public class MonitorService(
                     Wifi = gpioData.Wifi,
                     Uptime = (long)EntitiesManagerService.Entities.SystemUptime.Value.TotalSeconds,
                     BoxOpened = State.McuSystem.BoxOpened,
-                    McuUptime = State.Time.Uptime,
+                    McuUptime = State.McuSystem.Uptime,
                     TemperatureRtc = State.McuSystem.TemperatureRtc
                 });
                 await context.SaveChangesAsync();
@@ -141,7 +136,7 @@ public class MonitorService(
                 
                 try
                 {
-                    Packet packet = new(loraData.Payload);
+                    var packet = loraData.Payload.ToAprsPacket();
                     sender = packet.Sender;
                 }
                 catch (Exception e)

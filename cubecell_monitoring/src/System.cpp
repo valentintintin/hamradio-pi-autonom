@@ -119,14 +119,10 @@ void System::update() {
             }
         }
 
-        if (forceSendTelemetry || timerTime.hasExpired()) {
-            showTime();
-
-            gpio.printJson();
-
+        if (forceSendTelemetry || timerState.hasExpired()) {
             printJsonSystem(PSTR("running"));
 
-            timerTime.restart();
+            timerState.restart();
         }
 
         mpptMonitor.update();
@@ -250,30 +246,12 @@ void System::displayText(const char *title, const char *content, uint16_t pause)
 
 DateTime System::nowToString(char *result) {
     DateTime now = RTClib::now();
-    if (now.year() < 2023) {
+    if (now.year() < CURRENT_YEAR) {
         Log.warningln("[TIME] Use System instead of RTC");
         now = DateTime(TimerGetSysTime().Seconds);
     }
     sprintf(result, "%04d-%02d-%02dT%02d:%02d:%02d Uptime %lds", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second(), millis() / 1000);
     return now;
-}
-
-void System::showTime() {
-    DateTime now = nowToString(bufferText);
-
-    if (now.year() != 2023) {
-        return;
-    }
-
-    serialJsonWriter
-            .beginObject()
-            .property(F("type"), PSTR("time"))
-            .property(F("state"), now.unixtime())
-            .property(F("uptime"), millis() / 1000)
-            .endObject(); SerialPi->println();
-
-    Log.infoln(F("[TIME] %s. Temperature RTC: %dC"), bufferText, RTC.getTemperature());
-    displayText(PSTR("Time"), bufferText, 1000);
 }
 
 void System::setTimeFromRTcToInternalRtc(uint64_t epoch) {
@@ -306,18 +284,27 @@ void System::setFunctionAllowed(byte function, bool allowed) {
 }
 
 void System::printJsonSystem(const char *state) {
+    DateTime now = nowToString(bufferText);
+    
     serialJsonWriter
             .beginObject()
             .property(F("type"), PSTR("system"))
             .property(F("state"), (char*)state)
             .property(F("boxOpened"), isBoxOpened())
             .property(F("temperatureRtc"), RTC.getTemperature())
+            .property(F("time"), now.unixtime())
+            .property(F("uptime"), millis() / 1000)
             .property(F("watchdogSafety"), functionsAllowed[EEPROM_ADDRESS_WATCHDOG_SAFETY])
             .property(F("aprsDigipeater"), functionsAllowed[EEPROM_ADDRESS_APRS_DIGIPEATER])
             .property(F("aprsTelemetry"), functionsAllowed[EEPROM_ADDRESS_APRS_TELEMETRY])
             .property(F("aprsPosition"), functionsAllowed[EEPROM_ADDRESS_APRS_POSITION])
             .property(F("sleep"), functionsAllowed[EEPROM_ADDRESS_SLEEP])
             .endObject(); SerialPi->println();
+
+    gpio.printJson();
+
+    Log.infoln(F("[TIME] %s. Temperature RTC: %fC"), bufferText, RTC.getTemperature());
+    displayText(PSTR("Time"), bufferText, 1000);
 }
 
 void System::sleep(uint64_t time) {
@@ -337,4 +324,10 @@ void System::sleep(uint64_t time) {
     TimerStart(wakeUpEvent);
 
     lowPowerHandler();
+}
+
+void System::resetTimerJson() {
+    timerState.hasExpired();
+    mpptMonitor.update(true);
+    weatherSensors.update(true);
 }

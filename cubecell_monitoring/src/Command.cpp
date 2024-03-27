@@ -22,6 +22,7 @@ Command::Command(System *system) {
     parser.registerCommand(PSTR("set"), PSTR("uu"), doSetEeprom);
     parser.registerCommand(PSTR("time"), PSTR("u"), doSetTime);
     parser.registerCommand(PSTR("sleep"), PSTR("u"), doSleep);
+    parser.registerCommand(PSTR("jsons"), PSTR(""), doGetJson);
 }
 
 bool Command::processCommand(const char *command) {
@@ -132,4 +133,9 @@ void Command::doSleep(MyCommandParser::Argument *args, char *response) {
     }
 
     sprintf_P(response, PSTR("KO"));
+}
+
+void Command::doGetJson(MyCommandParser::Argument *args, char *response) {
+    system->resetTimerJson();
+    sprintf_P(response, PSTR("OK"));
 }

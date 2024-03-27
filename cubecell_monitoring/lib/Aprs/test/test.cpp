@@ -18,8 +18,8 @@ int main() {
             40.12345,
             5.12345,
             123,
-            45,
-            678
+            45, // 83 Km/h
+            678 // 206 m
     };
     packet.telemetries.telemetrySequenceNumber = 7544;
     strcpy(packet.telemetries.projectName, "Test project");
@@ -38,7 +38,7 @@ int main() {
     };
     packet.telemetries.telemetriesAnalog[2] = {
             "",
-            1656,
+            -1656.45,
             "",
             {
                 1, -2.0987, 34.5
@@ -94,7 +94,7 @@ int main() {
     };
     packet.telemetries.telemetriesBoolean[7] = {
             "",
-            0,
+            1,
     };
 
     packet.type = Position;
@@ -171,7 +171,7 @@ int main() {
     packet.weather.usePressure = true;
     packet.position.withWeather = true;
     packet.position.withTelemetry = false;
-    strcpy(packet.weather.device, "Test");
+//    strcpy(packet.weather.device, "Test");
     size = Aprs::encode(&packet, encoded_packet);
     printf("\nAPRS Weather Size : %d\n%s\n", size, encoded_packet);
 

@@ -59,7 +59,7 @@ typedef struct {
     bool useRainSinceMidnight = false;
     bool useHumidity = false;
     bool usePressure = false;
-    char device[WEATHER_DEVICE_LENGTH]{};
+//    char device[WEATHER_DEVICE_LENGTH]{};
 } AprsWeather;
 
 typedef struct {
@@ -82,6 +82,7 @@ typedef struct {
     AprsTelemetry telemetriesBoolean[MAX_TELEMETRY_BOOLEAN]{};
     uint16_t telemetrySequenceNumber = 0;
     char projectName[TELEMETRY_PROJECT_NAME_LENGTH]{};
+    bool legacy = false;
 } AprsTelemetries;
 
 typedef struct {

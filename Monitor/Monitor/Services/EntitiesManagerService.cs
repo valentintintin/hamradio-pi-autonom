@@ -18,10 +18,10 @@ public class EntitiesManagerService : AService, IAsyncDisposable
 
     private readonly string _topicBase;
     private readonly string _clientId;
-    private readonly IMqttClient _mqttClient;
     private readonly IConfigurationSection _configurationSection;
+    private readonly IMqttClient _mqttClient;
     private readonly DataContext _context;
-    private readonly List<IStringConfigEntity> _entities = new();
+    private readonly List<IStringConfigEntity> _entities = [];
     private readonly IScheduler _scheduler;
 
     public EntitiesManagerService(ILogger<EntitiesManagerService> logger, 

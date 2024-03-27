@@ -20,7 +20,7 @@ Communication::Communication(System *system) : system(system) {
     aprsPacketTx.weather.useTemperature = true;
     aprsPacketTx.weather.usePressure = true;
 
-    strcpy_P(aprsPacketTx.weather.device, PSTR("4HVV"));
+//    strcpy_P(aprsPacketTx.weather.device, PSTR("4HVV"));
 
     strcpy_P(aprsPacketTx.telemetries.projectName, PSTR("Data"));
 
@@ -177,7 +177,7 @@ void Communication::sendTelemetry() {
     strcpy_P(aprsPacketTx.destination, PSTR(APRS_DESTINATION));
     aprsPacketTx.content[0] = '\0';
 
-    sprintf_P(aprsPacketTx.comment, PSTR("Chg:%s Up:%lds"), mpptChg::getStatusAsString(system->mpptMonitor.getStatus()), millis() / 1000);
+    sprintf_P(aprsPacketTx.comment, PSTR("Chg:%s Up:%ld"), mpptChg::getStatusAsString(system->mpptMonitor.getStatus()), millis() / 1000);
     aprsPacketTx.telemetries.telemetrySequenceNumber = telemetrySequenceNumber++;
     aprsPacketTx.telemetries.telemetriesAnalog[0].value = system->mpptMonitor.getVoltageBattery();
     aprsPacketTx.telemetries.telemetriesAnalog[1].value = system->mpptMonitor.getCurrentBattery();

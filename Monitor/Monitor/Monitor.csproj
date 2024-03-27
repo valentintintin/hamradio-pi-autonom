@@ -41,15 +41,15 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="AntDesign" Version="0.17.4" />
+      <PackageReference Include="AntDesign" Version="0.18.1" />
       <PackageReference Include="AntDesign.Charts" Version="0.5.1" />
       <PackageReference Include="AprsSharp.AprsIsClient" Version="0.3.1" />
       <PackageReference Include="JoySoftware.NetDaemon.Extensions.Scheduling" Version="23.44.1" />
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.2">
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.3">
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
-      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.2" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.3" />
       <PackageReference Include="MQTTnet" Version="4.3.3.952" />
       <PackageReference Include="Seq.Extensions.Logging" Version="8.0.0" />
       <PackageReference Include="SunCalcNet" Version="1.2.2" />

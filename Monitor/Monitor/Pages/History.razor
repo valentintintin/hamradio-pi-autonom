@@ -1,11 +1,11 @@
 @page "/History"
 
-@using Microsoft.EntityFrameworkCore
-@using Monitor.Context
-@using Monitor.Context.Entities
 @using Monitor.Models
 @using System.Globalization
+@using Monitor.Context
+@using Microsoft.EntityFrameworkCore
 @using Monitor.Extensions
+@using Monitor.Components
 
 @inject IDbContextFactory<DataContext> DbContextFactory
 
@@ -14,15 +14,65 @@
 <PageHeader Title="Historique" Subtitle="@DataVoltageBattery.LastOrDefault()?.date" />
 
 <Spin Spinning="Loading">
-    <AntDesign.Charts.Line Data="DataVoltageBattery" Config="_configVoltageBattery" />
-    <AntDesign.Charts.Line Data="DataVoltageSolar" Config="_configVoltageSolar" />
-    <AntDesign.Charts.Line Data="DataCurrent" Config="_configCurrent" />
-    <AntDesign.Charts.Line Data="DataWeather" Config="_configTemperature" />
-    <AntDesign.Charts.Line Data="DataWeatherPressure" Config="_configPressure" />
+    <GridRow Gutter="(16, 16)" Justify="center">
+        <GridCol Xs="24" Md="12">
+            <Stat Title="Température" Data="@_temperature" Suffix="°C" />
+        </GridCol>
+        <GridCol Xs="24" Md="12">
+            <Stat Title="Intensité solaire" Data="@_currentSolar" Suffix="mA" />
+        </GridCol>
+        
+        <GridCol Xs="24" Md="12">
+            <Stat Title="Voltage batterie" Data="@_voltageBattery" Suffix="V" />
+        </GridCol>
+        <GridCol Xs="24" Md="12">
+            <Stat Title="Intensité batterie" Data="@_currentBattery" Suffix="mA" />
+        </GridCol>
+    </GridRow>
+    
+    <AntDesign.Charts.Line Data="DataVoltageBattery" Config="_configVoltageBattery"/>
+    <AntDesign.Charts.Line Data="DataVoltageSolar" Config="_configVoltageSolar"/>
+    <AntDesign.Charts.Line Data="DataCurrent" Config="_configCurrent"/>
+    <AntDesign.Charts.Line Data="DataWeather" Config="_configTemperature"/>
+    <AntDesign.Charts.Line Data="DataWeatherPressure" Config="_configPressure"/>
+    
+    <GridRow Gutter="(16, 16)" Justify="center">
+        <GridCol Xs="24" Md="12">
+            <Stat Title="Humidité" Data="@_humidity" Suffix="%" />
+        </GridCol>
+        <GridCol Xs="24" Md="12">
+            <Stat Title="Pression" Data="@_pressure" Suffix="hPa" />
+        </GridCol>
+        
+        <GridCol Xs="24" Md="12">
+            <Stat Title="LoRa RX" ShowMin="false" Data="@_loraRx" />
+        </GridCol>
+        <GridCol Xs="24" Md="12">
+            <Stat Title="Uptime" ShowMin="false" Data="@_uptime" Type="@typeof(TimeSpan)" />
+        </GridCol>
+        
+        <GridCol Xs="24" Md="12">
+            <Stat Title="Réveil" Data="@_wakeup" Type="@typeof(DateTime)" />
+        </GridCol>
+        <GridCol Xs="24" Md="12">
+            <Stat Title="Dodo" Data="@_dozeOff" Type="@typeof(DateTime)" />
+        </GridCol>
+    </GridRow>
 </Spin>
 
 @code
 {
+    private readonly StatsView _uptime = new();
+    private readonly StatsView _wakeup = new();
+    private readonly StatsView _dozeOff = new();
+    private readonly StatsView _voltageBattery = new();
+    private readonly StatsView _currentBattery = new();
+    private readonly StatsView _currentSolar = new();
+    private readonly StatsView _loraRx = new();
+    private readonly StatsView _temperature = new();
+    private readonly StatsView _humidity = new();
+    private readonly StatsView _pressure = new();
+    
     protected override async Task OnInitializedAsync()
     {
         await UpdateData();
@@ -35,11 +85,72 @@
         
         var context = await DbContextFactory.CreateDbContextAsync();
 
-        List<Mppt> mpptData = await context.Mppts.OrderByDescending(m => m.Id)
+        _uptime.FromData(context.Systems.Select(d => new StatsView.UnitData
+        {
+            DateTime = d.CreatedAt,
+            Value = d.Uptime
+        }));
+
+        var wakeupDozeOff = context.Systems.Select(d => new StatsView.UnitData
+        {
+            DateTime = d.CreatedAt,
+            Value = d.CreatedAt.ToUnixTimestamp()
+        }).OrderBy(d => d.DateTime).GroupBy(d => d.DateTime).ToList().AsQueryable();
+        
+        _wakeup.FromData(wakeupDozeOff.Select(d => d.First()));
+        _dozeOff.FromData(wakeupDozeOff.Select(d => d.Last()));
+
+        _voltageBattery.FromData(context.Mppts.Select(d => new StatsView.UnitData
+        {
+            DateTime = d.CreatedAt,
+            Value = d.BatteryVoltage / 1000.0
+        }));
+        
+        _currentBattery.FromData(context.Mppts.Select(d => new StatsView.UnitData
+        {
+            DateTime = d.CreatedAt,
+            Value = d.BatteryCurrent
+        }));
+        
+        _currentSolar.FromData(context.Mppts.Select(d => new StatsView.UnitData
+        {
+            DateTime = d.CreatedAt,
+            Value = d.SolarCurrent
+        }));
+
+        _loraRx.FromData(context.LoRas.Select(d => new StatsView.UnitData
+        {
+            DateTime = d.CreatedAt,
+            Value = d.IsTx ? 0 : 1
+        }).GroupBy(d => d.DateTime.Date, (time, data) => new StatsView.UnitData
+        {
+            DateTime = time,
+            Value = data.Sum(d => d.Value)
+        }));
+
+        _temperature.FromData(context.Weathers.Select(d => new StatsView.UnitData
+        {
+            DateTime = d.CreatedAt,
+            Value = d.Temperature
+        }));
+
+        _humidity.FromData(context.Weathers.Select(d => new StatsView.UnitData
+        {
+            DateTime = d.CreatedAt,
+            Value = d.Humidity
+        }));
+
+        _pressure.FromData(context.Weathers.Select(d => new StatsView.UnitData
+        {
+            DateTime = d.CreatedAt,
+            Value = d.Pressure
+        }));
+        
+        var mpptData = await context.Mppts.OrderByDescending(m => m.Id)
             .Take(500)
             .Reverse()
             .ToListAsync();
-        List<Weather> weatherData = await context.Weathers.OrderByDescending(m => m.Id)
+        var weatherData = await context.Weathers.OrderByDescending(m => m.Id)
             .Take(500)
             .Reverse()
             .ToListAsync();
@@ -115,11 +226,11 @@
         await base.OnAfterRenderAsync(firstRender);
     }
 
-    List<LineChartData<float>> DataVoltageBattery { get; set; } = new();
-    List<LineChartData<float>> DataVoltageSolar { get; set; } = new();
-    List<LineChartData<int>> DataCurrent { get; set; } = new();
-    List<LineChartData<float>> DataWeather { get; set; } = new();
-    List<LineChartData<float>> DataWeatherPressure { get; set; } = new();
+    List<LineChartData<float>> DataVoltageBattery { get; set; } = [];
+    List<LineChartData<float>> DataVoltageSolar { get; set; } = [];
+    List<LineChartData<int>> DataCurrent { get; set; } = [];
+    List<LineChartData<float>> DataWeather { get; set; } = [];
+    List<LineChartData<float>> DataWeatherPressure { get; set; } = [];
 
     readonly LineConfig _configVoltageBattery = new()
     {
@@ -249,8 +360,8 @@
             {
                 Text = "Pression atmosphérique (hPa)"
             },
-            Min = 800,
-            Max = 1200,
+            Min = 950,
+            Max = 1050,
             Visible = true
         },
         Legend = new Legend

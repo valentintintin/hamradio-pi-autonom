@@ -29,7 +29,8 @@ public class CameraService : AService
     {
         var configurationSection = configuration.GetSection("Cameras");
         _message = configurationSection.GetValue<string?>("Message");
-        _fswebcamParameters = configurationSection.GetSection("Devices").Get<List<FswebcamParameters>>()?.ToList() ?? new List<FswebcamParameters>();
+        _fswebcamParameters = configurationSection.GetSection("Devices").Get<List<FswebcamParameters>>()?.ToList() ??
+                              [];
         
         _storagePath = Path.Combine(
             configuration.GetValueOrThrow<string>("StoragePath"), 
