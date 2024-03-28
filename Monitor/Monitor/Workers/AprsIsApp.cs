@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Reactive.Linq;
 using AprsSharp.AprsIsClient;
 using AprsSharp.AprsParser;
+using AprsSharp.Shared;
+using GeoCoordinatePortable;
 using Microsoft.EntityFrameworkCore;
 using Monitor.Context;
 using Monitor.Extensions;
@@ -14,8 +16,11 @@ public class AprsIsApp : AEnabledWorker
     private readonly SerialMessageService _serialMessageService;
     private readonly AprsIsClient _aprsIsClient;
     private readonly string _callsign, _passcode, _server, _filter;
+    private readonly string? _objectName, _objectComment;
     private readonly DataContext _context;
+    private readonly Position? _objectPosition;
     private readonly TimeSpan? _durationHeard = TimeSpan.FromMinutes(30);
+    private readonly TcpConnection _tcpConnection = new();
 
     public AprsIsApp(ILogger<AprsIsApp> logger, IServiceProvider serviceProvider,
         IConfiguration configuration, IDbContextFactory<DataContext> contextFactory) : base(logger, serviceProvider)
@@ -23,20 +28,48 @@ public class AprsIsApp : AEnabledWorker
         _serialMessageService = Services.GetRequiredService<SerialMessageService>();
         _context = contextFactory.CreateDbContext();
 
-        _aprsIsClient = new AprsIsClient(Services.GetRequiredService<ILogger<AprsIsClient>>());
+        _aprsIsClient = new AprsIsClient(Services.GetRequiredService<ILogger<AprsIsClient>>(), _tcpConnection);
         _aprsIsClient.ReceivedPacket += ComputeReceivedPacket;
+        // _aprsIsClient.ReceivedTcpMessage += message => Logger.LogTrace(message);
         
         var configurationSection = configuration.GetSection("AprsIs");
         var positionSection = configuration.GetSection("Position");
         
+        var latitude = positionSection.GetValueOrThrow<double>("Latitude");
+        var longitude = positionSection.GetValueOrThrow<double>("Longitude");
+        
         _callsign = configurationSection.GetValueOrThrow<string>("Callsign");
         _passcode = configurationSection.GetValueOrThrow<string>("Passcode");
         _server = configurationSection.GetValueOrThrow<string>("Server");
-        _filter = $"r/{positionSection.GetValueOrThrow<double>("Latitude").ToString( CultureInfo.InvariantCulture)}/{positionSection.GetValueOrThrow<double>("Longitude").ToString(CultureInfo.InvariantCulture)}/{configurationSection.GetValueOrThrow<int>("RadiusKm")} -e/{_callsign} {configurationSection.GetValueOrThrow<string>("Filter")}\n";
+        _filter = $"r/{latitude.ToString( CultureInfo.InvariantCulture)}/{longitude.ToString(CultureInfo.InvariantCulture)}/{configurationSection.GetValueOrThrow<int>("RadiusKm")} -e/{_callsign} {configurationSection.GetValueOrThrow<string>("Filter")}\n";
 
         if (configurationSection.GetValue("AlwaysTx", true))
         {
             _durationHeard = null;
+        }
+
+        var beaconObjectSection = configurationSection.GetSection("BeaconObject");
+        if (beaconObjectSection.GetValue("Enable", false))
+        {
+            _objectName = beaconObjectSection.GetValueOrThrow<string>("Name");
+            _objectComment = beaconObjectSection.GetValue<string>("Comment");
+            _objectPosition = new Position(new GeoCoordinate(latitude, longitude), 
+                beaconObjectSection.GetValueOrThrow<char>("SymbolTable"),
+                beaconObjectSection.GetValueOrThrow<char>("SymbolCode")
+                );
+            
+            _aprsIsClient.ChangedState += state =>
+            {
+                if (state == ConnectionState.LoggedIn)
+                {
+                    SendBeaconObjectPacket();
+                }
+            };
+            
+            AddDisposable(Observable.Timer(TimeSpan.FromMinutes(30)).Subscribe(_ =>
+            {
+                SendBeaconObjectPacket();
+            }));
         }
     }
 
@@ -47,11 +80,18 @@ public class AprsIsApp : AEnabledWorker
         return Task.CompletedTask;
     }
 
-    protected override Task Stop()
+    protected override async Task Stop()
     {
+        if (_objectPosition != null)
+        {
+            SendBeaconObjectPacket(false);
+
+            await Task.Delay(1500);
+        }
+
         _aprsIsClient.Disconnect();
 
-        return base.Stop();
+        await base.Stop();
     }
 
     private void ComputeReceivedPacket(Packet packet)
@@ -96,5 +136,14 @@ public class AprsIsApp : AEnabledWorker
         
         var lastHeard = DateTime.UtcNow - _durationHeard.Value;
         return _context.LoRas.Any(e => !e.IsTx && e.CreatedAt >= lastHeard);
+    }
+
+    private void SendBeaconObjectPacket(bool alive = true)
+    {
+        var packet = $"{_callsign}>TCPIP:){_objectName}{(alive ? '!' : '_')}{_objectPosition!.Encode()}{_objectComment} Up:{EntitiesManagerService.Entities.SystemUptime.Value}";
+        
+        Logger.LogInformation("Send packet beacon object alive ? {alive} : {packet}", alive, packet);
+
+        _tcpConnection.SendString(packet + "\n");
     }
 }
