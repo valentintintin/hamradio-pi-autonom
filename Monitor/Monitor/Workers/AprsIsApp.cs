@@ -140,7 +140,8 @@ public class AprsIsApp : AEnabledWorker
 
     private void SendBeaconObjectPacket(bool alive = true)
     {
-        var packet = $"{_callsign}>TCPIP:){_objectName}{(alive ? '!' : '_')}{_objectPosition!.Encode()}{_objectComment} Up:{EntitiesManagerService.Entities.SystemUptime.Value}";
+        var comment = alive ? $"{_objectComment} Up:{EntitiesManagerService.Entities.SystemUptime.Value}" : "Éteint";
+        var packet = $"{_callsign}>TCPIP:){_objectName}{(alive ? '!' : '_')}{_objectPosition!.Encode()}{comment}";
         
         Logger.LogInformation("Send packet beacon object alive ? {alive} : {packet}", alive, packet);
 
