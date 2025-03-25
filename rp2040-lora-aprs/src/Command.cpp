@@ -31,6 +31,7 @@ Command::Command(System *system) {
     parser.registerCommand(PSTR("box"), PSTR(""), doGetBoxInfo);
     parser.registerCommand(PSTR("error"), PSTR(""), doGetError);
     parser.registerCommand(PSTR("setLoraMode"), PSTR("duuuu"), doSetLora);
+    parser.registerCommand(PSTR("sleepLinux"), PSTR("u"), doSleepLinux);
 
     parser.registerCommand(PSTR("?APRS?"), PSTR(""), doAprsQueryHelp);
     parser.registerCommand(PSTR("?APRSP"), PSTR(""), doPosition);
@@ -683,6 +684,15 @@ void Command::doSetLora(MyCommandParser::Argument *args, char *response) {
     bool ok = system->communication.changeLoRaSettings(frequency, bandwidth, spreadingFactor, codingRate, outputPower);
 
     strncpy_P(response, ok ? PSTR("OK") : PSTR("KO"), MyCommandParser::MAX_RESPONSE_SIZE);
+}
+
+void Command::doSleepLinux(MyCommandParser::Argument *args, char *response) {
+    const auto duration = args[0].asUInt64;
+
+    system->watchdogLinux->sleep(duration * 1000);
+    system->watchdogLinux->forceRun();
+
+    strncpy_P(response, PSTR("OK"), MyCommandParser::MAX_RESPONSE_SIZE);
 }
 
 void Command::doAprsQueryHelp(MyCommandParser::Argument *args, char *response) {

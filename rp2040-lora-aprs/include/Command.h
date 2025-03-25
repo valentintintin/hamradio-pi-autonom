@@ -37,6 +37,7 @@ private:
     static void doGetBoxInfo(MyCommandParser::Argument *args, char *response);
     static void doGetError(MyCommandParser::Argument *args, char *response);
     static void doSetLora(MyCommandParser::Argument *args, char *response);
+    static void doSleepLinux(MyCommandParser::Argument *args, char *response);
 
     static void doAprsQueryHelp(MyCommandParser::Argument *args, char *response);
     static void doAprsHeardWithoutDigi(MyCommandParser::Argument *args, char *response);
