@@ -14,14 +14,18 @@ public:
     void run() override;
     void forceRun();
 
-    bool shouldRun(unsigned long time) override;
+    virtual bool shouldRun(unsigned long time);
 
     inline void setRunned() {
         runned();
     }
 
+    inline bool isInitiated() const {
+        return _initiated;
+    }
+
     inline bool hasError() const {
-        return lastUpdateHasError;
+        return !_initiated || lastUpdateHasError;
     }
 
     inline uint64_t timeBeforeRun() const {
@@ -40,7 +44,7 @@ protected:
 
     System *system;
     bool force = false;
-    bool initiated = false;
+    bool _initiated = false;
     bool lastUpdateHasError = false;
     bool noLog = false;
 };

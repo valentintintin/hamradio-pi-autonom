@@ -7,13 +7,18 @@ EnergyMpptChgThread::EnergyMpptChgThread(System *system, uint16_t *ocv, const si
 }
 
 bool EnergyMpptChgThread::init() {
-    const SettingsEnergy settings = system->settings.energy;
-    return charger->begin() && setPowerOnOff(settings.mpptPowerOffVoltage, settings.mpptPowerOnVoltage);
+    return charger->begin() && setPowerOnOff();
 }
 
 void EnergyMpptChgThread::run() {
     EnergyThread::run();
     fetchOthersData();
+
+    if (system->settings.energy.sendAprsMessageWhenAlert && _isAlert && _isAlert != wasAlert) {
+        system->communication.sendMessage(PSTR(CALLSIGN_ALERT_MESSAGE_TO), PSTR("MPPT en alerte !"));
+    }
+
+    wasAlert = _isAlert;
 }
 
 bool EnergyMpptChgThread::fetchVoltageBattery() {
@@ -33,16 +38,34 @@ bool EnergyMpptChgThread::fetchCurrentSolar() {
 }
 
 bool EnergyMpptChgThread::fetchOthersData() {
-    return charger->isNight(&_isNight) && charger->getStatusValue(SYS_STATUS, &status);
+    return charger->isNight(&_isNight) && charger->isAlert(&_isAlert) && charger->getIndexedValue(VAL_INT_TEMP, &temperature);
 }
 
-bool EnergyMpptChgThread::setPowerOnOff(const uint16_t powerOnVoltage, const uint16_t powerOffVoltage) const {
-    Log.infoln(F("[ENERGY_MPPTCHG] Power On : %dmV and Power Off : %dmV"), powerOnVoltage, powerOffVoltage);
+bool EnergyMpptChgThread::setPowerOnOff() const {
+    SettingsEnergy settings = system->settings.energy;
+    
+    Log.infoln(F("[ENERGY_MPPTCHG] Power On : %dmV and Power Off : %dmV"), settings.mpptPowerOnVoltage, settings.mpptPowerOffVoltage);
 
-    if (!charger->setConfigurationValue(CFG_PWR_ON_TH, powerOnVoltage)
-        || !charger->setConfigurationValue(CFG_PWR_OFF_TH, powerOffVoltage)) {
+    if (!charger->setConfigurationValue(CFG_PWR_ON_TH, settings.mpptPowerOnVoltage)
+        || !charger->setConfigurationValue(CFG_PWR_OFF_TH, settings.mpptPowerOffVoltage)) {
         Log.warningln(F("[ENERGY_MPPTCHG] Failed to set power on off"));
         return false;
+    }
+
+    uint16_t powerOffVoltage;
+    uint16_t powerOnVoltage;
+
+    if (charger->getConfigurationValue(CFG_PWR_OFF_TH, &powerOffVoltage)
+        && charger->getConfigurationValue(CFG_PWR_ON_TH, &powerOnVoltage)
+        && (settings.mpptPowerOnVoltage != powerOffVoltage || settings.mpptPowerOnVoltage != powerOnVoltage)
+    ) {
+        Log.warningln(F("[ENERGY_MPPTCHG] Power on off are different on charger ! WantOn: %dmV CurrentOn: %dmv, WantOff: %dmv CurrentOff: %dmv"),
+            powerOnVoltage, settings.mpptPowerOnVoltage, powerOffVoltage, settings.mpptPowerOffVoltage);
+
+        settings.mpptPowerOffVoltage = powerOffVoltage;
+        settings.mpptPowerOnVoltage = powerOnVoltage;
+
+        system->saveSettings();
     }
 
     return true;

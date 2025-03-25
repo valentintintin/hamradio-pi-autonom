@@ -26,7 +26,7 @@ bool WatchdogSlaveMpptChgThread::runOnce() {
 }
 
 bool WatchdogSlaveMpptChgThread::feed() {
-    if (!initiated && !begin()) {
+    if (!_initiated && !begin()) {
         Log.errorln(F("[WATCHDOG_MPPTCHG] Fail to feed dog, not initiated"));
         return false;
     }
@@ -44,7 +44,7 @@ bool WatchdogSlaveMpptChgThread::feed() {
 }
 
 bool WatchdogSlaveMpptChgThread::setManagedByUser(const uint64_t millis) {
-    if (!initiated && !begin()) {
+    if (!_initiated && !begin()) {
         return false;
     }
 

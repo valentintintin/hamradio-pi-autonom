@@ -27,7 +27,7 @@ System::System() : communication(this), command(this) {
 bool System::begin() {
     Log.infoln(F("[SYSTEM] Starting"));
 
-    if (watchdog_caused_reboot()) {
+    if (watchdog_enable_caused_reboot()) {
         Log.warningln(F("[SYSTEM] Watchdog caused reboot"));
         ledBlink(3, 500);
     } else {
@@ -70,7 +70,7 @@ bool System::begin() {
     communication.begin();
 
     ldrBoxOpenedThread = new LdrBoxOpenedThread(this);
-    // threadController.add(ldrBoxOpenedThread);
+    threadController.add(ldrBoxOpenedThread);
 
     switch (settings.energy.type) {
         case dummy:
@@ -317,7 +317,7 @@ bool System::resetSettings() {
 
 void System::setDefaultSettings() {
     settings.useInternalWatchdog = true;
-    settings.useSlowClock = false;
+    settings.useSlowClock = true;
 
     settings.lora.frequency = 433.775;
     settings.lora.bandwidth = 125;
@@ -369,9 +369,10 @@ void System::setDefaultSettings() {
     settings.mpptWatchdog.intervalFeed = 30000; // 30 seconds
 
     settings.energy.type = mpptchg;
-    settings.energy.intervalCheck = 60000; // 60 seconds
-    settings.energy.mpptPowerOffVoltage = 11100;
-    settings.energy.mpptPowerOnVoltage = 11300;
+    settings.energy.intervalCheck = 30000; // 30 seconds
+    settings.energy.mpptPowerOffVoltage = 11550;
+    settings.energy.mpptPowerOnVoltage = 12000;
+    settings.energy.sendAprsMessageWhenAlert = true;
 
     settings.weather.enabled = true;
     settings.weather.intervalCheck = 60000; // 60 seconds
@@ -469,6 +470,7 @@ void System::printSettings() {
     Log.traceln(F("[CONFIG] energy.inaChannelSolar = %u"), settings.energy.inaChannelSolar);
     Log.traceln(F("[CONFIG] energy.mpptPowerOnVoltage = %u"), settings.energy.mpptPowerOnVoltage);
     Log.traceln(F("[CONFIG] energy.mpptPowerOffVoltage = %u"), settings.energy.mpptPowerOffVoltage);
+    Log.traceln(F("[CONFIG] energy.sendAprsMessageWhenAlert = %T"), settings.energy.sendAprsMessageWhenAlert);
 
     Log.traceln(F("[CONFIG] linux.watchdogEnabled = %T"), settings.linux.watchdogEnabled);
     Log.traceln(F("[CONFIG] linux.intervalTimeoutWatchdog = %u"), settings.linux.intervalTimeoutWatchdog);
@@ -494,6 +496,12 @@ void System::printSettings() {
             Log.traceln(F("[CONFIG] APRS Frame received #%d at %s from %s with SNR %F and RSSI %F, content: %s. Digi (%d) and last via %s. Count total %u"), frameIndex++, bufferText, callsign, snr, rssi, content, digipeaterCount, digipeaterCallsign, count);
         }
     }
+
+    Log.traceln(F("[SYSTEM] Internal watchdog caused reboot: %T"), watchdog_enable_caused_reboot());
+
+    const auto epoch = getDateTime().unixtime();
+    getDateTimeStringFromEpoch(epoch, bufferText, BUFFER_LENGTH);
+    Log.infoln(F("[RTC] Date now %s"), bufferText);
 }
 
 void System::planReboot() {
@@ -507,13 +515,7 @@ void System::planDfu() {
 }
 
 void System::printJson(const bool onUsb) {
-    int16_t temperatureBattery = 0;
-
-    if (settings.energy.type == mpptchg && !mpptChgCharger.getIndexedValue(VAL_INT_TEMP, &temperatureBattery)) {
-        Log.warningln(F("[SYSTEM] Impossible to get MPPT Temperature"));
-    }
-
-    const bool isBoxOpened = ldrBoxOpenedThread->isBoxOpened(); // Here to avoid log serial
+    const bool isBoxOpened = ldrBoxOpenedThread->enabled && ldrBoxOpenedThread->isBoxOpened(); // Here to avoid log serial
     JsonWriter *jsonWriter = onUsb ? &serialJsonWriter : &serialLinuxJsonWriter;
 
     auto json = &jsonWriter->beginObject()
@@ -534,11 +536,13 @@ void System::printJson(const bool onUsb) {
             .beginObject(F("box"));
 
     if (settings.rtc.enabled) {
-        json = &json->property(F("temperatureRtc"), settings.rtc.enabled ? rtc.getTemperature() : 0);
+        json = &json->property(F("temperatureRtc"), rtc.getTemperature());
     }
 
-    if (settings.energy.type == mpptchg) {
-        json = &json->property(F("temperatureBattery"), !energyThread->hasError() ? temperatureBattery / 10.0 : 0);
+    if (settings.energy.type == mpptchg && !energyThread->hasError()) {
+        const auto energyThreadMppt = static_cast<EnergyMpptChgThread*>(energyThread);
+        json = &json->property(F("temperatureBattery"), energyThreadMppt->getTemperature());
+        json = &json->property(F("alertBattery"), energyThreadMppt->isAlert());
     }
 
     if (ldrBoxOpenedThread->enabled) {

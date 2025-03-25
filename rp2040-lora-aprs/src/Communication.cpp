@@ -1,4 +1,7 @@
 #include "Communication.h"
+
+#include <Threads/Energy/EnergyMpptChgThread.h>
+
 #include "ArduinoLog.h"
 #include "utils.h"
 #include "System.h"
@@ -207,15 +210,12 @@ void Communication::prepareTelemetry() {
     double temperatureBox = 0;
     double temperatureBoxNb = 0;
 
-    if (system->settings.energy.type == mpptchg && !system->energyThread->hasError()) {
-        int16_t rawTemperatureBattery = 0;
+    const EnergyMpptChgThread* energyThreadMppt = system->settings.energy.type == mpptchg && !system->energyThread->hasError() ?
+        static_cast<EnergyMpptChgThread*>(system->energyThread) : nullptr;
 
-        if (system->mpptChgCharger.getIndexedValue(VAL_INT_TEMP, &rawTemperatureBattery)) {
-            temperatureBox += rawTemperatureBattery / 10.0;
-            temperatureBoxNb++;
-        } else {
-            Log.warningln(F("[COMMAND] Impossible to get MPPT Temperature"));
-        }
+    if (energyThreadMppt != nullptr) {
+        temperatureBox += energyThreadMppt->getTemperature();
+        temperatureBoxNb++;
     }
 
     if (system->settings.rtc.enabled) {
@@ -234,11 +234,17 @@ void Communication::prepareTelemetry() {
 
     i = 0;
 
-    // aprsPacketTx.telemetries.telemetriesBoolean[i++].value = system->ldrBoxOpenedThread->isBoxOpened();
+    if (system->ldrBoxOpenedThread->enabled) {
+        aprsPacketTx.telemetries.telemetriesBoolean[i++].value = system->ldrBoxOpenedThread->isBoxOpened();
+    }
     aprsPacketTx.telemetries.telemetriesBoolean[i++].value = system->watchdogMeshtastic->enabled ? system->watchdogMeshtastic->isFed() : system->watchdogMeshtastic->isGpioOn();
     aprsPacketTx.telemetries.telemetriesBoolean[i++].value = system->watchdogLinux->enabled ? system->watchdogLinux->isFed() : system->watchdogLinux->isGpioOn();
     aprsPacketTx.telemetries.telemetriesBoolean[i++].value = system->getGpio(system->settings.linux.wifiPin)->getState() || system->getGpio(system->settings.linux.nprPin)->getState();
     aprsPacketTx.telemetries.telemetriesBoolean[i++].value = system->hasError();
+
+    if (energyThreadMppt != nullptr) {
+        aprsPacketTx.telemetries.telemetriesBoolean[i++].value = energyThreadMppt->isAlert();
+    }
 }
 
 bool Communication::sendTelemetry() {
@@ -299,11 +305,17 @@ bool Communication::sendTelemetryParams() {
 
     i = 0;
 
-    // strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[i++].name, PSTR("Box"));
+    if (system->ldrBoxOpenedThread->enabled) {
+        strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[i++].name, PSTR("Box"));
+    }
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[i++].name, PSTR("Msh"));
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[i++].name, PSTR("Lnx"));
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[i++].name, PSTR("Lnk"));
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[i++].name, PSTR("Err"));
+
+    if (system->settings.energy.type == mpptchg) {
+        strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[i++].name, PSTR("Alr"));
+    }
 
     aprsPacketTx.type = TelemetryLabel;
     bool result = sendAprsFrame();
@@ -431,14 +443,14 @@ void Communication::received(uint8_t * payload, const uint16_t size, const float
     } else {
         Log.traceln(F("[APRS] Decoded from %s to %s via %s"), aprsPacketRx.source, aprsPacketRx.destination, aprsPacketRx.path);
 
-        system->addAprsFrameReceivedToHistory(&aprsPacketRx, snr, rssi);
-
         const SettingsAprs settings = system->settings.aprs;
 
         if (strcasecmp(aprsPacketRx.source, settings.call) == 0) {
             Log.warningln(F("[APRS] It's from us. Bug ? Ignore it"));
             return;
         }
+
+        system->addAprsFrameReceivedToHistory(&aprsPacketRx, snr, rssi);
 
         if (strstr(aprsPacketRx.message.destination, settings.call) != nullptr) {
             Log.traceln(F("[APRS] Message for me : %s"), aprsPacketRx.message.message);

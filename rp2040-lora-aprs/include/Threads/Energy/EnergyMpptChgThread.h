@@ -8,14 +8,16 @@ public:
     explicit EnergyMpptChgThread(System *system, uint16_t *ocv = nullptr, size_t numOcvPoints = 0);
     void run() override;
 
-    bool setPowerOnOff(uint16_t powerOnVoltage, uint16_t powerOffVoltage) const;
-
     inline bool isNight() const override {
         return _isNight;
     }
 
-    inline uint16_t getStatus() const {
-        return status;
+    inline bool isAlert() const {
+        return _isAlert;
+    }
+
+    inline double getTemperature() const {
+        return temperature / 10.0;
     }
 protected:
     bool init() override;
@@ -26,9 +28,12 @@ protected:
 
 private:
     bool fetchOthersData();
+    bool setPowerOnOff() const;
 
     bool _isNight = false;
-    uint16_t status = 0;
+    bool _isAlert = false;
+    int16_t temperature = 0;
+    bool wasAlert = false;
     mpptChg *charger;
 };
 

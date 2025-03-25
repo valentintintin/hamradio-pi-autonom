@@ -18,7 +18,7 @@ bool LdrBoxOpenedThread::runOnce() {
             return true;
         }
 
-        return system->communication.sendMessage(PSTR("F4HVV-7"), PSTR("Boîte ouverte !"));
+        return system->communication.sendMessage(PSTR(CALLSIGN_ALERT_MESSAGE_TO), PSTR("Boîte ouverte !"));
     }
 
     Log.traceln(F("[LDR_BOX_OPENED] Box closed"));

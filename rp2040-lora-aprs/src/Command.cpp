@@ -122,7 +122,6 @@ void Command::doDfu(MyCommandParser::Argument *args, char *response) {
 
 void Command::doGpioOutput(MyCommandParser::Argument *args, char *response) {
     const auto what = args[0].asString;
-    const auto state = args[1].asUInt64 == 1;
 
     GpioPin *gpio = nullptr;
 
@@ -143,7 +142,16 @@ void Command::doGpioOutput(MyCommandParser::Argument *args, char *response) {
     }
 
     if (gpio != nullptr) {
-        gpio->setState(state);
+        const auto state = args[1].asUInt64;
+
+        if (state > 1) {
+            gpio->setState(false);
+            delayWdt(state * 1000);
+            gpio->setState(true);
+        } else {
+            gpio->setState(state == 1);
+        }
+
         strncpy_P(response, PSTR("OK"), MyCommandParser::MAX_RESPONSE_SIZE);
         return;
     }
@@ -351,6 +359,8 @@ void Command::doSetSetting(MyCommandParser::Argument *args, char *response) {
     } else if (strcmp_P(key, PSTR("energy.mpptPowerOffVoltage")) == 0) {
         system->settings.energy.mpptPowerOffVoltage = static_cast<uint16_t>(strtoul(value, nullptr, 0));
         ok = system->energyThread->begin();
+    } else if (strcmp_P(key, PSTR("energy.sendAprsMessageWhenAlert")) == 0) {
+        system->settings.energy.sendAprsMessageWhenAlert = value[0] == '1';
     } else if (strcmp_P(key, PSTR("linux.watchdogEnabled")) == 0) {
         system->settings.linux.watchdogEnabled =
             system->watchdogLinux->enabled = value[0] == '1';
@@ -558,6 +568,8 @@ void Command::doGetSetting(MyCommandParser::Argument *args, char *response) {
         snprintf_P(response, MyCommandParser::MAX_RESPONSE_SIZE, PSTR("%d"), system->settings.energy.mpptPowerOnVoltage);
     } else if (strcmp_P(key, PSTR("energy.mpptPowerOffVoltage")) == 0) {
         snprintf_P(response, MyCommandParser::MAX_RESPONSE_SIZE, PSTR("%d"), system->settings.energy.mpptPowerOffVoltage);
+    } else if (strcmp_P(key, PSTR("energy.sendAprsMessageWhenAlert")) == 0) {
+        snprintf_P(response, MyCommandParser::MAX_RESPONSE_SIZE, PSTR("%d"), system->settings.energy.sendAprsMessageWhenAlert);
     } else if (strcmp_P(key, PSTR("linux.watchdogEnabled")) == 0) {
         snprintf_P(response, MyCommandParser::MAX_RESPONSE_SIZE, PSTR("%d"), system->settings.linux.watchdogEnabled);
     } else if (strcmp_P(key, PSTR("linux.intervalTimeoutWatchdog")) == 0) {
@@ -590,6 +602,10 @@ void Command::doGetSetting(MyCommandParser::Argument *args, char *response) {
         snprintf_P(response, MyCommandParser::MAX_RESPONSE_SIZE, PSTR("%d"), system->settings.useInternalWatchdog);
     } else if (strcmp_P(key, PSTR("useSlowClock")) == 0) {
         snprintf_P(response, MyCommandParser::MAX_RESPONSE_SIZE, PSTR("%d"), system->settings.useSlowClock);
+    } else if (strcmp_P(key, PSTR("time")) == 0 || strcmp_P(key, PSTR("now")) == 0) {
+        getDateTimeStringFromEpoch(system->getDateTime().unixtime(), response, MyCommandParser::MAX_RESPONSE_SIZE);
+    } else if (strcmp_P(key, PSTR("wdReboot")) == 0) {
+        snprintf_P(response, MyCommandParser::MAX_RESPONSE_SIZE, PSTR("%d"), watchdog_enable_caused_reboot());
     } else if (strcmp_P(key, PSTR("all")) == 0) {
         system->printSettings();
         strncpy_P(response, PSTR("OK"), MyCommandParser::MAX_RESPONSE_SIZE);

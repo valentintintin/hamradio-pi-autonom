@@ -18,9 +18,9 @@ bool MyThread::begin() {
 
     Log.infoln(F("[%s] Begin"), ThreadName.c_str());
 
-    initiated = init();
+    _initiated = init();
 
-    if (initiated) {
+    if (_initiated) {
         lastUpdateHasError = false;
         Log.infoln(F("[%s] Begin OK"), ThreadName.c_str());
     } else {
@@ -28,7 +28,7 @@ bool MyThread::begin() {
         Log.errorln(F("[%s] Begin KO"), ThreadName.c_str());
     }
 
-    return initiated;
+    return _initiated;
 }
 
 void MyThread::run() {
@@ -36,7 +36,7 @@ void MyThread::run() {
         Log.traceln(F("[%s] Run"), ThreadName.c_str());
     }
 
-    if (!initiated && !begin()) {
+    if (!_initiated && !begin()) {
         runned();
         force = false;
         Log.errorln(F("[%s] Run KO"), ThreadName.c_str());

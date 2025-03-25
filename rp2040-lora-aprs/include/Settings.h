@@ -78,6 +78,7 @@ typedef struct {
     ina3221_ch_t inaChannelSolar;
     uint16_t mpptPowerOnVoltage;
     uint16_t mpptPowerOffVoltage;
+    bool sendAprsMessageWhenAlert;
 
     uint8_t reserved[8];
 } SettingsEnergy;
