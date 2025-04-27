@@ -10,7 +10,7 @@ bool SendTelemetriesThread::runOnce() {
     return system->communication.sendTelemetry();
 }
 
-bool SendTelemetriesThread::shouldRun(const unsigned long time) {
+long SendTelemetriesThread::tillRun(const unsigned long time) {
     // We want to be at boot so bypass super class
-    return MyThread::shouldRun(time); // NOLINT(*-parent-virtual-call)
+    return MyThread::tillRun(time) && millis() >= TIME_AFTER_BOOT; // NOLINT(*-parent-virtual-call)
 }

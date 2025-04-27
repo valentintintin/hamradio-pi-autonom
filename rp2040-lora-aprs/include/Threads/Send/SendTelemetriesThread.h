@@ -9,7 +9,7 @@ class SendTelemetriesThread : public SendThread {
 public:
     explicit SendTelemetriesThread(System *system);
 
-    bool shouldRun(unsigned long time) override;
+    long tillRun(unsigned long time) override;
 protected:
     bool runOnce() override;
 };

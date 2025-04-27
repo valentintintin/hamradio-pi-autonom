@@ -1,8 +1,10 @@
 #include "GpioPin.h"
 #include "ArduinoLog.h"
 
-GpioPin::GpioPin(const pin_size_t pin, const PinMode mode, const bool isAdc, const bool inverted, const bool state) : pin(pin), mode(mode),
+GpioPin::GpioPin(const char* name, const pin_size_t pin, const PinMode mode, const bool isAdc, const bool inverted, const bool state) : pin(pin), mode(mode),
     inverted(inverted), isAdc(isAdc) {
+    strncpy(this->name, name, PIN_NAME);
+
     pinMode(pin, mode);
 
     if (isOutput()) {
@@ -14,7 +16,7 @@ void GpioPin::setState(const bool state) {
     assert(isOutput());
 
     if (pin != LED_BUILTIN) {
-        Log.infoln(F("[GPIO_%d] Set %T"), pin, state);
+        Log.infoln(F("[GPIO_%s_%d] Set %T"), name, pin, state);
     }
 
     digitalWrite(pin, inverted == !state);
@@ -35,7 +37,7 @@ bool GpioPin::getState() const {
         result = !result;
     }
 
-    Log.traceln(F("[GPIO_%d] Get currentState %T"), pin, result);
+    Log.traceln(F("[GPIO_%s_%d] Get currentState %T"), name, pin, result);
 
     return result;
 }
@@ -46,7 +48,7 @@ uint16_t GpioPin::getValue() const {
 
     const uint16_t value = analogRead(pin);
 
-    Log.traceln(F("[GPIO_%d] Get value %d"), pin, value);
+    Log.traceln(F("[GPIO_%s_%d] Get value %d"), name, pin, value);
 
     return value;
 }

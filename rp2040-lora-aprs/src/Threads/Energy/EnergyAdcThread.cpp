@@ -3,7 +3,7 @@
 #include "System.h"
 
 EnergyAdcThread::EnergyAdcThread(System *system, uint16_t *ocv, const size_t numOcvPoints, const uint8_t numCells) : EnergyThread(system, PSTR("ENERGY_ADC"), ocv, numOcvPoints, numCells),
-adc(new GpioPin(system->settings.energy.adcPin, INPUT, true)) {
+adc(new GpioPin(PSTR("EnergyADC"), system->settings.energy.adcPin, INPUT, true)) {
 }
 
 bool EnergyAdcThread::fetchVoltageBattery() {

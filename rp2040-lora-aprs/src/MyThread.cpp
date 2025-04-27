@@ -7,8 +7,8 @@ MyThread::MyThread(System *system, const unsigned long interval, const char *nam
     ThreadName = name;
 }
 
-bool MyThread::shouldRun(const unsigned long time) {
-    return Thread::shouldRun(time) || force;
+long MyThread::tillRun(const unsigned long time) {
+    return force ? 0 : Thread::tillRun(time);
 }
 
 bool MyThread::begin() {

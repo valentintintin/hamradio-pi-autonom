@@ -62,4 +62,5 @@ void WatchdogMasterPinThread::sleep(const uint64_t millis) {
     Log.infoln(F("[%s] Sleep for %ums at next internal (%u)"), ThreadName.c_str(), millis, interval);
     timerSleep.setInterval(millis);
     wantToSleep = true;
+    enabled = true;
 }

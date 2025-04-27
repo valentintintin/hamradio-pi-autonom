@@ -3,9 +3,11 @@
 
 #include "Arduino.h"
 
+#define PIN_NAME 10
+
 class GpioPin {
 public:
-    explicit GpioPin(pin_size_t pin, PinMode mode = OUTPUT, bool isAdc = false, bool inverted = false, bool state = false);
+    explicit GpioPin(const char* name, pin_size_t pin, PinMode mode = OUTPUT, bool isAdc = false, bool inverted = false, bool state = false);
     void setState(bool state);
     bool getState() const;
     uint16_t getValue() const;
@@ -13,7 +15,12 @@ public:
     inline pin_size_t getPin() const {
         return pin;
     }
+
+    inline const char* getName() const {
+        return name;
+    }
 private:
+    char name[PIN_NAME + 1];
     pin_size_t pin;
     PinMode mode;
     bool currentState = false;

@@ -15,7 +15,7 @@ void EnergyMpptChgThread::run() {
     fetchOthersData();
 
     if (system->settings.energy.sendAprsMessageWhenAlert && _isAlert && _isAlert != wasAlert) {
-        system->communication.sendMessage(PSTR(CALLSIGN_ALERT_MESSAGE_TO), PSTR("MPPT en alerte !"));
+        system->communication.sendMessage(system->settings.energy.callsignToSendMessageAlert, PSTR("MPPT en alerte !"));
     }
 
     wasAlert = _isAlert;

@@ -6,6 +6,10 @@
 
 uint8_t I2CSlave::currentRegToRead = 0;
 System *I2CSlave::system = nullptr;
+char I2CSlave::commandToSendToMaster[BUFFER_LENGTH + 1];
+char I2CSlave::commandResponseFromMaster[BUFFER_LENGTH + 1];
+char I2CSlave::commandReceivedFromMaster[BUFFER_LENGTH + 1];
+char I2CSlave::commandResponseToSendToMaster[BUFFER_LENGTH + 1];
 
 void I2CSlave::begin(System *system) {
     I2CSlave::system = system;
@@ -20,7 +24,7 @@ void I2CSlave::begin(System *system) {
         return;
     }
 
-    const auto address = system->settings.meshtastic.i2cSlaveAddress;
+    const auto address = system->settings.i2c.address;
 
     Wire1.begin(address);
     Wire1.onRequest(onRequest);
@@ -34,6 +38,10 @@ void I2CSlave::end() {
     Wire1.end();
 }
 
+void I2CSlave::sendCommandToMaster(const char *command) {
+    strncpy(commandToSendToMaster, command, BUFFER_LENGTH);
+}
+
 void I2CSlave::onRequest() {
     const Settings settings = system->settings;
     uint32_t value = 0;
@@ -45,11 +53,11 @@ void I2CSlave::onRequest() {
             value += HAS_POWER;
 
             if (system->weatherThread->enabled) {
-                value += HAS_WEATHER;
+                value += HAS_ENVIRONMENT;
             }
 
             if (settings.rtc.enabled) {
-                value += HAS_RTC;
+                value += HAS_DATETIME;
             }
             break;
         case REG_BATTERY_VOLTAGE:
@@ -91,6 +99,16 @@ void I2CSlave::onRequest() {
         case REG_YEARS:
             value = datetime.year();
             break;
+        case REG_COMMAND_RECEIVE_FROM_SLAVE:
+            Log.infoln(F("[I2C_SLAVE] Send %s for register %x (command to master)"), commandToSendToMaster, currentRegToRead);
+            Wire1.write(commandToSendToMaster);
+            commandToSendToMaster[0] = '\0';
+            return;
+        case REG_COMMAND_RESPONSE_TO_MASTER:
+            Log.infoln(F("[I2C_SLAVE] Send %s for register %x (command response to master)"), commandToSendToMaster, currentRegToRead);
+            Wire1.write(commandResponseToSendToMaster);
+            commandResponseToSendToMaster[0] = '\0';
+        return;
         default:
             Log.warningln(F("[I2C_SLAVE] Register %x not found"), currentRegToRead);
             break;
@@ -108,10 +126,34 @@ void I2CSlave::onReceive(const int bytes) {
 
     if (bytes == 1) {
         currentRegToRead = Wire1.read();
-        Log.traceln(F("[I2C_SLAVE] Receive value %x to read"), currentRegToRead);
+
+        if (currentRegToRead == REG_COMMAND_RESPONSE_TRANSMIT_FROM_MASTER) {
+            Log.traceln(F("[I2C_SLAVE] Receive value %x to write (command response from master)"), currentRegToRead);
+            byte i = 0;
+            while (Wire.available() && i < BUFFER_LENGTH) {
+                commandResponseFromMaster[i++] = Wire.read();
+            }
+            commandResponseFromMaster[i] = '\0';
+        } else if (currentRegToRead == REG_COMMAND_RECEIVED_FROM_MASTER) {
+            Log.traceln(F("[I2C_SLAVE] Receive value %x to write (command received from master)"), currentRegToRead);
+            byte i = 0;
+            while (Wire.available() && i < BUFFER_LENGTH) {
+                commandReceivedFromMaster[i++] = Wire.read();
+            }
+            commandReceivedFromMaster[i] = '\0';
+
+            system->command.processCommand(nullptr, commandReceivedFromMaster);
+            commandReceivedFromMaster[0] = '\0';
+
+            strncpy(commandResponseToSendToMaster, system->command.response, BUFFER_LENGTH);
+        } else {
+            Log.traceln(F("[I2C_SLAVE] Receive value %x to read"), currentRegToRead);
+        }
 
         if (system->watchdogMeshtastic->enabled) {
             system->watchdogMeshtastic->feed();
         }
+    } else {
+        Log.warningln(F("[I2C_SLAVE] Receive size 0"));
     }
 }

@@ -9,7 +9,7 @@ class SendThread : public MyThread {
 public:
     explicit SendThread(System *system, unsigned long interval, const char *name, bool enabled);
 
-    bool shouldRun(unsigned long time) override;
+    long tillRun(unsigned long time) override;
 protected:
     virtual bool runOnce() override = 0;
 };

@@ -8,7 +8,7 @@ class System;
 class LinuxSendAprsThread : public SendThread {
 public:
     explicit LinuxSendAprsThread(System *system);
-    bool shouldRun(unsigned long time) override;
+    long tillRun(unsigned long time) override;
 protected:
     bool runOnce() override;
 };

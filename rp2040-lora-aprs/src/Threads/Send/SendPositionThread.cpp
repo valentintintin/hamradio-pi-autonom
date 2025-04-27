@@ -6,5 +6,5 @@ SendPositionThread::SendPositionThread(System *system) : SendThread(system, syst
 }
 
 bool SendPositionThread::runOnce() {
-    return system->communication.sendPosition(system->settings.aprs.comment);
+    return system->communication.sendPosition(system->settings.aprs.positionComment);
 }

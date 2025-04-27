@@ -2,6 +2,8 @@
 #define MONITORING_COMMAND_H
 
 #include <CommandParser.h>
+#include <GpioPin.h>
+#include <Settings.h>
 
 class System;
 
@@ -10,12 +12,13 @@ typedef CommandParser<32,       2,              16,                     200,    
 
 class Command {
 public:
+    char response[MyCommandParser::MAX_RESPONSE_SIZE + 1]{};
+
     explicit Command(System *system);
     bool processCommand(Stream* stream, const char *command);
-
-    char response[MyCommandParser::MAX_RESPONSE_SIZE]{};
 private:
     static System *system;
+    static SettingsAprsCallsignHeard *sortedAprsHeard[APRS_CALLSIGNS_HEARD_NUMBER];
 
     MyCommandParser parser;
 
@@ -38,6 +41,8 @@ private:
     static void doGetError(MyCommandParser::Argument *args, char *response);
     static void doSetLora(MyCommandParser::Argument *args, char *response);
     static void doSleepLinux(MyCommandParser::Argument *args, char *response);
+    static void doCommandMeshtastic(MyCommandParser::Argument *args, char *response);
+    static void doGetCommandResponseFromMeshtastic(MyCommandParser::Argument *args, char *response);
 
     static void doAprsQueryHelp(MyCommandParser::Argument *args, char *response);
     static void doAprsHeardWithoutDigi(MyCommandParser::Argument *args, char *response);
@@ -45,6 +50,10 @@ private:
     static void doAprsHeardSomeone(MyCommandParser::Argument *args, char *response);
     static void doAbout(MyCommandParser::Argument *args, char *response);
     static void doAprsPing(MyCommandParser::Argument *args, char *response);
+
+    static void sortAprsHeard();
+    static int compareAprsHeardTimeDescending(const void *a, const void *b);
+    static bool changeGpio(const char *what, uint16_t state);
 };
 
 #endif //MONITORING_COMMAND_H

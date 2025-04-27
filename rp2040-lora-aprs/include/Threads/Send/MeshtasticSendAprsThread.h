@@ -8,7 +8,7 @@ class System;
 class MeshtasticSendAprsThread : public SendThread {
 public:
     explicit MeshtasticSendAprsThread(System *system);
-    bool shouldRun(unsigned long time) override;
+    long tillRun(unsigned long time) override;
 protected:
     bool runOnce() override;
 };

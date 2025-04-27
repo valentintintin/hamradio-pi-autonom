@@ -6,89 +6,11 @@
 #include "utils.h"
 #include "System.h"
 
-volatile bool Communication::hasInterrupt = false;
-
 Communication::Communication(System *system) : system(system) {
 }
 
-bool Communication::begin() {
-    Log.infoln(F("[LORA] Init"));
-
-    SPI1.setSCK(LORA_SCK);
-    SPI1.setTX(LORA_MOSI);
-    SPI1.setRX(LORA_MISO);
-    pinMode(LORA_CS, OUTPUT);
-    digitalWrite(LORA_CS, HIGH);
-    SPI1.begin(false);
-
-    const SettingsLoRa settings = system->settings.lora;
-
-    if (lora.begin(settings.frequency, settings.bandwidth, settings.spreadingFactor, settings.codingRate, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, settings.outputPower, LORA_PREAMBLE_LENGTH, 0, false) != RADIOLIB_ERR_NONE) {
-        Log.errorln(F("[LORA] Init error"));
-        _hasError = true;
-        return false;
-    }
-
-    lora.setDio1Action(setHasInterrupt);
-    lora.setDio2AsRfSwitch(true);
-    lora.setRfSwitchPins(LORA_DIO4, RADIOLIB_NC);
-
-    uint16_t state = lora.setRxBoostedGainMode(true);
-    if (state != RADIOLIB_ERR_NONE) {
-        Log.errorln(F("[LORA] Init KO setRxBoostedGainMode"));
-        _hasError = true;
-        return false;
-    }
-
-    state = lora.setCRC(RADIOLIB_SX126X_LORA_CRC_ON);
-    if (state != RADIOLIB_ERR_NONE) {
-        Log.errorln(F("[LORA] Init KO setCRC"));
-        _hasError = true;
-        return false;
-    }
-
-    state = lora.setCurrentLimit(140); // https://github.com/jgromes/RadioLib/discussions/489
-    if (state != RADIOLIB_ERR_NONE) {
-        Log.errorln(F("[LORA] Init KO setCurrentLimit"));
-        _hasError = true;
-        return false;
-    }
-
-    if (!startReceive()) {
-        return false;
-    }
-
-    Log.infoln(F("[LORA] Init OK"));
-
-    return true;
-}
-
-void Communication::setHasInterrupt() {
-    hasInterrupt = true;
-}
-
-void Communication::update() {
-    if (hasInterrupt) {
-        hasInterrupt = false;
-        const uint16_t irqFlags = lora.getIrqFlags();
-
-        Log.traceln(F("[LORA] Interrupt with flags : %d"), irqFlags);
-
-        if (irqFlags & RADIOLIB_SX126X_IRQ_RX_DONE) {
-            memset(buffer, '\0', TRX_BUFFER);
-            const size_t size = lora.getPacketLength();
-            const int state = lora.readData(buffer, size);
-            if (state == RADIOLIB_ERR_NONE && size >= 15) {
-                received(buffer, size, lora.getRSSI(), lora.getSNR());
-            }
-        } else {
-            startReceive();
-        }
-    }
-}
-
 bool Communication::sendAprsFrame() {
-    size_t size = Aprs::encode(&aprsPacketTx, bufferText);
+    const size_t size = Aprs::encode(&aprsPacketTx, bufferText);
 
     if (!size) {
         Log.errorln(F("[APRS] Error during string encode"));
@@ -100,83 +22,15 @@ bool Communication::sendAprsFrame() {
         return false;
     }
 
+    Log.infoln(F("[LORA_TX] Send %d bytes : %s"), size, bufferText);
+
     buffer[0] = '<';
     buffer[1]= 0xFF;
     buffer[2] = 0x01;
 
-    for (uint8_t i = 0; i < size; i++) {
-        buffer[i + 3] = bufferText[i];
-        Log.verboseln(F("[LORA_TX] Payload[%d]=%X %c"), i + 3, buffer[i + 3], buffer[i + 3]);
-    }
+    memcpy(buffer + 3, bufferText, size);
 
-    return send(size + 3);
-}
-
-bool Communication::sendRaw(const uint8_t* payload, size_t size) {
-    if (size > TRX_BUFFER) {
-        Log.errorln(F("[LORA_TX] Error during raw send. Size of %d is out of %d"), size, TRX_BUFFER);
-        return false;
-    }
-
-    memcpy(buffer, payload, size);
-
-    return send(size);
-}
-
-bool Communication::changeLoRaSettings(float frequency, uint16_t bandwidth, uint8_t spreadingFactor, uint8_t codingRate,
-    uint8_t outputPower) {
-    if (!lora.setFrequency(frequency) || !lora.setBandwidth(bandwidth) || !lora.setSpreadingFactor(spreadingFactor) || !lora.setCodingRate(codingRate) || !lora.setOutputPower(outputPower)) {
-        Log.errorln(F("[LORA] Error during change changed to frequency: %f, bandwidth: %d, spreading factor: %d, coding rate: %d, output power: %d. Reload default"), frequency, bandwidth, spreadingFactor, codingRate, outputPower);
-        begin();
-        return false;
-    }
-
-    Log.infoln(F("[LORA] Settings changed to frequency: %f, bandwidth: %d, spreading factor: %d, coding rate: %d, output power: %d"), frequency, bandwidth, spreadingFactor, codingRate, outputPower);
-
-    return true;
-}
-
-bool Communication::send(const size_t size) {
-    system->gpioLed.setState(HIGH);
-
-    Log.infoln(F("[LORA_TX] Start send %d bytes : %s"), size, bufferText);
-
-    uint8_t i = 0;
-    while (i++ < 3 && isChannelActive()) {
-        startReceive();
-        delayWdt(TIME_WAIT_CHANNEL_ACTIVE);
-    }
-    if (i == 3) {
-        Log.errorln(F("[LORA_TX] Can't send because too much signal on channel"));
-        return false;
-    }
-
-    if (system->settings.lora.txEnabled) {
-        const int currentState = lora.transmit(buffer, size);
-
-        if (currentState == RADIOLIB_ERR_NONE) {
-            sent();
-        } else if (currentState == RADIOLIB_ERR_PACKET_TOO_LONG) {
-            Log.errorln(F("[LORA] TX Error too long"));
-            _hasError = true;
-            return false;
-        } else if (currentState == RADIOLIB_ERR_TX_TIMEOUT) {
-            Log.errorln(F("[LORA] TX Error timeout"));
-            _hasError = true;
-            return false;
-        } else {
-            sprintf_P(bufferText, PSTR("[LORA] TX Error : %d"), currentState);
-            _hasError = true;
-            Log.errorln(bufferText);
-            return false;
-        }
-    }
-    else {
-        delayWdt(1000);
-        sent();
-    }
-
-    return true;
+    return system->radio.send(buffer, size + 3);
 }
 
 bool Communication::sendMessage(const char* destination, const char* message, const char* ackToConfirm) {
@@ -185,7 +39,7 @@ bool Communication::sendMessage(const char* destination, const char* message, co
     const SettingsAprs settings = system->settings.aprs;
 
     strcpy(aprsPacketTx.path, settings.path);
-    strcpy(aprsPacketTx.source, settings.call);
+    strcpy(aprsPacketTx.source, settings.callsign);
     strcpy(aprsPacketTx.destination, settings.destination);
 
     strcpy(aprsPacketTx.message.destination, destination);
@@ -207,40 +61,22 @@ void Communication::prepareTelemetry() {
 
     sprintf_P(aprsPacketTx.comment, PSTR("Bat:%d%% Up:%ld"), system->energyThread->getBatteryPercentage(), millis() / 1000);
 
-    double temperatureBox = 0;
-    double temperatureBoxNb = 0;
-
-    const EnergyMpptChgThread* energyThreadMppt = system->settings.energy.type == mpptchg && !system->energyThread->hasError() ?
-        static_cast<EnergyMpptChgThread*>(system->energyThread) : nullptr;
-
-    if (energyThreadMppt != nullptr) {
-        temperatureBox += energyThreadMppt->getTemperature();
-        temperatureBoxNb++;
-    }
-
-    if (system->settings.rtc.enabled) {
-        temperatureBox += system->rtc.getTemperature();
-        temperatureBoxNb++;
-    }
-
-    temperatureBox /= temperatureBoxNb;
-
     uint8_t i = 0;
     aprsPacketTx.telemetries.telemetriesAnalog[i++].value = system->energyThread->getVoltageBattery();
     aprsPacketTx.telemetries.telemetriesAnalog[i++].value = system->energyThread->getCurrentBattery();
     aprsPacketTx.telemetries.telemetriesAnalog[i++].value = system->energyThread->getVoltageSolar();
     aprsPacketTx.telemetries.telemetriesAnalog[i++].value = system->energyThread->getCurrentSolar();
-    aprsPacketTx.telemetries.telemetriesAnalog[i++].value = temperatureBox;
+    aprsPacketTx.telemetries.telemetriesAnalog[i++].value = system->getTemperatureBox();
 
     i = 0;
 
-    if (system->ldrBoxOpenedThread->enabled) {
-        aprsPacketTx.telemetries.telemetriesBoolean[i++].value = system->ldrBoxOpenedThread->isBoxOpened();
-    }
     aprsPacketTx.telemetries.telemetriesBoolean[i++].value = system->watchdogMeshtastic->enabled ? system->watchdogMeshtastic->isFed() : system->watchdogMeshtastic->isGpioOn();
     aprsPacketTx.telemetries.telemetriesBoolean[i++].value = system->watchdogLinux->enabled ? system->watchdogLinux->isFed() : system->watchdogLinux->isGpioOn();
-    aprsPacketTx.telemetries.telemetriesBoolean[i++].value = system->getGpio(system->settings.linux.wifiPin)->getState() || system->getGpio(system->settings.linux.nprPin)->getState();
+    aprsPacketTx.telemetries.telemetriesBoolean[i++].value = system->getGpio(PSTR("wifi"))->getState() || system->getGpio("npr")->getState();
     aprsPacketTx.telemetries.telemetriesBoolean[i++].value = system->hasError();
+
+    const EnergyMpptChgThread* energyThreadMppt = system->settings.energy.type == mpptchg && !system->energyThread->hasError() ?
+        static_cast<EnergyMpptChgThread*>(system->energyThread) : nullptr;
 
     if (energyThreadMppt != nullptr) {
         aprsPacketTx.telemetries.telemetriesBoolean[i++].value = energyThreadMppt->isAlert();
@@ -259,8 +95,8 @@ bool Communication::sendTelemetry() {
 
     const SettingsAprs settings = system->settings.aprs;
 
-    strcpy(aprsPacketTx.path, settings.path);
-    strcpy(aprsPacketTx.source, settings.call);
+    strcpy(aprsPacketTx.path, settings.pathTelemetry);
+    strcpy(aprsPacketTx.source, settings.callsign);
     strcpy(aprsPacketTx.destination, settings.destination);
 
     prepareTelemetry();
@@ -276,8 +112,8 @@ bool Communication::sendTelemetryParams() {
 
     const SettingsAprs settings = system->settings.aprs;
 
-    strcpy(aprsPacketTx.path, settings.path);
-    strcpy(aprsPacketTx.source, settings.call);
+    strcpy(aprsPacketTx.path, settings.pathTelemetry);
+    strcpy(aprsPacketTx.source, settings.callsign);
     strcpy(aprsPacketTx.destination, settings.destination);
 
     uint8_t i = 0;
@@ -305,9 +141,6 @@ bool Communication::sendTelemetryParams() {
 
     i = 0;
 
-    if (system->ldrBoxOpenedThread->enabled) {
-        strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[i++].name, PSTR("Box"));
-    }
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[i++].name, PSTR("Msh"));
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[i++].name, PSTR("Lnx"));
     strcpy_P(aprsPacketTx.telemetries.telemetriesBoolean[i++].name, PSTR("Lnk"));
@@ -335,7 +168,7 @@ bool Communication::sendPosition(const char* comment) {
     const SettingsAprs settings = system->settings.aprs;
 
     strcpy(aprsPacketTx.path, settings.path);
-    strcpy(aprsPacketTx.source, settings.call);
+    strcpy(aprsPacketTx.source, settings.callsign);
     strcpy(aprsPacketTx.destination, settings.destination);
 
     aprsPacketTx.position.symbol = settings.symbol;
@@ -347,15 +180,39 @@ bool Communication::sendPosition(const char* comment) {
 
     aprsPacketTx.type = Position;
 
-    if (system->settings.weather.enabled && !system->weatherThread->hasError()) {
+    const auto weatherThread = system->weatherThread;
+    if (system->settings.weather.enabled && !weatherThread->hasError()) {
         aprsPacketTx.position.withWeather =
                 aprsPacketTx.weather.useHumidity =
-                        aprsPacketTx.weather.useTemperature =
-                                aprsPacketTx.weather.usePressure = true;
+                        aprsPacketTx.weather.useTemperature = true;
 
-        aprsPacketTx.weather.temperatureFahrenheit = static_cast<int16_t>(system->weatherThread->getTemperature() * 9.0 / 5.0 + 32);
-        aprsPacketTx.weather.humidity = static_cast<int16_t>(system->weatherThread->getHumidity());
-        aprsPacketTx.weather.pressure = static_cast<int16_t>(system->weatherThread->getPressure());
+        aprsPacketTx.weather.temperatureFahrenheit = static_cast<int16_t>(weatherThread->getTemperature() * 9.0 / 5.0 + 32);
+        aprsPacketTx.weather.humidity = static_cast<int16_t>(weatherThread->getHumidity());
+
+        if (weatherThread->getPressure() > 0) {
+            aprsPacketTx.weather.usePressure = true;
+            aprsPacketTx.weather.pressure = static_cast<int16_t>(weatherThread->getPressure());
+        }
+
+        if (weatherThread->getWh65BData() != nullptr) {
+            aprsPacketTx.weather.useWindDirection = true;
+            aprsPacketTx.weather.windDirectionDegrees = weatherThread->getWindDirectionDeg();
+
+            aprsPacketTx.weather.useWindSpeed = true;
+            aprsPacketTx.weather.windSpeedMph = static_cast<uint16_t>(weatherThread->getWindAverageMs() * 2.237);
+
+            aprsPacketTx.weather.useGustSpeed = true;
+            aprsPacketTx.weather.gustSpeedMph = static_cast<uint16_t>(weatherThread->getWindMaxMs() * 2.237);
+
+            aprsPacketTx.weather.useRain1Hour = true;
+            aprsPacketTx.weather.rainSinceMidnightHundredthsOfAnInch = static_cast<uint16_t>(weatherThread->getRain1hMm() / 25.4);
+
+            aprsPacketTx.weather.useRain24Hour = true;
+            aprsPacketTx.weather.rainSinceMidnightHundredthsOfAnInch = static_cast<uint16_t>(weatherThread->getRain24hMm() / 25.4);
+
+            aprsPacketTx.weather.useRainSinceMidnight = system->settings.rtc.enabled;
+            aprsPacketTx.weather.rainSinceMidnightHundredthsOfAnInch = static_cast<uint16_t>(weatherThread->getRainSinceMidnightMm() / 25.4);
+        }
     }
 
     if (settings.telemetryInPosition) {
@@ -376,7 +233,7 @@ bool Communication::sendStatus(const char* comment) {
     const SettingsAprs settings = system->settings.aprs;
 
     strcpy(aprsPacketTx.path, settings.path);
-    strcpy(aprsPacketTx.source, settings.call);
+    strcpy(aprsPacketTx.source, settings.callsign);
     strcpy(aprsPacketTx.destination, settings.destination);
 
     strcpy(aprsPacketTx.comment, comment);
@@ -392,7 +249,7 @@ bool Communication::sendItem(const char *name, const char symbol, const char sym
     const SettingsAprs settings = system->settings.aprs;
 
     strcpy(aprsPacketTx.path, settings.path);
-    strcpy(aprsPacketTx.source, settings.call);
+    strcpy(aprsPacketTx.source, settings.callsign);
     strcpy(aprsPacketTx.destination, settings.destination);
 
     aprsPacketTx.position.latitude = latitude;
@@ -411,48 +268,27 @@ bool Communication::sendItem(const char *name, const char symbol, const char sym
     return sendAprsFrame();
 }
 
-void Communication::sent() {
-    system->gpioLed.setState(LOW);
-
-    Log.infoln(F("[LORA_TX] End"));
-
-    if (system->watchdogSlaveLoraTxThread->enabled) {
-        system->watchdogSlaveLoraTxThread->feed();
-    }
-
-    startReceive();
-
-    delayWdt(TIME_AFTER_TX); // Time for others receivers to return to RX mode. It is a test where I missed some frames
-}
-
-void Communication::received(uint8_t * payload, const uint16_t size, const float rssi, const float snr) {
-    Log.traceln(F("[LORA_RX] Payload of size %d, RSSI : %F and SNR : %F"), size, rssi, snr);
-    Log.infoln(F("[LORA_RX] %s"), payload);
-
-    for (uint16_t i = 0; i < size; i++) {
-        Log.verboseln(F("[LORA_RX] Payload[%d]=%X %c"), i, payload[i], payload[i]);
-    }
-
-    system->gpioLed.setState(HIGH);
-
-    bool shouldTx = false;
-
+void Communication::received(const uint8_t * payload, const uint16_t size, const float rssi, const float snr) {
     if (!Aprs::decode(reinterpret_cast<const char *>(payload + sizeof(uint8_t) * 3), &aprsPacketRx)) {
         Log.warningln(F("[APRS] Error during decode, KISS ?"));
         system->sendToKissInterface(payload, size);
     } else {
+        bool shouldTx = false;
         Log.traceln(F("[APRS] Decoded from %s to %s via %s"), aprsPacketRx.source, aprsPacketRx.destination, aprsPacketRx.path);
 
         const SettingsAprs settings = system->settings.aprs;
 
-        if (strcasecmp(aprsPacketRx.source, settings.call) == 0) {
-            Log.warningln(F("[APRS] It's from us. Bug ? Ignore it"));
+        snprintf_P(bufferText, BUFFER_LENGTH, PSTR("%s*"), settings.callsign);
+        if (strcasecmp(aprsPacketRx.source, settings.callsign) == 0 // own frame
+            || strcasecmp(aprsPacketRx.path, bufferText) == 0 // we already have digipeated the frame
+        ) {
+            Log.warningln(F("[APRS] It's from us or we already have digipeated it. Ignored"));
             return;
         }
 
         system->addAprsFrameReceivedToHistory(&aprsPacketRx, snr, rssi);
 
-        if (strstr(aprsPacketRx.message.destination, settings.call) != nullptr) {
+        if (strstr(aprsPacketRx.message.destination, settings.callsign) != nullptr) {
             Log.traceln(F("[APRS] Message for me : %s"), aprsPacketRx.message.message);
 
             if (strlen(aprsPacketRx.message.message) > 0) {
@@ -465,7 +301,7 @@ void Communication::received(uint8_t * payload, const uint16_t size, const float
                 shouldTx |= sendMessage(aprsPacketRx.source, system->command.response);
             }
         } else if (settings.digipeaterEnabled) {
-            shouldTx = Aprs::canBeDigipeated(aprsPacketRx.path, settings.call);
+            shouldTx = Aprs::canBeDigipeated(aprsPacketRx.path, settings.callsign);
 
             Log.traceln(F("[APRS] Message should TX : %T"), shouldTx);
 
@@ -480,44 +316,4 @@ void Communication::received(uint8_t * payload, const uint16_t size, const float
             }
         }
     }
-
-    if (!shouldTx) {
-        system->gpioLed.setState(LOW);
-    }
-}
-
-bool Communication::isChannelActive() {
-    Log.traceln(F("[LORA] Test channel is active"));
-
-    lora.standby();
-
-    const auto result = lora.scanChannel();
-    if (result == RADIOLIB_LORA_DETECTED) {
-        Log.warningln(F("[LORA] Channel is already active"));
-        return true;
-    }
-
-    if (result != RADIOLIB_CHANNEL_FREE) {
-        Log.errorln(F("[LORA] Error during test channel free: %d"), result);
-    } else {
-        Log.traceln(F("[LORA] Channel is free"));
-    }
-
-    return false;
-}
-
-bool Communication::startReceive() {
-    Log.traceln(F("[LORA] Start receive"));
-
-    lora.standby();
-
-    if (lora.startReceiveDutyCycleAuto(LORA_PREAMBLE_LENGTH, 8, RADIOLIB_IRQ_RX_DEFAULT_FLAGS | RADIOLIB_IRQ_PREAMBLE_DETECTED) != RADIOLIB_ERR_NONE) {
-        Log.errorln(F("[LORA] Start receive KO"));
-        _hasError = true;
-        return false;
-    }
-
-    Log.traceln(F("[LORA] Start receive OK"));
-
-    return true;
 }

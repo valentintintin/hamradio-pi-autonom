@@ -2,7 +2,6 @@
 #define RP2040_LORA_APRS_MYTHREAD_H
 
 #include "Thread.h"
-#include "config.h"
 
 class System;
 
@@ -14,7 +13,7 @@ public:
     void run() override;
     void forceRun();
 
-    virtual bool shouldRun(unsigned long time);
+    long tillRun(unsigned long time) override;
 
     inline void setRunned() {
         runned();
@@ -24,7 +23,7 @@ public:
         return _initiated;
     }
 
-    inline bool hasError() const {
+    virtual inline bool hasError() const {
         return !_initiated || lastUpdateHasError;
     }
 
@@ -34,10 +33,6 @@ public:
 protected:
     virtual bool init() {
         return true;
-    }
-
-    inline bool isAfterBoot() const {
-        return millis() > TIME_AFTER_BOOT;
     }
 
     virtual bool runOnce() = 0;
