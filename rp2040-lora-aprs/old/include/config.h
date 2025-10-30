@@ -17,8 +17,18 @@
 #define LORA_PREAMBLE_LENGTH 8
 #define TRX_BUFFER 253 // 256 - 3 because 3 bytes for LoRa APRS
 
-#define SETTINGS_VERSION 1
+#ifdef GRAND_RATZ
+#define USE_RX_QUEUE false
+#define USE_TX_QUEUE false
+#else
+#define USE_RX_QUEUE false
+#define USE_TX_QUEUE false
+#endif
+
+#define SETTINGS_VERSION 10
+#define USE_KISS false
 #define DISABLE_SLOW_CLOCK false
+#define MAX_GPIO_USED 30
 
 #define TIME_SET_MPPT_WATCHDOG_DFU 120000 // 2 minutes
 #define INTERVAL_BLINKER 1000 // 1 second

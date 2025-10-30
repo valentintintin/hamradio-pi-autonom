@@ -3,7 +3,7 @@
 
 #include "MyThread.h"
 #include "mpptChg.h"
-#include "Communication.h"
+#include "../Communication.h"
 #include "config.h"
 
 class EnergyThread : public MyThread {
