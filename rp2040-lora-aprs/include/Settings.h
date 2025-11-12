@@ -2,13 +2,11 @@
 #define RP2040_LORA_APRS_SETTINGS_H
 
 #include <Arduino.h>
-#include "Aprs.h"
-#include "INA3221.h"
 
 #include "config.h"
 
 #define APRS_CALLSIGNS_HEARD_NUMBER 30
-#define NB_SETTINGS 81
+#define NB_SETTINGS 82
 
 enum SettingsType { Boolean, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Char, Float, Double, CharString };
 
@@ -18,6 +16,7 @@ typedef struct {
     uint8_t spreadingFactor = 12;
     uint8_t codingRate = 5;
     uint8_t outputPower = 22;
+    uint8_t syncWord = 0x12;
     bool txEnabled = true;
     bool boostedRxGain = true;
     bool watchdogTxEnabled = true;

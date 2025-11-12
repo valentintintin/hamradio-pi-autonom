@@ -4,3 +4,6 @@
 [submodule "rp2040-lora-aprs/lib/Timer"]
 	path = rp2040-lora-aprs/lib/Timer
 	url = https://github.com/valentintintin/SimpleLibTimer
+[submodule "rp2040-lora-aprs/lib/SimpleLibTimer"]
+	path = rp2040-lora-aprs/lib/SimpleLibTimer
+	url = git@github.com:valentintintin/SimpleLibTimer.git

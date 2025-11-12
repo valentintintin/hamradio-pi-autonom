@@ -3,23 +3,23 @@
 #include <task.h>
 
 #include "config.h"
+#include <RadioLib.h>
 
-void BlinkTask(void *pvParameters) {
-    pinMode(25, OUTPUT);
+[[noreturn]] void heartBeatTask(void *pvParameters) {
+    pinMode(LED_BUILTIN, OUTPUT);
     for (;;) {
-        digitalWrite(25, HIGH);
+        digitalWrite(LED_BUILTIN, HIGH);
         vTaskDelay(500 / portTICK_PERIOD_MS);
-        digitalWrite(25, LOW);
+        digitalWrite(LED_BUILTIN, LOW);
         vTaskDelay(500 / portTICK_PERIOD_MS);
     }
 }
 
 void setup() {
-    xTaskCreate(BlinkTask, "Blink", 128, NULL, 1, NULL);
+    xTaskCreate(heartBeatTask, "HeartBeat", 128, nullptr, 1, nullptr);
 
     vTaskStartScheduler();
 }
 
 void loop() {
-    // loop vide si tout est géré par FreeRTOS
 }

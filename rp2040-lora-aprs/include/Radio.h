@@ -2,8 +2,6 @@
 #define RADIO_H
 
 #include <RadioLib.h>
-#include <ArduinoQueue.h>
-#include <MyThread.h>
 #include <Timer.h>
 
 #include "config.h"
@@ -24,49 +22,40 @@ typedef struct {
 
 enum InterruptType { IDLE, RX, TX };
 
-class Radio : public MyThread {
+class Radio {
 public:
-    explicit Radio(System *system);
+    explicit Radio();
 
-    bool init() override;
-    bool runOnce() override;
+    bool init();
     bool send(const uint8_t *payload, size_t size);
 
-    bool changeLoRaSettings(float frequency, uint16_t bandwidth, uint8_t spreadingFactor, uint8_t codingRate, uint8_t outputPower, bool boostedRxGain = true);
+    bool changeLoRaSettings(float frequency, uint16_t bandwidth, uint8_t spreadingFactor, uint8_t codingRate, uint8_t outputPower, uint8_t syncWord = 0x12, bool boostedRxGain = true);
 
-    bool hasError() const override {
-      return _hasError || MyThread::hasError();
+    bool hasError() const {
+      return _hasError;
     }
 
-    inline uint16_t countRxItemQueued() {
-        return rxQueue.itemCount();
-    }
-
-    inline uint16_t countTxItemQueued() {
-        return txQueue.itemCount();
-    }
-
-    inline uint32_t countRx() const {
+    uint32_t countRx() const {
         return nbRx;
     }
 
-    inline uint32_t countTx() const {
+    uint32_t countTx() const {
         return nbTx;
     }
 private:
-    static volatile InterruptType hasInterrupt;
+    static volatile InterruptType radioStatus;
 
-    static void setHasRxInterrupt();
-    static void setHasTxInterrupt();
+    static void handleIRQ(BaseType_t* taskWoken);
+
+    static void onISR();
 
     SX1262 lora = new Module(LORA_CS, LORA_DIO1, LORA_RESET, LORA_BUSY, SPI1, SPISettings(4000000, MSBFIRST, SPI_MODE0));
-    ArduinoQueue<LoRaReceived> rxQueue = ArduinoQueue<LoRaReceived>(LORA_QUEUE_RX_SIZE);
-    ArduinoQueue<LoRaTransmit> txQueue = ArduinoQueue<LoRaTransmit>(LORA_QUEUE_TX_SIZE);
+    QueueHandle_t rxQueue;
+    QueueHandle_t txQueue;
     bool _hasError = false;
     bool loraSettingsChanged = false;
     /// are _trying_ to receive a packet currently (note - we might just be waiting for one)
     bool wantToSend = false;
-    InterruptType radioStatus = IDLE;
     uint32_t activeReceiveStart = 0;
     uint32_t lastTxStart = 0;
     Timer timerNextTx = Timer();

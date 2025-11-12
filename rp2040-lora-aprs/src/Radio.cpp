@@ -2,20 +2,31 @@
 
 #include <numeric>
 
-#include "ArduinoLog.h"
-#include "System.h"
+#include <ArduinoLog.h>
 
-volatile InterruptType Radio::hasInterrupt = IDLE;
+#include "Settings.h"
 
-void Radio::setHasRxInterrupt() {
-    hasInterrupt = RX;
+volatile InterruptType Radio::radioStatus = IDLE;
+
+void Radio::onISR() {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    handleIRQ(&xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-void Radio::setHasTxInterrupt() {
-    hasInterrupt = TX;
+void Radio::handleIRQ(BaseType_t* taskWoken) {
+    if (radioStatus == RX) {
+
+    } else if (radioStatus == TX) {
+
+    }
 }
 
-Radio::Radio(System *system) : MyThread(system, 10, PSTR("Radio"), true) {
+Radio::Radio() {
+    rxQueue = xQueueCreate(LORA_QUEUE_RX_SIZE, sizeof(LoRaReceived));
+    txQueue = xQueueCreate(LORA_QUEUE_TX_SIZE, sizeof(LoRaTransmit));
+
+    xTaskCreate(heartBeatTask, "HeartBeat", 128, nullptr, 1, nullptr);
 }
 
 bool Radio::init() {
@@ -46,8 +57,8 @@ bool Radio::init() {
     return changeLoRaSettings(settings.frequency, settings.bandwidth, settings.spreadingFactor, settings.codingRate, settings.outputPower, settings.boostedRxGain);
 }
 
-bool Radio::changeLoRaSettings(const float frequency, const uint16_t bandwidth, const uint8_t spreadingFactor, const uint8_t codingRate, const uint8_t outputPower, bool boostedRxGain) {
-    auto state = lora.begin(frequency, bandwidth, spreadingFactor, codingRate, RADIOLIB_SX126X_SYNC_WORD_PRIVATE, outputPower, LORA_PREAMBLE_LENGTH, 0, false);
+bool Radio::changeLoRaSettings(const float frequency, const uint16_t bandwidth, const uint8_t spreadingFactor, const uint8_t codingRate, const uint8_t outputPower, const uint8_t syncWord, bool boostedRxGain) {
+    auto state = lora.begin(frequency, bandwidth, spreadingFactor, codingRate, syncWord, outputPower, LORA_PREAMBLE_LENGTH, 0, false);
     if (state != RADIOLIB_ERR_NONE) {
         Log.errorln(F("[LORA] Init KO: %d"), state);
         _hasError = true;
@@ -97,14 +108,14 @@ bool Radio::changeLoRaSettings(const float frequency, const uint16_t bandwidth, 
         return false;
     }
 
-    Log.infoln(F("[LORA] Init OK to frequency: %f, bandwidth: %d, spreading factor: %d, coding rate: %d, output power: %d, rx boosted : %d"), frequency, bandwidth, spreadingFactor, codingRate, outputPower, boostedRxGain);
+    Log.infoln(F("[LORA] Init OK to frequency: %f, bandwidth: %d, spreading factor: %d, coding rate: %d, sync word: %d, output power: %d, rx boosted : %d"), frequency, bandwidth, spreadingFactor, codingRate, syncWord, outputPower, boostedRxGain);
 
     // Maybe clear TX and RX queue ?
 
     return true;
 }
 
-bool Radio::runOnce() {
+bool Radio::receive() {
     if (hasInterrupt != IDLE) {
         const uint16_t irqFlags = lora.getIrqFlags();
 
@@ -137,10 +148,6 @@ bool Radio::runOnce() {
             default:
                 break;
         }
-    }
-
-    if (!txQueue.isEmpty()) {
-        Log.noticeln(F("txqueue: %d    rxqueue: %d   radioStatus: %d    wantToSend: %d    timerNextTx: %lu"), txQueue.itemCount(), rxQueue.itemCount(), radioStatus, wantToSend, timerNextTx.getTimeLeft());
     }
 
     if (!txQueue.isEmpty() && radioStatus != TX) {
@@ -255,7 +262,7 @@ bool Radio::startSend(const uint8_t *payload, uint16_t size) {
         return false;
     }
 
-    lora.setDio1Action(setHasTxInterrupt);
+    lora.setDio1Action(onISR);
     lastTxStart = millis();
     Log.infoln(F("[LORA_TX] Start sending"));
 
@@ -464,7 +471,7 @@ uint32_t Radio::getPacketTime(const float bw, const uint8_t sf, const uint8_t cr
     constexpr bool headDisable = false; // we currently always use the header
     const float tSym = (1 << sf) / bandwidthHz;
 
-    const bool lowDataOptEn = tSym > 16e-3 ? true : false; // Needed if symbol time is >16ms
+    const bool lowDataOptEn = tSym > 16e-3; // Needed if symbol time is >16ms
 
     const float tPreamble = (preambleLength + 4.25f) * tSym;
     const float numPayloadSym =
