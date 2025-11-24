@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-#include "config.h"
+#include "../include/config.h"
 
 #define APRS_CALLSIGNS_HEARD_NUMBER 30
 #define NB_SETTINGS 82

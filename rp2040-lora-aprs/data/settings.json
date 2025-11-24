@@ -1,0 +1,118 @@
+{
+  "useInternalWatchdog": true,
+  "useSlowClock": false,
+  "pins": [
+    {
+      "pin": 11,
+      "mode": 1,
+      "name": "WiFi"
+    },
+    {
+      "pin": 12,
+      "mode": 1,
+      "name": "CAM"
+    }
+  ],
+  "rtc": {
+    "enabled": true
+  },
+  "lora": {
+    "frequency": 433.775,
+    "bandwidth": 125,
+    "spreadingFactor": 12,
+    "codingRate": 5,
+    "outputPower": 22,
+    "syncWord": 18,
+    "txEnabled": true,
+    "boostedRxGain": true,
+    "watchdogTxEnabled": true,
+    "intervalTimeoutWatchdogTx": 7200000
+  },
+  "aprs": {
+    "callsign": "F4HVV-15",
+    "destination": "APLV1",
+    "path": "WIDE1-1",
+    "pathTelemetry": "F4HVV-10",
+    "positionComment": "Le Grand Ratz",
+    "status": "Digi LoRa solaire",
+    "symbol": "L",
+    "symbolTable": "#",
+    "latitude": 45.325776,
+    "longitude": 5.636580,
+    "altitude": 850,
+    "digipeaterEnabled": true,
+    "telemetryEnabled": true,
+    "intervalTelemetry": 9000,
+    "statusEnabled": true,
+    "intervalStatus": 86400,
+    "positionWeatherEnabled": true,
+    "intervalPositionWeather": 3600,
+    "telemetryInPosition": false,
+    "telemetrySequenceNumber": 0
+  },
+  "energy": {
+    "intervalCheck": 30000,
+    "type": "dummy",
+    "adcPin": 26,
+    "inaChannelBattery": 1,
+    "inaChannelSolar": 2,
+    "mpptPowerOnVoltage": 12000,
+    "mpptPowerOffVoltage": 11550,
+    "sendAprsMessageWhenAlert": true,
+    "callsignToSendMessageAlert": "F4HVV-10"
+  },
+  "weather": {
+    "enabled": true,
+    "intervalCheck": 60000,
+    "decodeWH65B": true,
+    "intervalWH65B": 900000
+  },
+  "mpptWatchdog": {
+    "enabled": false,
+    "timeout": 90,
+    "intervalFeed": 30000,
+    "timeOff": 5000
+  },
+  "i2c": {
+    "enabled": true,
+    "address": 17
+  },
+  "meshtastic": {
+    "enabled": false,
+    "intervalTimeoutWatchdog": 300000,
+    "pin": {
+      "pin": 10,
+      "mode": 1,
+      "inverted": false,
+      "name": "868"
+    },
+    "aprsSendItemEnabled": true,
+    "intervalSendItem": 3600000,
+    "itemName": "MSH",
+    "itemComment": "Meshtastic LongModerate 869.4625",
+    "symbol": "#",
+    "symbolTable": "\\",
+    "latitude": 45.325796,
+    "longitude": 5.636426,
+    "altitude": 850
+  },
+  "linux": {
+    "enabled": false,
+    "intervalTimeoutWatchdog": 300000,
+    "pin": {
+      "pin": 9,
+      "mode": 1,
+      "inverted": false,
+      "name": "Pi"
+    },
+    "aprsSendItemEnabled": false,
+    "intervalSendItem": 3600000,
+    "itemName": "CAMIP",
+    "itemComment": "f4hvv.valentin-saugnier.fr/f4hvv-15",
+    "symbol": "I",
+    "symbolTable": "/",
+    "latitude": 45.325688,
+    "longitude": 5.636493,
+    "altitude": 850
+  }
+}

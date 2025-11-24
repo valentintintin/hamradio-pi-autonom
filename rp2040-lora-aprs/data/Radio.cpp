@@ -3,37 +3,32 @@
 #include <numeric>
 
 #include <ArduinoLog.h>
+#include <FreeRTOS.h>
+#include <task.h>
 
 #include "Settings.h"
 
-volatile InterruptType Radio::radioStatus = IDLE;
+volatile RadioState Radio::radioStatus = IDLE;
+QueueHandle_t Radio::irqQueue = xQueueCreate(10, 0);
 
 void Radio::onISR() {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    handleIRQ(&xHigherPriorityTaskWoken);
+    xQueueSendFromISR(irqQueue, nullptr, &xHigherPriorityTaskWoken);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-}
-
-void Radio::handleIRQ(BaseType_t* taskWoken) {
-    if (radioStatus == RX) {
-
-    } else if (radioStatus == TX) {
-
-    }
 }
 
 Radio::Radio() {
     rxQueue = xQueueCreate(LORA_QUEUE_RX_SIZE, sizeof(LoRaReceived));
     txQueue = xQueueCreate(LORA_QUEUE_TX_SIZE, sizeof(LoRaTransmit));
+    txDone = xSemaphoreCreateBinary();
 
-    xTaskCreate(heartBeatTask, "HeartBeat", 128, nullptr, 1, nullptr);
+    xTaskCreate(&Radio::taskProcessInterruptRun, "RadioISRTask", 2048, this, 2, nullptr);
+    xTaskCreate(&Radio::taskReceiveRun, "RadioRxTask", 2048, this, 2, nullptr);
+    xTaskCreate(&Radio::taskTransmitRun, "RadioTxTask", 2048, this, 2, nullptr);
 }
 
 bool Radio::init() {
     Log.infoln(F("[LORA] Init"));
-
-    radioStatus = IDLE;
-    hasInterrupt = IDLE;
 
     SPI1.setSCK(LORA_SCK);
     SPI1.setTX(LORA_MOSI);
@@ -52,13 +47,19 @@ bool Radio::init() {
     pinMode(LORA_POWER_EN, OUTPUT);
 #endif
 
-    const SettingsLoRa settings = system->settings.lora;
+    // const SettingsLoRa settings = system->settings.lora;
 
-    return changeLoRaSettings(settings.frequency, settings.bandwidth, settings.spreadingFactor, settings.codingRate, settings.outputPower, settings.boostedRxGain);
+    return changeLoRaSettings(settings.frequency, settings.bandwidth, settings.spreadingFactor, settings.codingRate,
+                              settings.outputPower, settings.boostedRxGain);
 }
 
-bool Radio::changeLoRaSettings(const float frequency, const uint16_t bandwidth, const uint8_t spreadingFactor, const uint8_t codingRate, const uint8_t outputPower, const uint8_t syncWord, bool boostedRxGain) {
-    auto state = lora.begin(frequency, bandwidth, spreadingFactor, codingRate, syncWord, outputPower, LORA_PREAMBLE_LENGTH, 0, false);
+bool Radio::changeLoRaSettings(const float frequency, const uint16_t bandwidth, const uint8_t spreadingFactor,
+                               const uint8_t codingRate, const uint8_t outputPower, const uint8_t syncWord,
+                               bool boostedRxGain) {
+    radioStatus = IDLE;
+
+    auto state = lora.begin(frequency, bandwidth, spreadingFactor, codingRate, syncWord, outputPower,
+                            LORA_PREAMBLE_LENGTH, 0, false);
     if (state != RADIOLIB_ERR_NONE) {
         Log.errorln(F("[LORA] Init KO: %d"), state);
         _hasError = true;
@@ -98,147 +99,110 @@ bool Radio::changeLoRaSettings(const float frequency, const uint16_t bandwidth, 
         return false;
     }
 
-    slotTimeMsec = computeSlotTimeMsec(bandwidth, spreadingFactor);
-    preambleTimeMsec = getPacketTime(bandwidth, spreadingFactor, codingRate, LORA_PREAMBLE_LENGTH, 0);
-    maxPacketTimeMsec = getPacketTime(bandwidth, spreadingFactor, codingRate, LORA_PREAMBLE_LENGTH, TRX_BUFFER + 3);
+    lora.clearIrqFlags(IRQS);
+    lora.setIrqFlags(IRQS);
+    lora.setDio1Action(onISR);
 
-    Log.traceln(F("[LORA] SlotTime %d ms | PreambleTime %d ms | MaxPacketTime %d ms"), slotTimeMsec, preambleTimeMsec, maxPacketTimeMsec);
+    xQueueReset(irqQueue);
+    xQueueReset(rxQueue);
+    xQueueReset(txQueue);
+    xSemaphoreGive(txDone);
+
+    slotTimeMsec = computeSlotTimeMsec(bandwidth, spreadingFactor);
+    maxPacketTimeMsec = getPacketTime(bandwidth, spreadingFactor, codingRate, LORA_PREAMBLE_LENGTH, TRX_BUFFER);
+
+    Log.traceln(
+        F("[LORA] SlotTime %d ms | PreambleTime %d ms | MaxPacketTime %d ms"), slotTimeMsec, preambleTimeMsec,
+        maxPacketTimeMsec);
 
     if (!startReceive()) {
         return false;
     }
 
-    Log.infoln(F("[LORA] Init OK to frequency: %f, bandwidth: %d, spreading factor: %d, coding rate: %d, sync word: %d, output power: %d, rx boosted : %d"), frequency, bandwidth, spreadingFactor, codingRate, syncWord, outputPower, boostedRxGain);
-
-    // Maybe clear TX and RX queue ?
+    Log.infoln(
+        F(
+            "[LORA] Init OK to frequency: %f, bandwidth: %d, spreading factor: %d, coding rate: %d, sync word: %d, output power: %d, rx boosted : %d"),
+        frequency, bandwidth, spreadingFactor, codingRate, syncWord, outputPower, boostedRxGain);
 
     return true;
 }
 
-bool Radio::receive() {
-    if (hasInterrupt != IDLE) {
-        const uint16_t irqFlags = lora.getIrqFlags();
-
-        if (irqFlags == 0) {
-            return true;
-        }
-
-        Log.traceln(F("[LORA] Interrupt %d"), hasInterrupt);
-        Log.traceln(F("[LORA] Interrupt with flags : %d"), irqFlags);
-
-        switch (hasInterrupt) {
-            case RX: {
-                hasInterrupt = IDLE;
-
-                if (isReceiving()) {
-                    handleReceived();
-                    startReceive();
-                }
-                break;
-            }
-            case TX: {
-                hasInterrupt = IDLE;
-
-                if (isSending()) {
-                    completeSending();
-                }
+void Radio::processInterruptTask() {
+    while (true) {
+        switch (getAndClearIrq()) {
+            case RxTimeout:
                 startReceive();
                 break;
-            }
+            case CadDetected:
+                // TODO relancer la detection
+                break;
+            case CadDone:
+                // TODO envoyer
+                break;
+            case RxDone:
+                startReceive();
+                break;
+            case TxDone:
+                startReceive();
+                break;
+            case CrcError:
+                startReceive();
+                break;
+            case Pending:
             default:
+                // TODO error
                 break;
         }
     }
-
-    if (!txQueue.isEmpty() && radioStatus != TX) {
-        if (wantToSend) {
-            if (timerNextTx.hasExpired()) {
-                wantToSend = false;
-
-                if (!canSendImmediately() || isChannelActive()) {
-                    Log.traceln(F("[LORA_TX] Can't send yet"));
-                    startReceive();
-                } else {
-                    const auto [payload, size] = txQueue.getHead();
-                    if (startSend(payload, size)) {
-                        txQueue.dequeue();
-                    }
-                }
-            }
-        } else {
-            wantToSend = true;
-            timerNextTx.setInterval(getTxDelayMsec());
-
-            Log.infoln(F("[LORA_TX] Next send in %d ms. %d remaining"), timerNextTx.getTimeLeft(), txQueue.itemCount());
-        }
-    }
-
-    if (!rxQueue.isEmpty()) {
-        const auto [payload, size, rssi, snr] = rxQueue.dequeue();
-        system->communication.received(payload, size, rssi, snr);
-    }
-
-    return true;
 }
 
-bool Radio::isChannelActive() {
-    Log.traceln(F("[LORA] Test channel is active"));
+void Radio::receiveTask() {
+    LoRaReceived pkt;
 
-    lora.standby();
-
-    const auto result = lora.scanChannel();
-    if (result == RADIOLIB_LORA_DETECTED) {
-        Log.warningln(F("[LORA] Channel is already active"));
-        return true;
-    }
-
-    if (result != RADIOLIB_CHANNEL_FREE) {
-        Log.errorln(F("[LORA] Error during test channel free: %d"), result);
-    } else {
-        Log.traceln(F("[LORA] Channel is free"));
-    }
-
-    return false;
-}
-
-bool Radio::canSendImmediately() {
-    // We wait _if_ we are partially though receiving a packet (rather than just merely waiting for one).
-    // To do otherwise would be doubly bad because not only would we drop the packet that was on the way in,
-    // we almost certainly guarantee no one outside will like the packet we are sending.
-    const bool isActivelyReceiving = receiveDetected(lora.getIrqFlags(), RADIOLIB_SX126X_IRQ_HEADER_VALID, RADIOLIB_SX126X_IRQ_PREAMBLE_DETECTED);
-    const bool busyRx = isReceiving() && isActivelyReceiving;
-
-    if (isSending() || busyRx) {
-        if (isSending()) {
-            Log.warningln("[LORA_TX] Can not send yet, busyTx");
-        }
-        // If we've been trying to send the same packet more than one minute and we haven't gotten a
-        // TX IRQ from the radio, the radio is probably broken.
-        if (isSending() && !isWithinTimespanMs(lastTxStart, 60000)) {
-            Log.errorln("[LORA_TX] Hardware Failure! busyTx for more than 60s, so reboot");
-            system->planReboot();
-            return false;
-        }
-        if (busyRx) {
-            Log.warningln("[LORA_TX] Can not send yet, busyRx");
-        }
-        return false;
-    }
-
-    return true;
-}
-
-void Radio::completeSending() {
-    if (isSending()) {
-        Log.infoln(F("[LORA_TX] End. %d remaining"), txQueue.itemCount());
-        radioStatus = IDLE;
-        nbTx++;
-
-        if (system->watchdogSlaveLoraTxThread->enabled) {
-            system->watchdogSlaveLoraTxThread->feed();
+    while (true) {
+        if (xQueueReceive(rxQueue, &pkt, portMAX_DELAY) == pdTRUE) {
+            // TODO décodage APRS
         }
     }
 }
+
+void Radio::transmitTask() {
+    LoRaTransmit pkt;
+
+    while (true) {
+        if (xQueueReceive(txDone, &pkt, portMAX_DELAY) == pdTRUE) {
+        }
+    }
+}
+
+// void Radio::processTxQueue() {
+//     while (true) {
+//     if (uxQueueMessagesWaiting(txQueue) > 0 && radioStatus != TX) {
+//         if (wantToSend) {
+//             if (timerNextTx.hasExpired()) {
+//                 wantToSend = false;
+//
+//                 if (!canSendImmediately() || isChannelActive()) {
+//                     Log.traceln(F("[LORA_TX] Can't send yet"));
+//                     startReceive();
+//                 } else {
+//                     LoRaTransmit loraTransmit;
+//                     if (xQueuePeek(txQueue, &loraTransmit, 0) == pdTRUE) {
+//                         if (startSend(loraTransmit.payload, loraTransmit.size)) {
+//                             // Remove from queue after successful start
+//                             xQueueReceive(txQueue, &loraTransmit, 0);
+//                         }
+//                     }
+//                 }
+//             }
+//         } else {
+//             wantToSend = true;
+//             timerNextTx.setInterval(getTxDelayMsec());
+//
+//             Log.infoln(F("[LORA_TX] Next send in %d ms. %d remaining"), timerNextTx.getTimeLeft(), uxQueueMessagesWaiting(txQueue));
+//         }
+//     }
+// }
 
 bool Radio::startSend(const uint8_t *payload, uint16_t size) {
     Log.infoln(F("[LORA_TX] Will TX size %d => %s"), size, payload);
@@ -262,8 +226,6 @@ bool Radio::startSend(const uint8_t *payload, uint16_t size) {
         return false;
     }
 
-    lora.setDio1Action(onISR);
-    lastTxStart = millis();
     Log.infoln(F("[LORA_TX] Start sending"));
 
     return true;
@@ -294,7 +256,7 @@ bool Radio::send(const uint8_t *payload, const size_t size) {
     return true;
 #endif
 
-    if (txQueue.isFull()) {
+    if (uxQueueSpacesAvailable(txQueue) == 0) {
         Log.warningln(F("[LORA_TX] Queue is full"));
         return false;
     }
@@ -304,12 +266,12 @@ bool Radio::send(const uint8_t *payload, const size_t size) {
     memcpy(loraTransmit.payload, payload, size);
     loraTransmit.size = size;
 
-    if (!txQueue.enqueue(loraTransmit)) {
+    if (xQueueSend(txQueue, &loraTransmit, 0) != pdTRUE) {
         Log.errorln(F("[LORA_TX] Impossible to enqueue"));
         return false;
     }
 
-    Log.infoln(F("[LORA_TX] %d in TX queue"), txQueue.itemCount());
+    Log.infoln(F("[LORA_TX] %d in TX queue"), uxQueueMessagesWaiting(txQueue));
 
     return true;
 }
@@ -327,9 +289,12 @@ bool Radio::startReceive() {
         return false;
     }
 
-    radioStatus = RX;
+    if (xSemaphoreTake(statusMutex, portMAX_DELAY) == pdTRUE) {
+        radioStatus = RX;
+        xSemaphoreGive(statusMutex);
+    }
     // Must be done AFTER, starting transmit, because startTransmit clears (possibly stale) interrupt pending register bits
-    lora.setDio1Action(setHasRxInterrupt);
+    // lora.setDio1Action(onISR);
 
     Log.traceln(F("[LORA] Start receive OK"));
 
@@ -346,33 +311,45 @@ bool Radio::setStandby() {
     }
 
     radioStatus = IDLE; // If we were receiving, not any more
-    activeReceiveStart = 0;
-
-    lora.clearDio1Action();
-    completeSending();
 
     return true;
 }
 
-bool Radio::receiveDetected(const uint16_t irq, const ulong syncWordHeaderValidFlag, const ulong preambleDetectedFlag) {
-    const bool detected = irq & (syncWordHeaderValidFlag | preambleDetectedFlag);
-    // Handle false detections
-    if (detected) {
-        if (!activeReceiveStart) {
-            activeReceiveStart = millis();
-        } else if (!isWithinTimespanMs(activeReceiveStart, 2 * preambleTimeMsec) && !(irq & syncWordHeaderValidFlag)) {
-            // The HEADER_VALID flag should be set by now if it was really a packet, so ignore PREAMBLE_DETECTED flag
-            activeReceiveStart = 0;
-            Log.noticeln("[LORA_RX] Ignore false preamble detection");
-            return false;
-        } else if (!isWithinTimespanMs(activeReceiveStart, maxPacketTimeMsec)) {
-            // We should have gotten an RX_DONE IRQ by now if it was really a packet, so ignore HEADER_VALID flag
-            activeReceiveStart = 0;
-            Log.noticeln("[LORA_RX] Ignore false header detection");
-            return false;
-        }
+InterruptType Radio::getAndClearIrq() {
+    const auto flags = lora.getIrqFlags();
+
+    if (flags & RADIOLIB_IRQ_CAD_DETECTED) {
+        lora.clearIrqFlags(RADIOLIB_IRQ_CAD_DETECTED);
+        return CadDetected;
     }
-    return detected;
+
+    if (flags & RADIOLIB_IRQ_CAD_DONE) {
+        lora.clearIrqFlags(RADIOLIB_IRQ_CAD_DONE);
+        return CadDone;
+    }
+
+    if (flags & RADIOLIB_IRQ_RX_DONE) {
+        lora.clearIrqFlags(RADIOLIB_IRQ_RX_DONE);
+        return RxDone;
+    }
+
+    if (flags & RADIOLIB_IRQ_TX_DONE) {
+        lora.clearIrqFlags(RADIOLIB_IRQ_TX_DONE);
+        return TxDone;
+    }
+
+    if (flags & RADIOLIB_IRQ_TIMEOUT) {
+        lora.clearIrqFlags(RADIOLIB_IRQ_TIMEOUT);
+        return RxTimeout;
+    }
+
+    if (flags & RADIOLIB_IRQ_CRC_ERR) {
+        lora.clearIrqFlags(RADIOLIB_IRQ_CRC_ERR);
+        return CrcError;
+    }
+
+    // Error !
+    return Pending;
 }
 
 /** The delay to use when we want to send something */
@@ -405,7 +382,8 @@ bool Radio::handleReceived() {
         Log.verboseln(F("[LORA_RX] Payload[%d]=%X %c"), i, buffer[i], buffer[i]);
     }
 
-    if (state != RADIOLIB_ERR_NONE || size < 15) { // APRS Frame are always >= 15
+    if (state != RADIOLIB_ERR_NONE || size < 15) {
+        // APRS Frame are always >= 15
         Log.warningln(F("[LORA_RX] Wrong packet received, error (%d)"), state);
         return false;
     }
@@ -417,12 +395,12 @@ bool Radio::handleReceived() {
     return true;
 #endif
 
-    if (rxQueue.isEmpty()) {
+    if (uxQueueMessagesWaiting(rxQueue) == 0) {
         system->communication.received(buffer, size, rssi, snr);
         return true;
     }
 
-    if (rxQueue.isFull()) {
+    if (uxQueueSpacesAvailable(rxQueue) == 0) {
         Log.warningln(F("[LORA_RX] Queue full. Ignore packet"));
         return false;
     }
@@ -434,12 +412,12 @@ bool Radio::handleReceived() {
     loraReceived.rssi = rssi;
     loraReceived.snr = snr;
 
-    if (!rxQueue.enqueue(loraReceived)) {
+    if (xQueueSend(rxQueue, &loraReceived, 0) != pdTRUE) {
         Log.errorln(F("[LORA_RX] Impossible to enqueue"));
         return false;
     }
 
-    Log.infoln(F("[LORA_RX] %d packet in RX queue"), rxQueue.itemCount());
+    Log.infoln(F("[LORA_RX] %d packet in RX queue"), uxQueueMessagesWaiting(rxQueue));
 
     return true;
 }
@@ -450,13 +428,11 @@ bool Radio::handleReceived() {
   - Tx/Rx turnaround time (maximum of SX126x and SX127x);
   - MAC processing time (measured on T-beam) */
 uint32_t Radio::computeSlotTimeMsec(const float bw, const uint8_t sf) {
-    constexpr float sumPropagationTurnaroundMACTime = 0.2 + 0.4 + 7; // in milliseconds
-    const float symbolTime = pow(2, sf) / bw;                    // in milliseconds
-
+    const float symbolTime = pow(2, sf) / bw; // in milliseconds
     // CAD duration for SX127x is max. 2.25 symbols, for SX126x it is number of symbols + 0.5 symbol
     // Number of symbols used for CAD, 2 is the default since RadioLib 6.3.0 as per AN1200.48
     constexpr auto NUM_SYM_CAD = 2;
-    return max(2.25, NUM_SYM_CAD + 0.5) * symbolTime + sumPropagationTurnaroundMACTime;
+    return max(2.25, NUM_SYM_CAD + 0.5) * symbolTime;
 }
 
 /**
@@ -466,7 +442,8 @@ uint32_t Radio::computeSlotTimeMsec(const float bw, const uint8_t sf) {
  *
  * @return num msecs for the packet
  */
-uint32_t Radio::getPacketTime(const float bw, const uint8_t sf, const uint8_t cr, const uint16_t preambleLength, const uint32_t packetSize) {
+uint32_t Radio::getPacketTime(const float bw, const uint8_t sf, const uint8_t cr, const uint16_t preambleLength,
+                              const uint32_t packetSize) {
     const float bandwidthHz = bw * 1000.0f;
     constexpr bool headDisable = false; // we currently always use the header
     const float tSym = (1 << sf) / bandwidthHz;
@@ -475,11 +452,28 @@ uint32_t Radio::getPacketTime(const float bw, const uint8_t sf, const uint8_t cr
 
     const float tPreamble = (preambleLength + 4.25f) * tSym;
     const float numPayloadSym =
-        8 + max(ceilf(((8.0f * packetSize - 4 * sf + 28 + 16 - 20 * headDisable) / (4 * (sf - 2 * lowDataOptEn))) * cr), 0.0f);
+            8 + max(
+                ceilf(((8.0f * packetSize - 4 * sf + 28 + 16 - 20 * headDisable) / (4 * (sf - 2 * lowDataOptEn))) * cr),
+                0.0f);
     const float tPayload = numPayloadSym * tSym;
     const float tPacket = tPreamble + tPayload;
 
     const uint32_t msecs = tPacket * 1000;
 
     return msecs;
+}
+
+extern "C" void Radio::taskProcessInterruptRun(void *params) {
+    const auto radio = static_cast<Radio *>(params);
+    radio->processInterruptTask();
+}
+
+extern "C" void Radio::taskReceiveRun(void *params) {
+    const auto radio = static_cast<Radio *>(params);
+    radio->receiveTask();
+}
+
+extern "C" void Radio::taskTransmitRun(void *params) {
+    const auto radio = static_cast<Radio *>(params);
+    radio->transmitTask();
 }

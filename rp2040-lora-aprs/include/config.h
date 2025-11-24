@@ -15,7 +15,7 @@
 #define LORA_QUEUE_RX_SIZE 20
 #define LORA_QUEUE_TX_SIZE 20
 #define LORA_PREAMBLE_LENGTH 8
-#define TRX_BUFFER 253 // 256 - 3 because 3 bytes for LoRa APRS
+#define TRX_BUFFER 256
 
 #define SETTINGS_VERSION 1
 #define DISABLE_SLOW_CLOCK false
