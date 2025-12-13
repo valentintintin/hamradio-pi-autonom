@@ -22,7 +22,7 @@
 #include "Threads/Send/SendStatusThread.h"
 #include "Threads/Send/SendTelemetriesThread.h"
 
-#include "Settings.h"
+#include "settings.h"
 #include "Threads/Send/MeshtasticSendAprsThread.h"
 #include "Threads/Send/LinuxSendAprsThread.h"
 

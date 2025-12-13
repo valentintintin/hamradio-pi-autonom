@@ -3,7 +3,7 @@
 
 #include <CommandParser.h>
 #include <GpioPin.h>
-#include <Settings.h>
+#include <settings.h>
 
 class System;
 

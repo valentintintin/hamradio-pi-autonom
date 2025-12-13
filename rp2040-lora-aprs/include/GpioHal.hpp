@@ -10,7 +10,7 @@ public:
     virtual bool get() = 0;
 
     bool toggle();
-protected:
+
     const uint8_t pin;
     const PinMode mode;
     const bool inverted;

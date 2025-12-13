@@ -1,17 +1,25 @@
 #include "../include/RelayController.hpp"
 
-bool RelayController::addRelay(uint8_t id, GpioHal *gpio) {
-    if (nbRelays >= MAX_RELAYS) {
-        // TODO log
-        return false;
+#include <ArduinoLog.h>
+
+RelayController::RelayController(QueueHandle_t *queue) : BaseController(queue), relays{} {
+}
+
+int8_t RelayController::addRelay(GpioHal *gpio) {
+    if (nbRelays >= MAX_GPIO_USED) {
+        Log.errorln(F("Can't add relay, no more space"));
+        return -1;
     }
 
-    relays[nbRelays++] = gpio;
+    Log.infoln(F("Relay pin %d added with id %d"), gpio->pin, nbRelays);
+    relays[nbRelays] = gpio;
 
-    return true;
+    return nbRelays++;
 }
 
 bool RelayController::begin() {
+    Log.infoln(F("Relay begin"));
+
     bool result = false;
 
     for (const auto gpio : relays) {
@@ -27,5 +35,25 @@ bool RelayController::begin() {
     return result;
 }
 
-bool RelayController::processCommand() {
+void RelayController::task(void *pvParameters) {
+    const auto* ctrl = static_cast<RelayController*>(pvParameters);
+    RelayCommand command;
+
+    Log.infoln(F("Relay task started"));
+
+    while (true) {
+        if (xQueueReceive(*ctrl->queue, &command, portMAX_DELAY) == pdTRUE) {
+            Log.infoln(F("RelayController receive message for id %d"), command.id);
+
+            if (command.id >= ctrl->nbRelays) {
+                Log.errorln(F("No relay for id %d"), command.id);
+                continue;
+            }
+
+            const auto relay = ctrl->relays[command.id];
+            relay->set(command.id);
+
+            Log.infoln(F("RelayController message received done for id %d"), command.id);
+        }
+    }
 }

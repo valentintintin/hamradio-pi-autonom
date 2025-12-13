@@ -1,4 +1,4 @@
-#include "Radio.h"
+#include "data/Radio.h"
 
 #include <numeric>
 
@@ -6,7 +6,7 @@
 #include <FreeRTOS.h>
 #include <task.h>
 
-#include "Settings.h"
+#include "data/Settings.h"
 
 volatile RadioState Radio::radioStatus = IDLE;
 QueueHandle_t Radio::irqQueue = xQueueCreate(10, 0);

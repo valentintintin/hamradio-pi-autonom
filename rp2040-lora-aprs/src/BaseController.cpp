@@ -1,4 +1,4 @@
 #include "../include/BaseController.hpp"
 
-BaseController::BaseController(QueueHandle_t queue) : queue(queue) {
+BaseController::BaseController(QueueHandle_t *queue) : queue(queue) {
 }

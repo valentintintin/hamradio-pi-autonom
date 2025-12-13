@@ -1,6 +1,6 @@
-#ifndef RP2040_LORA_APRS_CONFIG_H
-#define RP2040_LORA_APRS_CONFIG_H
+#pragma once
 
+#define MAX_GPIO_USED 16
 #define BUFFER_LENGTH 255
 
 #define LORA_SCK 14  // GPIO14
@@ -37,12 +37,6 @@
 #define CC1101_RECEIVER_IRQ 99
 #define CC1101_RECEIVER_GPIO 99
 #define WH65B_MAX_PAYLOAD_LENGTH 27
-
-extern char bufferText[BUFFER_LENGTH + 1];
-extern uint8_t buffer[BUFFER_LENGTH + 1];
-
-#endif
-
 
 /*
  * Arduino log : format
