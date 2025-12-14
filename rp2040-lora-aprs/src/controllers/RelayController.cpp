@@ -1,4 +1,4 @@
-#include "../include/RelayController.hpp"
+#include "controllers/RelayController.hpp"
 
 #include <ArduinoLog.h>
 
@@ -30,7 +30,7 @@ bool RelayController::begin() {
         result &= gpio->init();
     }
 
-    xTaskCreate(task, "RelayTask", 1024, this, 1, nullptr);
+    xTaskCreate(task, "RelayTask", configMINIMAL_STACK_SIZE, this, tskIDLE_PRIORITY, nullptr);
 
     return result;
 }
@@ -51,7 +51,7 @@ void RelayController::task(void *pvParameters) {
             }
 
             const auto relay = ctrl->relays[command.id];
-            relay->set(command.id);
+            relay->set(command.state);
 
             Log.infoln(F("RelayController message received done for id %d"), command.id);
         }

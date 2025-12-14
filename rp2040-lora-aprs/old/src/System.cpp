@@ -15,7 +15,7 @@
 #include "Threads/BlinkerThread.h"
 
 #include "I2CSlave.h"
-#include "utils.h"
+#include "../../include/utils/utils.h"
 #include "PicoSleep.h"
 
 System::System() : communication(this), radio(this), command(this) {

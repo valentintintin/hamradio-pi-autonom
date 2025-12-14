@@ -1,7 +1,7 @@
 #ifndef RP2040_LORA_APRS_WATCHDOGTHREAD_H
 #define RP2040_LORA_APRS_WATCHDOGTHREAD_H
 
-#include <utils.h>
+#include <../../../include/utils/utils.h>
 
 #include "MyThread.h"
 

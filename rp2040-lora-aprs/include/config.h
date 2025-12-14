@@ -1,7 +1,7 @@
 #pragma once
 
 #define MAX_GPIO_USED 16
-#define BUFFER_LENGTH 255
+#define BUFFER_LENGTH 256
 
 #define LORA_SCK 14  // GPIO14
 #define LORA_MISO 24 // GPIO24

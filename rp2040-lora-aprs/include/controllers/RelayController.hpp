@@ -2,7 +2,7 @@
 #include <Arduino.h>
 
 #include "BaseController.hpp"
-#include "GpioHal.hpp"
+#include "hal/GpioHal.hpp"
 #include "config.h"
 
 struct RelayCommand {

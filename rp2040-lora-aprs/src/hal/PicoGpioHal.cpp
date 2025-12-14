@@ -1,4 +1,4 @@
-#include "../include/PicoGpioHal.hpp"
+#include "hal/PicoGpioHal.hpp"
 
 #include <ArduinoLog.h>
 

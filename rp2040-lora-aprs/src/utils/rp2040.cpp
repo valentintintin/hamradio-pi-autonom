@@ -1,4 +1,4 @@
-#include "rp2040.h"
+#include "utils/rp2040.h"
 
 #include <hardware/clocks.h>
 #include <hardware/pll.h>
