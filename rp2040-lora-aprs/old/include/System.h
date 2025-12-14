@@ -50,7 +50,6 @@ public:
 
     GpioPin* getGpio(uint8_t pin);
     GpioPin* getGpio(const char* name);
-    DateTime getDateTime() const;
 
     inline bool hasError() const {
         return rtcHasError || radio.hasError() || weatherThread->hasError() || energyThread->hasError();

@@ -16,6 +16,7 @@ public:
 
     int8_t addRelay(GpioHal* gpio);
     bool begin() override;
+    bool changeState(uint8_t id, bool state) const;
 
     static void task(void *pvParameters);
 private:

@@ -1,11 +1,14 @@
 #include "utils/rp2040.h"
 
+#include <RP2040Support.h>
 #include <hardware/clocks.h>
 #include <hardware/pll.h>
 #include <hardware/rtc.h>
 #include <hardware/vreg.h>
 
-#include "PicoSleep.h"
+#include <PicoSleep.h>
+#include <FreeRTOS.h>
+#include <timers.h>
 
 void setSlowClock() {
     /* Set the system frequency to 18 MHz. */
@@ -34,4 +37,12 @@ void setTimeToInternalRtc(const time_t epoch) {
     datetime_t datetime;
     epoch_to_datetime(epoch, &datetime);
     rtc_set_datetime(&datetime);
+}
+
+void rebootTask(TimerHandle_t xTimer) {
+    rp2040.reboot();
+}
+
+void dfuTask(TimerHandle_t xTimer) {
+    rp2040.rebootToBootloader();
 }

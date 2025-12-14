@@ -35,6 +35,14 @@ bool RelayController::begin() {
     return result;
 }
 
+bool RelayController::changeState(const uint8_t id, const bool state) const {
+    const RelayCommand command = {
+        .id = id,
+        .state = state
+    };
+    return xQueueSend(*queue, &command, 0) == pdTRUE;
+}
+
 void RelayController::task(void *pvParameters) {
     const auto* ctrl = static_cast<RelayController*>(pvParameters);
     RelayCommand command;
