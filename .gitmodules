@@ -7,3 +7,15 @@
 [submodule "rp2040-lora-aprs/lib/SimpleLibTimer"]
 	path = rp2040-lora-aprs/lib/SimpleLibTimer
 	url = git@github.com:valentintintin/SimpleLibTimer.git
+[submodule "rp2040-lora-aprs/libaprs"]
+	path = rp2040-lora-aprs/libaprs
+	url = https://github.com/iontodirel/libaprs.git
+[submodule "rp2040-lora-aprs/lib/libaprs"]
+	path = rp2040-lora-aprs/lib/libaprs
+	url = https://github.com/iontodirel/libaprs.git
+[submodule "rp2040-lora-aprs/lib/MeshCore"]
+	path = rp2040-lora-aprs/lib/MeshCore
+	url = https://github.com/meshcore-dev/MeshCore.git
+[submodule "rp2040-lora-aprs/lib/nanopb"]
+	path = rp2040-lora-aprs/lib/nanopb
+	url = https://github.com/nanopb/nanopb.git
