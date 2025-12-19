@@ -20,14 +20,11 @@
 #include "config.h"
 #include "controllers/CommandController.hpp"
 
-bool processCommand(Stream* stream, const char *command);
-
 char bufferText[BUFFER_LENGTH];
 Settings settings;
 
 QueueHandle_t queueRelay = xQueueCreate(2, sizeof(RelayCommand));
 RelayController relayController(&queueRelay);
-
 CommandController commandController(&relayController);
 
 void heartBeatTask(void *pvParameters) {
@@ -146,4 +143,16 @@ void setup() {
 }
 
 void loop() {
+    // digitalWrite(LED_BUILTIN, HIGH);
+    // delay(500);
+    // digitalWrite(LED_BUILTIN, LOW);
+    // delay(500);
+    //
+    // Serial.println(">");
+    //
+    // while (Serial.available()) {
+    //     Serial.write(Serial.read());
+    // }
+    //
+    // delay(100);
 }

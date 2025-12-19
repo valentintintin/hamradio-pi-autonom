@@ -3,6 +3,8 @@
 #include <ctime>
 #include <hardware/rtc.h>
 
+#include "DS3231.h"
+
 void getDateTimeStringFromEpoch(const uint64_t epoch, char* buffer, const size_t size) {
     const time_t epochTimeT = epoch;
     tm ts{};
