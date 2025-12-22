@@ -2,6 +2,7 @@
 
 #include <ArduinoLog.h>
 #include <LittleFS.h>
+#include <bits/ios_base.h>
 
 bool SettingsManager::begin()
 {
@@ -34,7 +35,7 @@ bool SettingsManager::getSettingFromString(const char* source, char* value, cons
 
         const auto index = parseNameIndex(source, name);
 
-        if (strcmp(settingFn.name, name) == -1)
+        if (strcmp(settingFn.name, name) != 0)
         {
             continue;
         }
@@ -46,63 +47,63 @@ bool SettingsManager::getSettingFromString(const char* source, char* value, cons
         switch (settingFn.type) {
             case Boolean:
                 snprintf(value, lengthValue, "%d", *static_cast<bool *>(pointer));
-            break;
+                return true;
             case Int8:
                 snprintf(value, lengthValue, "%d", *static_cast<int8_t *>(pointer));
-            break;
+                return true;
             case Int16:
                 snprintf(value, lengthValue, "%d", *static_cast<int16_t *>(pointer));
-            break;
+                return true;
             case Int32:
                 snprintf(value, lengthValue, "%ld", *static_cast<int32_t *>(pointer));
-            break;
+                return true;
             case Int64:
                 snprintf(value, lengthValue, "%lld", *static_cast<int64_t *>(pointer));
-            break;
+                return true;
             case UInt8:
                 snprintf(value, lengthValue, "%u", *static_cast<uint8_t *>(pointer));
-            break;
+                return true;
             case UInt16:
                 snprintf(value, lengthValue, "%u", *static_cast<uint16_t *>(pointer));
-            break;
+                return true;
             case UInt32:
                 snprintf(value, lengthValue, "%lu", *static_cast<uint32_t *>(pointer));
-            break;
+                return true;
             case UInt64:
                 snprintf(value, lengthValue, "%llu", *static_cast<uint64_t *>(pointer));
-            break;
+                return true;
             case Char:
                 snprintf(value, lengthValue, "%c", *static_cast<char *>(pointer));
-            break;
+                return true;
             case Float:
                 snprintf(value, lengthValue, "%f", *static_cast<float *>(pointer));
-            break;
+                return true;
             case Double:
                 snprintf(value, lengthValue, "%lf", *static_cast<double *>(pointer));
-            break;
+                return true;
             case CharString:
-                snprintf(value, lengthValue, "%s", *static_cast<char* *>(pointer));
-            break;
+                strncpy(value, static_cast<const char*>(pointer), min(settingFn.maxStringLength, lengthValue));
+                return true;
             default:
                 Log.warningln("Config key found but not readable");
                 strncpy(value, "KO readable", lengthValue);
-                break;
+                return false;
         }
     }
 
     return false;
 }
 
-void* SettingsManager::getSettingsPointer(const SettingsGetSetFunction& settingGetSetFn, const uint32_t index) const
+void* SettingsManager::getSettingsPointer(const SettingsGetSetFunction& settingFn, const uint32_t index) const
 {
-    const auto base = static_cast<uint8_t*>(settingGetSetFn.pointer);
+    const auto base = static_cast<uint8_t*>(settingFn.pointer);
 
-    if (settingGetSetFn.maxSize <= 1)
+    if (settingFn.maxSize <= 1)
     {
         return base;
     }
 
-    return base + settingGetSetFn.offset + index * getElementSize(settingGetSetFn.type);
+    return base + index * settingFn.parentSize;
 }
 
 // bool SettingsManager::setValue(const SettingsGetSetFunction& settingGetSetFn, uint32_t index, const void* value)

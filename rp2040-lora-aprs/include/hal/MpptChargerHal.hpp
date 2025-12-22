@@ -24,9 +24,5 @@ public:
 private:
     bool initialized = false;
     mpptChg charger;
-    QueueHandle_t i2cSemaphore;
-
-    MpptChargerHal();
-    bool takeSemaphore() const;
 };
 

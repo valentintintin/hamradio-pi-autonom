@@ -46,18 +46,22 @@ void serialReceivedTask(void* pvParameters)
 
         if (streamReceived != nullptr)
         {
-            streamReceived->readBytesUntil('\n', bufferText, BUFFER_LENGTH);
+            streamReceived->readBytesUntil('\r', bufferText, BUFFER_LENGTH);
+            while (streamReceived->available())
+            {
+                streamReceived->read();
+            }
 
             Log.infoln("Serial received: %s", bufferText);
 
-            // if (commandController.processCommand(bufferText))
-            // {
-                // Log.infoln("Command parsing OK: %s", commandController.getResponse());
-            // }
-            // else
-            // {
-                // Log.warningln("Command parsing KO: %s", commandController.getResponse());
-            // }
+            if (CommandController::getInstance().processCommand(bufferText))
+            {
+                Log.infoln("Command parsing OK: %s", CommandController::getInstance().getResponse());
+            }
+            else
+            {
+                Log.warningln("Command parsing KO: %s", CommandController::getInstance().getResponse());
+            }
 
             memset(bufferText, 0, BUFFER_LENGTH);
             Log.info(">");
@@ -73,9 +77,11 @@ void setup()
     randomSeed(analogRead(A1));
 
     Serial.begin(115200);
+    Serial.setTimeout(5000);
     Serial1.begin(115200);
+    Serial1.setTimeout(5000);
 
-    Log.begin(LOG_LEVEL_TRACE, &Serial);
+    Log.begin(LOG_LEVEL_VERBOSE, &Serial);
     Log.addHandler(&Serial1);
 
     if (rp2040.getResetReason() == RP2040::WDT_RESET)
@@ -86,6 +92,11 @@ void setup()
         digitalWrite(LED_BUILTIN, LOW);
     }
 
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(500);
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(500);
+
     Log.infoln("Starting");
 
     rtc_init();
@@ -95,7 +106,7 @@ void setup()
 
     if (SettingsManager::getSettings().useSlowClock)
     {
-
+        setSlowClock();
     }
 
     if (const auto now = RTClib::now(); now.year() >= 2025 && now.year() <= 2060)
@@ -111,15 +122,15 @@ void setup()
         Log.warningln("Wrong rtc time !");
     }
 
-    WatchdogController::getInstance().begin();
     RelayController::getInstance().begin();
     SensorController::getInstance().begin();
+    WatchdogController::getInstance().begin();
     I2CSlaveController::getInstance().begin();
     CommandController::getInstance().begin();
 
     if (xTaskCreate(serialReceivedTask, "SerialReceived", configMINIMAL_STACK_SIZE, nullptr, tskIDLE_PRIORITY, nullptr) != pdPASS)
     {
-        Log.errorln("Serial task cr");
+        Log.errorln("Serial task KO");
     }
 }
 

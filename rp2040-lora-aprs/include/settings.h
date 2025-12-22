@@ -143,6 +143,5 @@ typedef struct
     void* pointer{};
     uint32_t maxSize = 1;
     size_t parentSize = 0;
-    size_t offset = 0;
     uint32_t maxStringLength = 0;
 } SettingsGetSetFunction;

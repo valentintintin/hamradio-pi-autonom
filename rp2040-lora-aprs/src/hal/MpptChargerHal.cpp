@@ -2,17 +2,6 @@
 
 #include <ArduinoLog.h>
 
-MpptChargerHal::MpptChargerHal()
-{
-    i2cSemaphore = xSemaphoreCreateBinary();
-    if (i2cSemaphore == nullptr)
-    {
-        Log.errorln("Failed to create I2C semaphore");
-    }
-
-    xSemaphoreGive(i2cSemaphore);
-}
-
 bool MpptChargerHal::begin()
 {
     if (initialized)
@@ -22,7 +11,7 @@ bool MpptChargerHal::begin()
 
     Log.infoln("Init Mppt");
 
-    const auto result = takeSemaphore() && charger.begin();
+    const auto result = charger.begin();
 
     initialized = result;
 
@@ -35,8 +24,6 @@ bool MpptChargerHal::begin()
         Log.warningln("Init Mppt failed");
     }
 
-    xSemaphoreGive(i2cSemaphore);
-
     return result;
 }
 
@@ -44,7 +31,7 @@ bool MpptChargerHal::queryTelemetries(TelemetryPower &telemetryBattery, Telemetr
 {
     Log.infoln("Query Mppt telemetries");
 
-    bool result = begin() && takeSemaphore();
+    bool result = begin();
 
     int16_t tempVariable;
     result &= charger.getIndexedValue(VAL_INT_TEMP, &tempVariable);
@@ -69,8 +56,6 @@ bool MpptChargerHal::queryTelemetries(TelemetryPower &telemetryBattery, Telemetr
         Log.warningln("Query Mppt telemetries failed");
     }
 
-    xSemaphoreGive(i2cSemaphore);
-
     return result;
 }
 
@@ -78,15 +63,13 @@ bool MpptChargerHal::feedDog(const uint16_t powerOff, const uint8_t timeout)
 {
     Log.infoln("Feed Mppt watchdog with power off %d and timeout %d", powerOff, timeout);
 
-    auto result = begin() && takeSemaphore();
+    auto result = begin();
 
     if (result)
     {
         result &= charger.setWatchdogPoweroff(powerOff) && charger.setWatchdogTimeout(timeout);
 
         Log.infoln("Feed Mppt watchdog OK");
-
-        xSemaphoreGive(i2cSemaphore);
     }
     else
     {
@@ -94,16 +77,4 @@ bool MpptChargerHal::feedDog(const uint16_t powerOff, const uint8_t timeout)
     }
 
     return result;
-}
-
-bool MpptChargerHal::takeSemaphore() const
-{
-    if (xSemaphoreTake(i2cSemaphore, pdMS_TO_TICKS(2500)) == pdTRUE)
-    {
-        Log.warningln("Impossible to have I2C semaphore");
-
-        return false;
-    }
-
-    return true;
 }

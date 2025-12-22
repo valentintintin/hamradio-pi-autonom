@@ -2,6 +2,7 @@
 
 #include <ArduinoLog.h>
 
+#include "hal/I2CMasterHal.hpp"
 #include "utils/utils.h"
 
 Telemetry SensorController::telemetry{};
@@ -24,11 +25,28 @@ void SensorController::queryTimer(TimerHandle_t timer)
 
 bool SensorController::begin()
 {
-    return initMpptCharger() || initIna3221() || initBme280() || initBmp280();
+    if (!I2CMasterHal::takeSemaphore())
+    {
+        Log.warningln("Sensor can not begin, can not have semaphore");
+        // TODO retry
+        return false;
+    }
+
+    const auto result = initMpptCharger() || initIna3221() || initBme280() || initBmp280();
+
+    I2CMasterHal::releaseSemaphore();
+
+    return result;
 }
 
 bool SensorController::queryTelemetries()
 {
+    if (!I2CMasterHal::takeSemaphore())
+    {
+        Log.warningln("Sensor can not query, can not have semaphore");
+        return false;
+    }
+
     bool result = false;
 
     telemetry.updatedAt = getDateTime().unixtime();
@@ -109,6 +127,8 @@ bool SensorController::queryTelemetries()
             result = true;
         }
     }
+
+    I2CMasterHal::releaseSemaphore();
 
     return result;
 }

@@ -14,7 +14,9 @@ bool CommandController::begin()
 
 bool CommandController::processCommand(const char* command)
 {
-    if (memcmp(command, "set ", 4) == 0)
+    memset(response, 0, MAX_RESPONSE_LENGTH);
+
+    if (memcmp(command, "get ", 4) == 0)
     {
         const char* configKey = &command[4];
         return SettingsManager::getInstance().getSettingFromString(configKey, response, MAX_RESPONSE_LENGTH);
