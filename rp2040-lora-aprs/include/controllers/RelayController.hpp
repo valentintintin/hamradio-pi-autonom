@@ -5,21 +5,35 @@
 #include "hal/GpioHal.hpp"
 #include "config.h"
 
-struct RelayCommand {
+#include <queue.h>
+
+struct RelayCommand
+{
     uint8_t id;
     bool state;
 };
 
-class RelayController final : public BaseController {
+class RelayController : public BaseController
+{
 public:
-    explicit RelayController(QueueHandle_t *queue);
+    static RelayController& getInstance()
+    {
+        static RelayController instance;
+        return instance;
+    }
 
-    int8_t addRelay(GpioHal* gpio);
     bool begin() override;
+
+    uint8_t loadRelayFromSettings();
     bool changeState(uint8_t id, bool state) const;
 
-    static void task(void *pvParameters);
+    static void task(void* pvParameters);
+
 private:
-    GpioHal* relays[MAX_GPIO_USED];
+    QueueHandle_t queue;
+
+    GpioHal* relays[MAX_GPIO_USED]{};
     uint8_t nbRelays = 0;
+
+    RelayController();
 };

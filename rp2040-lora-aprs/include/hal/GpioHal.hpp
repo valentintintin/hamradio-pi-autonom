@@ -2,7 +2,8 @@
 
 #include <Arduino.h>
 
-class GpioHal {
+class GpioHal
+{
 public:
     GpioHal(uint8_t pin, PinMode mode, bool inverted = false);
     virtual bool init() = 0;

@@ -10,7 +10,8 @@
 #include <FreeRTOS.h>
 #include <timers.h>
 
-void setSlowClock() {
+void setSlowClock()
+{
     /* Set the system frequency to 18 MHz. */
     set_sys_clock_khz(18 * KHZ, false);
     /* The previous line automatically detached clk_peri from clk_sys, and
@@ -33,16 +34,19 @@ void setSlowClock() {
     pll_deinit(pll_usb);
 }
 
-void setTimeToInternalRtc(const time_t epoch) {
+void setTimeToInternalRtc(const time_t epoch)
+{
     datetime_t datetime;
     epoch_to_datetime(epoch, &datetime);
     rtc_set_datetime(&datetime);
 }
 
-void rebootTask(TimerHandle_t xTimer) {
+void rebootTask(TimerHandle_t xTimer)
+{
     rp2040.reboot();
 }
 
-void dfuTask(TimerHandle_t xTimer) {
+void dfuTask(TimerHandle_t xTimer)
+{
     rp2040.rebootToBootloader();
 }

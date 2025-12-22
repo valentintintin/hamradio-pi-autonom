@@ -3,73 +3,112 @@
 #include "utils/utils.h"
 #include "utils/rp2040.h"
 
-#include <FreeRTOS.h>
 #include <timers.h>
 
-const RelayController* CommandController::relayController;
+#include "SettingsManager.hpp"
 
-CommandController::CommandController(const RelayController *relayController) {
-    CommandController::relayController = relayController;
-
-    parser.registerCommand("gpio", "uu", &doGpioOutput);
-    parser.registerCommand("reboot", "", &doRebootOutput);
-    parser.registerCommand("dfu", "", &doDfuOutput);
-    parser.registerCommand("uptime", "", &doUptimeOutput);
-    parser.registerCommand("resetReason", "", &doResetReasonOutput);
-    parser.registerCommand("ping", "", &doPingOutput);
+bool CommandController::begin()
+{
+    return true;
 }
 
-bool CommandController::processCommand(const char *command) {
-    return parser.processCommand(command, response);
+bool CommandController::processCommand(const char* command)
+{
+    if (memcmp(command, "set ", 4) == 0)
+    {
+        const char* configKey = &command[4];
+        return SettingsManager::getInstance().getSettingFromString(configKey, response, MAX_RESPONSE_LENGTH);
+    }
+
+    if (memcmp(command, "gpio ", 5) == 0)
+    {
+        if (memcmp(&command[5], "on ", 3) == 0)
+        {
+            const auto pin = strtol(&command[5 + 3], nullptr, 10);
+            return doGpioOutput(pin, true);
+        }
+
+        if (memcmp(&command[5], "off ", 4) == 0)
+        {
+            const auto pin = strtol(&command[5 + 4], nullptr, 10);
+            return doGpioOutput(pin, false);
+        }
+    }
+
+    return false;
 }
 
-const char* CommandController::getResponse() const {
+const char* CommandController::getResponse() const
+{
     return response;
 }
 
-void CommandController::doRebootOutput(MyCommandParser::Argument *args, char *response) {
-    const TimerHandle_t timer = xTimerCreate("timerReboot", pdMS_TO_TICKS(10000), pdTRUE, nullptr, rebootTask);
+bool CommandController::doRebootOutput()
+{
+    TimerHandle_t timer = xTimerCreate("timerReboot", pdMS_TO_TICKS(10000), pdFALSE, nullptr, rebootTask);
 
-    if (xTimerStart(timer, 0) == pdPASS) {
-        strncpy(response, "Reboot in 10s !", MyCommandParser::MAX_RESPONSE_SIZE);
-    } else {
-        strncpy(response, "Reboot !", MyCommandParser::MAX_RESPONSE_SIZE);
+    if (xTimerStart(timer, 0) == pdPASS)
+    {
+        strncpy(response, "Reboot in 10s !", MAX_RESPONSE_LENGTH);
+    }
+    else
+    {
+        strncpy(response, "Reboot !", MAX_RESPONSE_LENGTH);
         rebootTask(timer);
     }
+
+    return true;
 }
 
-void CommandController::doDfuOutput(MyCommandParser::Argument *args, char *response) {
-    const TimerHandle_t timer = xTimerCreate("timerDfu", pdMS_TO_TICKS(10000), pdTRUE, nullptr, dfuTask);
+bool CommandController::doDfuOutput()
+{
+    TimerHandle_t timer = xTimerCreate("timerDfu", pdMS_TO_TICKS(10000), pdFALSE, nullptr, dfuTask);
 
-    if (xTimerStart(timer, 0) == pdPASS) {
-        strncpy(response, "DFU in 10s !", MyCommandParser::MAX_RESPONSE_SIZE);
-    } else {
-        strncpy(response, "DFU !", MyCommandParser::MAX_RESPONSE_SIZE);
+    if (xTimerStart(timer, 0) == pdPASS)
+    {
+        strncpy(response, "DFU in 10s !", MAX_RESPONSE_LENGTH);
+    }
+    else
+    {
+        strncpy(response, "DFU !", MAX_RESPONSE_LENGTH);
         dfuTask(timer);
     }
+
+    return true;
 }
 
-void CommandController::doGpioOutput(MyCommandParser::Argument *args, char *response) {
-    const auto id = static_cast<uint8_t>(args[0].asUInt64);
-    const auto state = args[1].asUInt64 == 1;
+bool CommandController::doGpioOutput(const uint8_t id, const bool state)
+{
+    if (RelayController::getInstance().changeState(id, state))
+    {
+        snprintf(response, MAX_RESPONSE_LENGTH, "OK. GPIO %d is %d", id, state);
 
-    if (relayController->changeState(id, state)) {
-        snprintf(response, MyCommandParser::MAX_RESPONSE_SIZE, "OK. GPIO %d is %d", id, state);
-    } else {
-        snprintf(response, MyCommandParser::MAX_RESPONSE_SIZE, "KO");
+        return true;
     }
+
+    snprintf(response, MAX_RESPONSE_LENGTH, "KO");
+    return false;
 }
 
-void CommandController::doResetReasonOutput(MyCommandParser::Argument *args, char *response) {
-    snprintf(response, MyCommandParser::MAX_RESPONSE_SIZE, "Reset reason: %d", rp2040.getResetReason());
+bool CommandController::doResetReasonOutput()
+{
+    snprintf(response, MAX_RESPONSE_LENGTH, "Reset reason: %d", rp2040.getResetReason());
+
+    return true;
 }
 
-void CommandController::doUptimeOutput(MyCommandParser::Argument *args, char *response) {
-    snprintf(response, MyCommandParser::MAX_RESPONSE_SIZE, "%lu seconds", millis() / 1000);
+bool CommandController::doUptimeOutput()
+{
+    snprintf(response, MAX_RESPONSE_LENGTH, "%lu seconds", millis() / 1000);
+
+    return true;
 }
 
-void CommandController::doPingOutput(MyCommandParser::Argument *args, char *response) {
+bool CommandController::doPingOutput()
+{
     char dateString[64];
     getDateTimeStringFromEpoch(getDateTime().unixtime(), dateString, 64);
-    snprintf(response, MyCommandParser::MAX_RESPONSE_SIZE, "Pong!\n%s", dateString);
+    snprintf(response, MAX_RESPONSE_LENGTH, "Pong!\n%s", dateString);
+
+    return true;
 }

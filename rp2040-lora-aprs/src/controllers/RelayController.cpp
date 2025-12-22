@@ -2,58 +2,97 @@
 
 #include <ArduinoLog.h>
 
-RelayController::RelayController(QueueHandle_t *queue) : BaseController(queue), relays{} {
-}
+#include "SettingsManager.hpp"
+#include "hal/PicoGpioHal.hpp"
 
-int8_t RelayController::addRelay(GpioHal *gpio) {
-    if (nbRelays >= MAX_GPIO_USED) {
-        Log.errorln(F("Can't add relay, no more space"));
-        return -1;
+RelayController::RelayController() : relays{}
+{
+    queue = xQueueCreate(2, sizeof(RelayCommand));
+
+    if (queue == nullptr)
+    {
+        Log.errorln(F("Relay Queue creation failed"));
     }
-
-    Log.infoln(F("Relay pin %d added with id %d"), gpio->pin, nbRelays);
-    relays[nbRelays] = gpio;
-
-    return nbRelays++;
 }
 
-bool RelayController::begin() {
+bool RelayController::begin()
+{
     Log.infoln(F("Relay begin"));
 
-    bool result = false;
+    const bool result = loadRelayFromSettings() > 0;
 
-    for (const auto gpio : relays) {
-        if (gpio == nullptr) {
-            continue;
-        }
-
-        result &= gpio->init();
+    if (xTaskCreate(task, "RelayTask", configMINIMAL_STACK_SIZE, this, tskIDLE_PRIORITY, nullptr) != pdPASS)
+    {
+        Log.errorln("Relay task creation failed");
     }
-
-    xTaskCreate(task, "RelayTask", configMINIMAL_STACK_SIZE, this, tskIDLE_PRIORITY, nullptr);
 
     return result;
 }
 
-bool RelayController::changeState(const uint8_t id, const bool state) const {
+uint8_t RelayController::loadRelayFromSettings()
+{
+    for (const auto pin : SettingsManager::getSettings().pins)
+    {
+        if (pin.i2cAddress == 0)
+        {
+            const auto gpio = new PicoGpioHal(pin.pin, pin.mode, pin.inverted);
+
+            relays[nbRelays] = gpio;
+
+            Log.infoln(F("Relay pin %d added with id %d"), gpio->pin, nbRelays);
+
+            if (!gpio->init())
+            {
+                Log.warningln(F("Relay pin %d added with id %d failed to init"), gpio->pin, nbRelays);
+            }
+
+            nbRelays++;
+
+            if (nbRelays >= MAX_GPIO_USED)
+            {
+                Log.warningln("Max relay reached %d", nbRelays);
+                break;
+            }
+        }
+    }
+
+    return nbRelays;
+}
+
+bool RelayController::changeState(const uint8_t id, const bool state) const
+{
     const RelayCommand command = {
         .id = id,
         .state = state
     };
-    return xQueueSend(*queue, &command, 0) == pdTRUE;
+
+    if (xQueueSend(queue, &command, 0) != pdTRUE)
+    {
+        Log.warningln("Relay queue send failed for id %d", id);
+
+        return false;
+    }
+
+    Log.infoln("Relay queue send OK for id %d", id);
+
+    return true;
 }
 
-void RelayController::task(void *pvParameters) {
+void RelayController::task(void* pvParameters)
+{
+    Log.infoln(F("Relay task started"));
+
     const auto* ctrl = static_cast<RelayController*>(pvParameters);
     RelayCommand command;
 
-    Log.infoln(F("Relay task started"));
-
-    while (true) {
-        if (xQueueReceive(*ctrl->queue, &command, portMAX_DELAY) == pdTRUE) {
+    while (true)
+    {
+        if (xQueueReceive(ctrl->queue, &command, portMAX_DELAY) == pdTRUE)
+        {
             Log.infoln(F("RelayController receive message for id %d"), command.id);
 
-            if (command.id >= ctrl->nbRelays) {
+            if (command.id >= ctrl->nbRelays)
+            {
                 Log.errorln(F("No relay for id %d"), command.id);
                 continue;
             }

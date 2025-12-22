@@ -6,7 +6,10 @@
 
 #define NB_SETTINGS 82
 
-enum SettingsType { Boolean, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Char, Float, Double, CharString };
+enum SettingsType
+{
+    Boolean, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Char, Float, Double, CharString
+};
 
 // typedef struct {
 //     float frequency = 433.775;
@@ -73,11 +76,12 @@ enum SettingsType { Boolean, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, U
 // } SettingsEnergy;
 
 // typedef struct {
-    // bool enabled = true;
-    // uint8_t address = 0x11;
+// bool enabled = true;
+// uint8_t address = 0x11;
 // } SettingsI2CSlave;
 
-typedef struct {
+typedef struct
+{
     pin_size_t pin = 0;
     PinMode mode = OUTPUT;
     bool inverted = false;
@@ -100,17 +104,17 @@ typedef struct {
 //     uint16_t altitude = 0;
 // } SettingsWatchdogAndAprsItem;
 
-typedef struct {
+typedef struct
+{
     bool enabled = false;
 } SettingsRtc;
 
-typedef struct {
+typedef struct
+{
     uint16_t version = SETTINGS_VERSION;
-    bool useInternalWatchdog = true;
     bool useSlowClock = false;
 
     SettingsPin pins[MAX_GPIO_USED]{};
-    SettingsRtc rtc{};
     // SettingsLoRa lora{};
     // SettingsAprs aprs{};
     // SettingsEnergy energy{};
@@ -122,18 +126,23 @@ typedef struct {
 } Settings;
 
 // typedef struct {
-    // char callsign[CALLSIGN_LENGTH + 1]{};
-    // time_t time = 0;
-    // float rssi = 0;
-    // float snr = 0;
-    // char content[MAX_PACKET_LENGTH + 1]{};
-    // uint64_t count = 0;
-    // char digipeaterCallsign[CALLSIGN_LENGTH + 1]{};
-    // uint8_t digipeaterCount = 0;
+// char callsign[CALLSIGN_LENGTH + 1]{};
+// time_t time = 0;
+// float rssi = 0;
+// float snr = 0;
+// char content[MAX_PACKET_LENGTH + 1]{};
+// uint64_t count = 0;
+// char digipeaterCallsign[CALLSIGN_LENGTH + 1]{};
+// uint8_t digipeaterCount = 0;
 // } SettingsAprsCallsignHeard;
 
-// typedef struct {
-    // char name[32 + 1]{};
-    // SettingsType type = UInt8;
-    // void* pointer{};
-// } SettingsGetSetFunction;
+typedef struct
+{
+    char name[32 + 1]{};
+    SettingsType type = UInt8;
+    void* pointer{};
+    uint32_t maxSize = 1;
+    size_t parentSize = 0;
+    size_t offset = 0;
+    uint32_t maxStringLength = 0;
+} SettingsGetSetFunction;
