@@ -1,3 +1,4 @@
+/*
 #pragma once
 
 #include <helpers/sensors/EnvironmentSensorManager.h>
@@ -11,3 +12,4 @@ public:
 
     SensorController* sensorController;
 };
+*/

@@ -27,11 +27,11 @@ void SettingsManager::loadDefaults()
     strcpy(settings.pins[i++].name, "msh");
 }
 
-bool SettingsManager::getSettingFromString(const char* source, char* value, const size_t lengthValue)
+bool SettingsManager::getSettingFromString(const char* source, char* valueOut, const size_t lengthValueOut)
 {
     for (const auto& settingFn : settingsGetSetFunctions)
     {
-        char name[32 + 1]{};
+        char name[NAME_SETTING_LENGTH + 1]{};
 
         const auto index = parseNameIndex(source, name);
 
@@ -44,50 +44,118 @@ bool SettingsManager::getSettingFromString(const char* source, char* value, cons
 
         Log.infoln("Read setting %s at address %X", settingFn.name, pointer);
 
-        switch (settingFn.type) {
-            case Boolean:
-                snprintf(value, lengthValue, "%d", *static_cast<bool *>(pointer));
-                return true;
-            case Int8:
-                snprintf(value, lengthValue, "%d", *static_cast<int8_t *>(pointer));
-                return true;
-            case Int16:
-                snprintf(value, lengthValue, "%d", *static_cast<int16_t *>(pointer));
-                return true;
-            case Int32:
-                snprintf(value, lengthValue, "%ld", *static_cast<int32_t *>(pointer));
-                return true;
-            case Int64:
-                snprintf(value, lengthValue, "%lld", *static_cast<int64_t *>(pointer));
-                return true;
-            case UInt8:
-                snprintf(value, lengthValue, "%u", *static_cast<uint8_t *>(pointer));
-                return true;
-            case UInt16:
-                snprintf(value, lengthValue, "%u", *static_cast<uint16_t *>(pointer));
-                return true;
-            case UInt32:
-                snprintf(value, lengthValue, "%lu", *static_cast<uint32_t *>(pointer));
-                return true;
-            case UInt64:
-                snprintf(value, lengthValue, "%llu", *static_cast<uint64_t *>(pointer));
-                return true;
-            case Char:
-                snprintf(value, lengthValue, "%c", *static_cast<char *>(pointer));
-                return true;
-            case Float:
-                snprintf(value, lengthValue, "%f", *static_cast<float *>(pointer));
-                return true;
-            case Double:
-                snprintf(value, lengthValue, "%lf", *static_cast<double *>(pointer));
-                return true;
-            case CharString:
-                strncpy(value, static_cast<const char*>(pointer), min(settingFn.maxStringLength, lengthValue));
-                return true;
-            default:
-                Log.warningln("Config key found but not readable");
-                strncpy(value, "KO readable", lengthValue);
-                return false;
+        switch (settingFn.type)
+        {
+        case Boolean:
+            snprintf(valueOut, lengthValueOut, "%d", *static_cast<bool*>(pointer));
+            return true;
+        case Int8:
+            snprintf(valueOut, lengthValueOut, "%d", *static_cast<int8_t*>(pointer));
+            return true;
+        case Int16:
+            snprintf(valueOut, lengthValueOut, "%d", *static_cast<int16_t*>(pointer));
+            return true;
+        case Int32:
+            snprintf(valueOut, lengthValueOut, "%ld", *static_cast<int32_t*>(pointer));
+            return true;
+        case Int64:
+            snprintf(valueOut, lengthValueOut, "%lld", *static_cast<int64_t*>(pointer));
+            return true;
+        case UInt8:
+            snprintf(valueOut, lengthValueOut, "%u", *static_cast<uint8_t*>(pointer));
+            return true;
+        case UInt16:
+            snprintf(valueOut, lengthValueOut, "%u", *static_cast<uint16_t*>(pointer));
+            return true;
+        case UInt32:
+            snprintf(valueOut, lengthValueOut, "%lu", *static_cast<uint32_t*>(pointer));
+            return true;
+        case UInt64:
+            snprintf(valueOut, lengthValueOut, "%llu", *static_cast<uint64_t*>(pointer));
+            return true;
+        case Char:
+            snprintf(valueOut, lengthValueOut, "%c", *static_cast<char*>(pointer));
+            return true;
+        case Float:
+            snprintf(valueOut, lengthValueOut, "%f", *static_cast<float*>(pointer));
+            return true;
+        case Double:
+            snprintf(valueOut, lengthValueOut, "%lf", *static_cast<double*>(pointer));
+            return true;
+        case CharString:
+            strncpy(valueOut, static_cast<const char*>(pointer), min(settingFn.maxStringLength, lengthValueOut));
+            return true;
+        default:
+            Log.warningln("Config key found but not readable");
+            strncpy(valueOut, "KO readable", lengthValueOut);
+            return false;
+        }
+    }
+
+    return false;
+}
+
+bool SettingsManager::setSettingFromString(const char* source, const char* value)
+{
+    for (const auto& settingFn : settingsGetSetFunctions)
+    {
+        char name[NAME_SETTING_LENGTH + 1]{};
+
+        const auto index = parseNameIndex(source, name);
+
+        if (strcmp(settingFn.name, name) != 0)
+        {
+            continue;
+        }
+
+        const auto pointer = getSettingsPointer(settingFn, index);
+
+        Log.infoln("Set setting %s at address %X with value %s", settingFn.name, pointer, value);
+
+        switch (settingFn.type)
+        {
+        case Boolean:
+            *static_cast<bool*>(pointer) = value['0'] == '1';
+            return true;
+        case Int8:
+            *static_cast<int8_t*>(pointer) = static_cast<int8_t>(strtol(value, nullptr, 0));
+            return true;
+        case Int16:
+            *static_cast<int16_t*>(pointer) = static_cast<int16_t>(strtol(value, nullptr, 0));
+            return true;
+        case Int32:
+            *static_cast<int32_t*>(pointer) = strtol(value, nullptr, 0);
+            return true;
+        case Int64:
+            *static_cast<int64_t*>(pointer) = strtoll(value, nullptr, 0);
+            return true;
+        case UInt8:
+            *static_cast<uint8_t*>(pointer) = static_cast<uint8_t>(strtoul(value, nullptr, 0));
+            return true;
+        case UInt16:
+            *static_cast<uint16_t*>(pointer) = static_cast<uint16_t>(strtoul(value, nullptr, 0));
+            return true;
+        case UInt32:
+            *static_cast<uint32_t*>(pointer) = strtoul(value, nullptr, 0);
+            return true;
+        case UInt64:
+            *static_cast<uint64_t*>(pointer) = strtoull(value, nullptr, 0);
+            return true;
+        case Char:
+            *static_cast<char*>(pointer) = value[0];
+            return true;
+        case Float:
+            *static_cast<float*>(pointer) = strtof(value, nullptr);
+            return true;
+        case Double:
+            *static_cast<double*>(pointer) = strtod(value, nullptr);
+            return true;
+        case CharString:
+            strncpy(static_cast<char*>(pointer), value, settingFn.maxStringLength);
+            return true;
+        default:
+            Log.warningln("Config key found but not writable");
+            break;
         }
     }
 
@@ -106,63 +174,14 @@ void* SettingsManager::getSettingsPointer(const SettingsGetSetFunction& settingF
     return base + index * settingFn.parentSize;
 }
 
-// bool SettingsManager::setValue(const SettingsGetSetFunction& settingGetSetFn, uint32_t index, const void* value)
-// {
-//     switch (settingGetSetFn.type) {
-//             case Boolean:
-//                 *static_cast<bool *>(settingGetSetFn.pointer) = value['0'] == '1';
-//             break;
-//             case Int8:
-//                 *static_cast<int8_t *>(settingGetSetFn.pointer) = static_cast<int8_t>(strtol(value, nullptr, 0));
-//             break;
-//             case Int16:
-//                 *static_cast<int16_t *>(settingGetSetFn.pointer) = static_cast<int16_t>(strtol(value, nullptr, 0));
-//             break;
-//             case Int32:
-//                 *static_cast<int32_t *>(settingGetSetFn.pointer) = strtol(value, nullptr, 0);
-//             break;
-//             case Int64:
-//                 *static_cast<int64_t *>(settingGetSetFn.pointer) = strtoll(value, nullptr, 0);
-//             break;
-//             case UInt8:
-//                 *static_cast<uint8_t *>(settingGetSetFn.pointer) = static_cast<uint8_t>(strtoul(value, nullptr, 0));
-//             break;
-//             case UInt16:
-//                 *static_cast<uint16_t *>(settingGetSetFn.pointer) = static_cast<uint16_t>(strtoul(value, nullptr, 0));
-//             break;
-//             case UInt32:
-//                 *static_cast<uint32_t *>(settingGetSetFn.pointer) = strtoul(value, nullptr, 0);
-//             break;
-//             case UInt64:
-//                 *static_cast<uint64_t *>(settingGetSetFn.pointer) = strtoull(value, nullptr, 0);
-//             break;
-//             case Char:
-//                 *static_cast<char *>(settingGetSetFn.pointer) = value[0];
-//             break;
-//             case Float:
-//                 *static_cast<float *>(settingGetSetFn.pointer) = strtof(value, nullptr);
-//             break;
-//             case Double:
-//                 *static_cast<double *>(settingGetSetFn.pointer) = strtod(value, nullptr);
-//             break;
-//             case CharString:
-//                 strncpy(*static_cast<char* *>(settingGetSetFn.pointer), value, sizeof(*static_cast<char* *>(settingGetSetFn.pointer)));
-//             break;
-//             default:
-//                 Log.warningln(F("[COMMAND] Config key found but not settable"));
-//                 strncpy_P(response, "KO settable"), MyCommandParser::MAX_RESPONSE_SIZE);
-//                 break;
-//         }
-//
-//     return false;
-// }
-
 uint8_t SettingsManager::parseNameIndex(const char* source, char* name)
 {
+    // On prend la chaîne jusqu'à [
     const char* bracket = strchr(source, '[');
 
-    // Pas d'index
-    if (bracket == nullptr) {
+    // Pas de [
+    if (bracket == nullptr)
+    {
         strcpy(name, source);
         return 0;
     }

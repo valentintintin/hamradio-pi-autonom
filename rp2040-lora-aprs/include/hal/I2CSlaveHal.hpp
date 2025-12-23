@@ -1,15 +1,17 @@
 #pragma once
 #include "telemetry.h"
-
-#define REG_PING 0x
-// On réserve un offset pour "now" juste après la fin de Telemetry
-#define REG_NOW_OFFSET REG_PING + sizeof(Telemetry)
+#include "controllers/I2CSlaveController.hpp"
 
 class I2CSlaveHal
 {
 public:
-    bool begin();
-    bool queryTelemetries(Telemetry& telemetry, uint32_t& now);
+    bool begin(uint8_t address);
+    bool queryTelemetries(Telemetry& telemetry);
+    bool queryClock(uint32_t& now);
 private:
     bool initialized = false;
+    uint8_t slaveAddress = 0;
+
+    void setRegisterToRead(I2CSlaveRegisterValue reg) const;
+    bool readRegister(I2CSlaveRegisterValue reg, void* dest, size_t size);
 };

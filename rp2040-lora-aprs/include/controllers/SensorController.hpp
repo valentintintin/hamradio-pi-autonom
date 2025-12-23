@@ -9,6 +9,8 @@
 #include <Adafruit_INA3221.h>
 #include <timers.h>
 
+#include "hal/I2CSlaveHal.hpp"
+
 #define QUERY_DELAY 30000
 
 class SensorController : BaseController
@@ -47,10 +49,14 @@ private:
     bool ina3221Initialized = false;
     Adafruit_INA3221 ina3221 = Adafruit_INA3221();
 
+    bool i2cSlaveInitialized = false;
+    I2CSlaveHal i2cSlave = I2CSlaveHal();
+
     SensorController();
 
     bool initMpptCharger();
     bool initIna3221();
     bool initBme280();
     bool initBmp280();
+    bool initI2cSlave();
 };

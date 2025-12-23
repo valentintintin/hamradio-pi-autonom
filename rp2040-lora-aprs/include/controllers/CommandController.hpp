@@ -21,10 +21,10 @@ public:
 private:
     char response[MAX_RESPONSE_LENGTH]{};
 
-    bool doRebootOutput();
-    bool doDfuOutput();
-    bool doGpioOutput(uint8_t id, bool state);
-    bool doResetReasonOutput();
-    bool doUptimeOutput();
-    bool doPingOutput();
+    bool doRebootCommand();
+    bool doDfuCommand();
+    bool doGpioCommand(uint8_t id, bool state);
+    bool doResetReasonCommand();
+    bool doUptimeCommand();
+    bool doPingCommand();
 };

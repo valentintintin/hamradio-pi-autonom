@@ -2,6 +2,7 @@
 
 #include <ArduinoLog.h>
 
+#include "SettingsManager.hpp"
 #include "hal/I2CMasterHal.hpp"
 #include "utils/utils.h"
 
@@ -32,7 +33,7 @@ bool SensorController::begin()
         return false;
     }
 
-    const auto result = initMpptCharger() || initIna3221() || initBme280() || initBmp280();
+    const auto result = initMpptCharger() || initIna3221() || initBme280() || initBmp280() || initI2cSlave();
 
     I2CMasterHal::releaseSemaphore();
 
@@ -128,6 +129,22 @@ bool SensorController::queryTelemetries()
         }
     }
 
+    if (i2cSlaveInitialized)
+    {
+        Log.infoln("Query I2CSlave");
+
+        if (i2cSlave.queryTelemetries(telemetry))
+        {
+            result = true;
+        }
+        else
+        {
+            Log.warningln("I2CSlave in error");
+
+            initI2cSlave();
+        }
+    }
+
     I2CMasterHal::releaseSemaphore();
 
     return result;
@@ -213,4 +230,21 @@ bool SensorController::initBmp280()
     }
 
     return bmp280Initialized;
+}
+
+bool SensorController::initI2cSlave()
+{
+    Log.infoln("I2C Slave try init");
+
+    i2cSlaveInitialized = i2cSlave.begin(SettingsManager::getSettings().i2c.address);
+    if (i2cSlaveInitialized)
+    {
+        Log.info("I2C Slave found");
+    }
+    else
+    {
+        Log.infoln("I2C Slave init failed");
+    }
+
+    return i2cSlaveInitialized;
 }

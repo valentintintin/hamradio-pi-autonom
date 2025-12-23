@@ -1,3 +1,4 @@
+/*
 #include "meshcore/MeshCoreSensorManager.hpp"
 
 bool MeshCoreSensorManager::querySensors(uint8_t requester_permissions, CayenneLPP &telemetry) {
@@ -28,3 +29,4 @@ bool MeshCoreSensorManager::querySensors(uint8_t requester_permissions, CayenneL
 
     return result;
 }
+*/

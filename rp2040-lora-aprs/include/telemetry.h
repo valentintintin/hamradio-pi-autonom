@@ -32,7 +32,7 @@ typedef struct
 typedef struct
 {
     TelemetryBasic basic;
-    float outdoorRain;
+    float rain;
     TelemetryWind wind;
     TelemetryLight light;
 } TelemetryOutdoor;

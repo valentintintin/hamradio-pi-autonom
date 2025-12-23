@@ -5,6 +5,7 @@
 #include "config.h"
 
 #define NB_SETTINGS 82
+#define NAME_SETTING_LENGTH 32
 
 enum SettingsType
 {
@@ -75,10 +76,10 @@ enum SettingsType
 //     char callsignToSendMessageAlert[CALLSIGN_LENGTH + 1]{};
 // } SettingsEnergy;
 
-// typedef struct {
-// bool enabled = true;
-// uint8_t address = 0x11;
-// } SettingsI2CSlave;
+typedef struct {
+    bool enabled = true;
+    uint8_t address = 0x11;
+} SettingsI2CSlave;
 
 typedef struct
 {
@@ -115,12 +116,12 @@ typedef struct
     bool useSlowClock = false;
 
     SettingsPin pins[MAX_GPIO_USED]{};
+    SettingsI2CSlave i2c{};
     // SettingsLoRa lora{};
     // SettingsAprs aprs{};
     // SettingsEnergy energy{};
     // SettingsWeather weather{};
     // SettingsMpptWatchdog mpptWatchdog{};
-    // SettingsI2CSlave i2c{};
     // SettingsWatchdogAndAprsItem meshtastic{};
     // SettingsWatchdogAndAprsItem linux{};
 } Settings;
@@ -138,7 +139,7 @@ typedef struct
 
 typedef struct
 {
-    char name[32 + 1]{};
+    char name[NAME_SETTING_LENGTH + 1]{};
     SettingsType type = UInt8;
     void* pointer{};
     uint32_t maxSize = 1;

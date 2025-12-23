@@ -22,19 +22,57 @@ bool CommandController::processCommand(const char* command)
         return SettingsManager::getInstance().getSettingFromString(configKey, response, MAX_RESPONSE_LENGTH);
     }
 
+    if (memcmp(command, "set ", 4) == 0)
+    {
+        const char* configKey = &command[4];
+
+        const char* value = strchr(configKey, ' ');
+        if (value != nullptr && strlen(value) >= 2) // espace + valeur à minima 1 caractère
+        {
+            return SettingsManager::getInstance().setSettingFromString(configKey, value + 1);
+        }
+
+        return false;
+    }
+
     if (memcmp(command, "gpio ", 5) == 0)
     {
         if (memcmp(&command[5], "on ", 3) == 0)
         {
             const auto pin = strtol(&command[5 + 3], nullptr, 10);
-            return doGpioOutput(pin, true);
+            return doGpioCommand(pin, true);
         }
 
         if (memcmp(&command[5], "off ", 4) == 0)
         {
             const auto pin = strtol(&command[5 + 4], nullptr, 10);
-            return doGpioOutput(pin, false);
+            return doGpioCommand(pin, false);
         }
+    }
+
+    if (memcmp(command, "dfu", 3) == 0)
+    {
+        return doDfuCommand();
+    }
+
+    if (memcmp(command, "reboot", 6) == 0)
+    {
+        return doRebootCommand();
+    }
+
+    if (memcmp(command, "uptime", 6) == 0)
+    {
+        return doUptimeCommand();
+    }
+
+    if (memcmp(command, "resetReason", 11) == 0)
+    {
+        return doResetReasonCommand();
+    }
+
+    if (memcmp(command, "ping", 4) == 0)
+    {
+        return doPingCommand();
     }
 
     return false;
@@ -45,7 +83,7 @@ const char* CommandController::getResponse() const
     return response;
 }
 
-bool CommandController::doRebootOutput()
+bool CommandController::doRebootCommand()
 {
     TimerHandle_t timer = xTimerCreate("timerReboot", pdMS_TO_TICKS(10000), pdFALSE, nullptr, rebootTask);
 
@@ -62,7 +100,7 @@ bool CommandController::doRebootOutput()
     return true;
 }
 
-bool CommandController::doDfuOutput()
+bool CommandController::doDfuCommand()
 {
     TimerHandle_t timer = xTimerCreate("timerDfu", pdMS_TO_TICKS(10000), pdFALSE, nullptr, dfuTask);
 
@@ -79,7 +117,7 @@ bool CommandController::doDfuOutput()
     return true;
 }
 
-bool CommandController::doGpioOutput(const uint8_t id, const bool state)
+bool CommandController::doGpioCommand(const uint8_t id, const bool state)
 {
     if (RelayController::getInstance().changeState(id, state))
     {
@@ -92,21 +130,21 @@ bool CommandController::doGpioOutput(const uint8_t id, const bool state)
     return false;
 }
 
-bool CommandController::doResetReasonOutput()
+bool CommandController::doResetReasonCommand()
 {
     snprintf(response, MAX_RESPONSE_LENGTH, "Reset reason: %d", rp2040.getResetReason());
 
     return true;
 }
 
-bool CommandController::doUptimeOutput()
+bool CommandController::doUptimeCommand()
 {
     snprintf(response, MAX_RESPONSE_LENGTH, "%lu seconds", millis() / 1000);
 
     return true;
 }
 
-bool CommandController::doPingOutput()
+bool CommandController::doPingCommand()
 {
     char dateString[64];
     getDateTimeStringFromEpoch(getDateTime().unixtime(), dateString, 64);
