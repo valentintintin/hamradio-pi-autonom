@@ -26,10 +26,12 @@ void SensorController::queryTimer(TimerHandle_t timer)
 
 bool SensorController::begin()
 {
+    Wire.begin();
+    xTimerStart(timer, 0);
+
     if (!I2CMasterHal::takeSemaphore())
     {
         Log.warningln("Sensor can not begin, can not have semaphore");
-        // TODO retry
         return false;
     }
 
@@ -42,6 +44,13 @@ bool SensorController::begin()
 
 bool SensorController::queryTelemetries()
 {
+    if (!isInitialized() && !begin())
+    {
+        Log.warningln("Sensor can not query, no one found");
+
+        return false;
+    }
+
     if (!I2CMasterHal::takeSemaphore())
     {
         Log.warningln("Sensor can not query, can not have semaphore");
@@ -95,7 +104,7 @@ bool SensorController::queryTelemetries()
         Log.infoln("Query BMP280");
 
         telemetry.box.temperature = bmp280.readTemperature();
-        telemetry.box.pressure = bmp280.readPressure();
+        telemetry.box.pressure = bmp280.readPressure() / 100.0;
 
         if (telemetry.box.pressure == NAN)
         {
@@ -115,7 +124,7 @@ bool SensorController::queryTelemetries()
 
         telemetry.box.temperature = bme280.readTemperature();
         telemetry.box.humidity = bme280.readHumidity();
-        telemetry.box.pressure = bme280.readPressure();
+        telemetry.box.pressure = bme280.readPressure() / 100.0;
 
         if (telemetry.box.pressure == NAN)
         {
@@ -147,7 +156,68 @@ bool SensorController::queryTelemetries()
 
     I2CMasterHal::releaseSemaphore();
 
+    if (result)
+    {
+        printJson();
+    }
+
     return result;
+}
+
+void SensorController::printJson()
+{
+    serialJsonWriter.beginObject()
+    .property("updatedAt", telemetry.updatedAt)
+
+    .beginObject("battery")
+        .property("voltage", telemetry.battery.voltage)
+        .property("current", telemetry.battery.current)
+    .endObject()
+
+    .beginObject("solar")
+        .property("voltage", telemetry.solar.voltage)
+        .property("current", telemetry.solar.current)
+    .endObject()
+
+    .property("batteryTemperature", telemetry.batteryTemperature)
+
+    .beginObject("box")
+        .property("temperature", telemetry.box.temperature)
+        .property("humidity", telemetry.box.humidity)
+        .property("pressure", telemetry.box.pressure)
+    .endObject()
+
+    .beginObject("outdoor")
+        .beginObject("basic")
+            .property("temperature", telemetry.outdoor.basic.temperature)
+            .property("humidity", telemetry.outdoor.basic.humidity)
+            .property("pressure", telemetry.outdoor.basic.pressure)
+        .endObject()
+
+        .property("rain", telemetry.outdoor.rain)
+
+        .beginObject("wind")
+            .property("direction", telemetry.outdoor.wind.direction)
+            .property("speedAverage", telemetry.outdoor.wind.speedAverage)
+            .property("speedMax", telemetry.outdoor.wind.speedMax)
+        .endObject()
+
+        .beginObject("light")
+            .property("uv", telemetry.outdoor.light.uv)
+            .property("uvIndex", telemetry.outdoor.light.uvIndex)
+            .property("lux", telemetry.outdoor.light.lux)
+        .endObject()
+    .endObject()
+
+    .beginObject("position")
+        .property("latitude", telemetry.position.latitude)
+        .property("longitude", telemetry.position.longitude)
+        .property("altitude", telemetry.position.altitude)
+    .endObject()
+
+.endObject();
+
+    Serial.println();
 }
 
 bool SensorController::initMpptCharger()
@@ -157,7 +227,7 @@ bool SensorController::initMpptCharger()
     mpptChgInitialized = charger.begin();
     if (mpptChgInitialized)
     {
-        Log.info("MpptCharger found");
+        Log.infoln("MpptCharger found");
     }
     else
     {
@@ -175,7 +245,7 @@ bool SensorController::initIna3221()
 
     if (ina3221Initialized)
     {
-        Log.info("INA3221 found");
+        Log.infoln("INA3221 found");
     }
     else
     {
@@ -199,7 +269,7 @@ bool SensorController::initBme280()
                            Adafruit_BME280::SAMPLING_X1, // Humidity oversampling
                            Adafruit_BME280::FILTER_OFF, Adafruit_BME280::STANDBY_MS_1000);
 
-        Log.info("BME280 found");
+        Log.infoln("BME280 found");
     }
     else
     {
@@ -222,7 +292,7 @@ bool SensorController::initBmp280()
                            Adafruit_BMP280::SAMPLING_X1, // Pressure oversampling
                            Adafruit_BMP280::FILTER_OFF, Adafruit_BMP280::STANDBY_MS_1000);
 
-        Log.info("BMP280 found");
+        Log.infoln("BMP280 found");
     }
     else
     {
@@ -239,7 +309,7 @@ bool SensorController::initI2cSlave()
     i2cSlaveInitialized = i2cSlave.begin(SettingsManager::getSettings().i2c.address);
     if (i2cSlaveInitialized)
     {
-        Log.info("I2C Slave found");
+        Log.infoln("I2C Slave found");
     }
     else
     {

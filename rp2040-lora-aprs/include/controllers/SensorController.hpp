@@ -8,6 +8,7 @@
 #include <Adafruit_BMP280.h>
 #include <Adafruit_INA3221.h>
 #include <timers.h>
+#include <JsonWriter.h>
 
 #include "hal/I2CSlaveHal.hpp"
 
@@ -24,6 +25,12 @@ public:
 
     bool begin() override;
     bool queryTelemetries();
+    void printJson();
+
+    bool isInitialized() const
+    {
+        return mpptChgInitialized || bmp280Initialized || bme280Initialized || ina3221Initialized || i2cSlaveInitialized;
+    }
 
     static const Telemetry& getTelemetry()
     {
@@ -51,6 +58,8 @@ private:
 
     bool i2cSlaveInitialized = false;
     I2CSlaveHal i2cSlave = I2CSlaveHal();
+
+    JsonWriter serialJsonWriter = JsonWriter(&Serial);
 
     SensorController();
 

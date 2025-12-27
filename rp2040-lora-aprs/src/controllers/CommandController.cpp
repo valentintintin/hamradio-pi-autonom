@@ -6,6 +6,7 @@
 #include <timers.h>
 
 #include "SettingsManager.hpp"
+#include "controllers/SensorController.hpp"
 
 bool CommandController::begin()
 {
@@ -68,6 +69,11 @@ bool CommandController::processCommand(const char* command)
     if (memcmp(command, "resetReason", 11) == 0)
     {
         return doResetReasonCommand();
+    }
+
+    if (memcmp(command, "telem", 5) == 0)
+    {
+        return doTelemetriesCommand();
     }
 
     if (memcmp(command, "ping", 4) == 0)
@@ -140,6 +146,20 @@ bool CommandController::doResetReasonCommand()
 bool CommandController::doUptimeCommand()
 {
     snprintf(response, MAX_RESPONSE_LENGTH, "%lu seconds", millis() / 1000);
+
+    return true;
+}
+
+bool CommandController::doTelemetriesCommand()
+{
+    if (SensorController::getInstance().queryTelemetries())
+    {
+        strncpy(response, "OK", MAX_RESPONSE_LENGTH);
+    }
+    else
+    {
+        strncpy(response, "KO", MAX_RESPONSE_LENGTH);
+    }
 
     return true;
 }

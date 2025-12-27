@@ -9,9 +9,8 @@ public:
     bool queryTelemetries(Telemetry& telemetry);
     bool queryClock(uint32_t& now);
 private:
-    bool initialized = false;
     uint8_t slaveAddress = 0;
 
     void setRegisterToRead(I2CSlaveRegisterValue reg) const;
-    bool readRegister(I2CSlaveRegisterValue reg, void* dest, size_t size);
+    bool readRegister(I2CSlaveRegisterValue reg, void* dest, size_t size) const;
 };

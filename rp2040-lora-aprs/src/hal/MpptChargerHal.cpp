@@ -11,11 +11,9 @@ bool MpptChargerHal::begin()
 
     Log.infoln("Init Mppt");
 
-    const auto result = charger.begin();
+    initialized = charger.begin();
 
-    initialized = result;
-
-    if (result)
+    if (initialized)
     {
         Log.infoln("Init Mppt OK");
     }
@@ -24,7 +22,7 @@ bool MpptChargerHal::begin()
         Log.warningln("Init Mppt failed");
     }
 
-    return result;
+    return initialized;
 }
 
 bool MpptChargerHal::queryTelemetries(TelemetryPower &telemetryBattery, TelemetryPower &telemetrySolar, float &temperature)

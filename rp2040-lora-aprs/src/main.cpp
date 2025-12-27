@@ -100,7 +100,12 @@ void setup()
     Log.infoln("Starting");
 
     rtc_init();
-    Wire.begin();
+
+    Wire.setSDA(0);
+    Wire.setSCL(1);
+
+    Wire1.setSDA(2);
+    Wire1.setSCL(3);
 
     SettingsManager::getInstance().begin();
 
@@ -132,6 +137,14 @@ void setup()
     {
         Log.errorln("Serial task KO");
     }
+
+    // pinMode(LED_BUILTIN,  OUTPUT);
+    // pinMode(0,  OUTPUT);
+    // pinMode(1,  OUTPUT);
+    // pinMode(4,  OUTPUT);
+    // pinMode(5,  OUTPUT);
+
+    SensorController::getInstance().queryTelemetries();
 }
 
 void loop()
@@ -148,4 +161,20 @@ void loop()
     // }
     //
     // delay(100);
+
+    // SensorController::getInstance().begin();
+
+    // digitalWrite(LED_BUILTIN, true);
+    // digitalWrite(0, true);
+    // digitalWrite(1, true);
+    // digitalWrite(4, true);
+    // digitalWrite(5, true);
+    // delay(1000);
+    //
+    // digitalWrite(LED_BUILTIN, false);
+    // digitalWrite(0, false);
+    // digitalWrite(1, false);
+    // digitalWrite(4, false);
+    // digitalWrite(5, false);
+    // delay(5000);
 }

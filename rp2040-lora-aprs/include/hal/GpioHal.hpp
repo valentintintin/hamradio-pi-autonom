@@ -15,4 +15,6 @@ public:
     const uint8_t pin;
     const PinMode mode;
     const bool inverted;
+
+    virtual ~GpioHal() = default;
 };

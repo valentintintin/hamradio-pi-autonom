@@ -6,6 +6,8 @@
 #define I2C_OK 0xAA
 #define I2C_KO 0xEE
 
+#define I2C_BUFFER_SIZE 32
+
 enum I2CSlaveRegisterValue
 {
     RegisterPing,
@@ -36,9 +38,12 @@ private:
     static void onReceive(int howMany);
     static void onRequest();
 
-    I2CSlaveRegisterValue regIndex = RegisterPing;
+    static uint8_t txBuffer[I2C_BUFFER_SIZE];
+    static size_t txBufferSize;
 
-    void sendPong() const;
-    void sendClock() const;
-    void sendTelemetry(I2CSlaveRegisterValue what) const;
+    static void preparePongBuffer();
+    static void prepareClockBuffer();
+    static void prepareTelemetryBuffer(I2CSlaveRegisterValue what);
+
+    static bool fillBuffer(const void *buffer, size_t size);
 };

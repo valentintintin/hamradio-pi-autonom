@@ -26,5 +26,6 @@ private:
     bool doGpioCommand(uint8_t id, bool state);
     bool doResetReasonCommand();
     bool doUptimeCommand();
+    bool doTelemetriesCommand();
     bool doPingCommand();
 };
