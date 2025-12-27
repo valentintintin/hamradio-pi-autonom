@@ -6,8 +6,10 @@
 #include <timers.h>
 
 #include "SettingsManager.hpp"
+#include "controllers/LedController.hpp"
 #include "controllers/SensorController.hpp"
 #include "controllers/WatchdogController.hpp"
+#include "hal/I2CMasterHal.hpp"
 
 bool CommandController::begin()
 {
@@ -77,6 +79,13 @@ bool CommandController::processCommand(const char* command)
         return doMpptWatchdogUserCommand(&command[9]);
     }
 
+    if (memcmp(command, "mppt.voltLimit ", 15) == 0)
+    {
+        return doMpptVoltageLimitsCommand(&command[15]);
+    }
+
+    LedController::getInstance().blink(Error, Command);
+
     return false;
 }
 
@@ -89,7 +98,7 @@ bool CommandController::doRebootCommand()
 {
     const TimerHandle_t timer = xTimerCreate("timerReboot", pdMS_TO_TICKS(5000), pdFALSE, nullptr, rebootTask);
 
-    if (xTimerStart(timer, 0) == pdPASS)
+    if (timer && xTimerStart(timer, 0) == pdPASS)
     {
         strncpy(response, "Reboot in 5s !", MAX_RESPONSE_LENGTH);
     }
@@ -98,6 +107,8 @@ bool CommandController::doRebootCommand()
         strncpy(response, "Reboot !", MAX_RESPONSE_LENGTH);
         rebootTask(timer);
     }
+
+    LedController::getInstance().blink(Success, Command);
 
     return true;
 }
@@ -108,7 +119,7 @@ bool CommandController::doDfuCommand()
 
     WatchdogController::getInstance().setMpptWatchdogManagedByUser(5);
 
-    if (xTimerStart(timer, 0) == pdPASS)
+    if (timer && xTimerStart(timer, 0) == pdPASS)
     {
         strncpy(response, "DFU in 5s !", MAX_RESPONSE_LENGTH);
     }
@@ -117,6 +128,8 @@ bool CommandController::doDfuCommand()
         strncpy(response, "DFU !", MAX_RESPONSE_LENGTH);
         dfuTask(timer);
     }
+
+    LedController::getInstance().blink(Success, Command);
 
     return true;
 }
@@ -142,8 +155,12 @@ bool CommandController::doGpioCommand(const char *command)
     {
         snprintf(response, MAX_RESPONSE_LENGTH, "OK. GPIO %d is %d", id, state);
 
+        LedController::getInstance().blink(Success, Command);
+
         return true;
     }
+
+    LedController::getInstance().blink(Error, Command);
 
     snprintf(response, MAX_RESPONSE_LENGTH, "KO");
     return false;
@@ -153,12 +170,16 @@ bool CommandController::doResetReasonCommand()
 {
     snprintf(response, MAX_RESPONSE_LENGTH, "Reset reason: %d", rp2040.getResetReason());
 
+    LedController::getInstance().blink(Success, Command);
+
     return true;
 }
 
 bool CommandController::doUptimeCommand()
 {
     snprintf(response, MAX_RESPONSE_LENGTH, "%lu seconds", millis() / 1000);
+
+    LedController::getInstance().blink(Success, Command);
 
     return true;
 }
@@ -168,13 +189,17 @@ bool CommandController::doTelemetriesCommand()
     if (SensorController::getInstance().queryTelemetries())
     {
         strncpy(response, "OK", MAX_RESPONSE_LENGTH);
-    }
-    else
-    {
-        strncpy(response, "KO", MAX_RESPONSE_LENGTH);
+
+        LedController::getInstance().blink(Error, Command);
+
+        return true;
     }
 
-    return true;
+    strncpy(response, "KO", MAX_RESPONSE_LENGTH);
+
+    LedController::getInstance().blink(Success, Command);
+
+    return false;
 }
 
 bool CommandController::doPingCommand()
@@ -183,7 +208,53 @@ bool CommandController::doPingCommand()
     getDateTimeStringFromEpoch(getDateTime().unixtime(), dateString, 64);
     snprintf(response, MAX_RESPONSE_LENGTH, "Pong!\n%s", dateString);
 
+    LedController::getInstance().blink(Success, Command);
+
     return true;
+}
+
+bool CommandController::doMpptVoltageLimitsCommand(const char* command)
+{
+    const char* space = strchr(command, ' ');
+    if (!space)
+    {
+        strncpy(response, "KO args: VOff VOn -> mV", MAX_RESPONSE_LENGTH);
+
+        LedController::getInstance().blink(Error, Command);
+
+        return false;
+    }
+
+    char* endPointer = nullptr;
+
+    const auto powerOff = static_cast<uint16_t>(strtol(command, &endPointer, 10));
+    const auto powerOn = static_cast<uint16_t>(strtol(space + 1, &endPointer, 10));
+
+    if (!I2CMasterHal::takeSemaphore())
+    {
+        strncpy(response, "KO semaphore", MAX_RESPONSE_LENGTH);
+
+        LedController::getInstance().blink(Error, I2C);
+
+        return false;
+    }
+
+    if (MpptChargerHal::getInstance().setVoltageLimits(powerOff, powerOn))
+    {
+        snprintf(response, MAX_RESPONSE_LENGTH, "OK. VOff %dmV, VOn %dmV", powerOff, powerOn);
+
+        LedController::getInstance().blink(Success, Command);
+
+        return true;
+    }
+
+    I2CMasterHal::releaseSemaphore();
+
+    snprintf(response, MAX_RESPONSE_LENGTH, "KO. VOff %dmV, VOn %dmV", powerOff, powerOn);
+
+    LedController::getInstance().blink(Error, Command);
+
+    return false;
 }
 
 bool CommandController::doMpptWatchdogUserCommand(const char *command)
@@ -192,6 +263,9 @@ bool CommandController::doMpptWatchdogUserCommand(const char *command)
     if (!space)
     {
         strncpy(response, "KO args: TOff TOn -> sec", MAX_RESPONSE_LENGTH);
+
+        LedController::getInstance().blink(Error, Command);
+
         return false;
     }
 
@@ -203,9 +277,15 @@ bool CommandController::doMpptWatchdogUserCommand(const char *command)
     if (WatchdogController::getInstance().setMpptWatchdogManagedByUser(timeOff, timeout))
     {
         snprintf(response, MAX_RESPONSE_LENGTH, "OK. TOff %ds, TOn %ds", timeOff, timeout);
+
+        LedController::getInstance().blink(Success, Command);
+
         return true;
     }
 
     snprintf(response, MAX_RESPONSE_LENGTH, "KO. TOff %ds, TOn %ds", timeOff, timeout);
+
+    LedController::getInstance().blink(Error, Command);
+
     return false;
 }

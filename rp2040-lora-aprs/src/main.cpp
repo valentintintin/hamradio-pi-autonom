@@ -20,8 +20,10 @@
 #include "SettingsManager.hpp"
 #include "controllers/CommandController.hpp"
 #include "controllers/I2CSlaveController.hpp"
+#include "controllers/LedController.hpp"
 #include "controllers/SensorController.hpp"
 #include "controllers/WatchdogController.hpp"
+#include "hal/I2CMasterHal.hpp"
 
 char bufferText[BUFFER_LENGTH];
 
@@ -71,6 +73,29 @@ void serialReceivedTask(void* pvParameters)
     }
 }
 
+void setMpptVoltageLimits()
+{
+    const auto& settingsMppt = SettingsManager::getSettings().mppt;
+
+    if (!I2CMasterHal::takeSemaphore())
+    {
+        Log.warningln("Can not set relay Mppt Charger voltage limit, can not have semaphore");
+
+        LedController::getInstance().blink(Error, I2C);
+
+        return;
+    }
+
+    if (!MpptChargerHal::getInstance().setVoltageLimits(settingsMppt.powerOffVoltage, settingsMppt.powerOnVoltage))
+    {
+        Log.warningln("Can not set relay Mppt Charger voltage limit");
+
+        LedController::getInstance().blink(Error, MpptCharger);
+    }
+
+    I2CMasterHal::releaseSemaphore();
+}
+
 void setup()
 {
     pinMode(LED_BUILTIN, OUTPUT);
@@ -78,31 +103,41 @@ void setup()
 
     Serial.begin(115200);
     Serial.setTimeout(5000);
-    Serial1.begin(115200);
-    Serial1.setTimeout(5000);
+
+    // Serial1.begin(115200);
+    // Serial1.setTimeout(5000);
+
+    Serial2.begin(115200);
+    Serial2.setTimeout(5000);
 
     Log.begin(LOG_LEVEL_VERBOSE, &Serial);
-    Log.addHandler(&Serial1);
-
-    if (rp2040.getResetReason() == RP2040::WDT_RESET)
-    {
-        digitalWrite(LED_BUILTIN, HIGH);
-        delay(2500);
-        Log.warningln("Watchdog caused reboot: %d"), rp2040.getResetReason();
-        digitalWrite(LED_BUILTIN, LOW);
-    }
+    Log.addHandler(&Serial2);
 
     digitalWrite(LED_BUILTIN, HIGH);
-    delay(500);
+    delay(2500);
     digitalWrite(LED_BUILTIN, LOW);
-    delay(500);
+    delay(2500);
+
+    const auto resetReason = rp2040.getResetReason();
+    Log.infoln("Reboot reason: %d", resetReason);
+
+    if (resetReason == RP2040::WDT_RESET)
+    {
+        digitalWrite(LED_BUILTIN, HIGH);
+        delay(1000);
+        digitalWrite(LED_BUILTIN, LOW);
+        delay(1000);
+    }
 
     Log.infoln("Starting");
+
+    LedController::getInstance().begin();
 
     rtc_init();
 
     Wire.setSDA(0);
     Wire.setSCL(1);
+    Wire.begin();
 
     Wire1.setSDA(2);
     Wire1.setSCL(3);
@@ -114,7 +149,9 @@ void setup()
         setSlowClock();
     }
 
-    if (const auto now = RTClib::now(); now.year() >= 2025 && now.year() <= 2060)
+    const auto now = RTClib::now();
+
+    if (now.year() >= 2026 && now.year() <= 2060)
     {
         const auto epoch = now.unixtime();
         setTimeToInternalRtc(epoch);
@@ -125,6 +162,8 @@ void setup()
     {
         setTimeToInternalRtc(0);
         Log.warningln("Wrong rtc time !");
+
+        LedController::getInstance().blink(Error, Clock);
     }
 
     RelayController::getInstance().begin();
@@ -133,48 +172,17 @@ void setup()
     I2CSlaveController::getInstance().begin();
     CommandController::getInstance().begin();
 
+    setMpptVoltageLimits();
+    SensorController::getInstance().queryTelemetries();
+
     if (xTaskCreate(serialReceivedTask, "SerialReceived", configMINIMAL_STACK_SIZE, nullptr, tskIDLE_PRIORITY, nullptr) != pdPASS)
     {
         Log.errorln("Serial task KO");
+
+        LedController::getInstance().blink(Error, FreeRtos);
     }
-
-    // pinMode(LED_BUILTIN,  OUTPUT);
-    // pinMode(0,  OUTPUT);
-    // pinMode(1,  OUTPUT);
-    // pinMode(4,  OUTPUT);
-    // pinMode(5,  OUTPUT);
-
-    SensorController::getInstance().queryTelemetries();
 }
 
 void loop()
 {
-    // digitalWrite(LED_BUILTIN, HIGH);
-    // delay(500);
-    // digitalWrite(LED_BUILTIN, LOW);
-    // delay(500);
-    //
-    // Serial.println(">");
-    //
-    // while (Serial.available()) {
-    //     Serial.write(Serial.read());
-    // }
-    //
-    // delay(100);
-
-    // SensorController::getInstance().begin();
-
-    // digitalWrite(LED_BUILTIN, true);
-    // digitalWrite(0, true);
-    // digitalWrite(1, true);
-    // digitalWrite(4, true);
-    // digitalWrite(5, true);
-    // delay(1000);
-    //
-    // digitalWrite(LED_BUILTIN, false);
-    // digitalWrite(0, false);
-    // digitalWrite(1, false);
-    // digitalWrite(4, false);
-    // digitalWrite(5, false);
-    // delay(5000);
 }

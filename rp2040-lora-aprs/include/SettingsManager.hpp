@@ -34,10 +34,12 @@ private:
         { "pin.name", CharString, &settings.pins[0].name, MAX_GPIO_USED, sizeof(SettingsPin), sizeof(decltype(SettingsPin::name)) },
         { "i2cSlave.enabled", Boolean, &settings.i2c.address },
         { "i2cSlave.address", UInt8, &settings.i2c.address },
-        { "mppt.wdt.enabled", Boolean, &settings.mpptWatchdog.enabled },
-        { "mppt.wdt.interval", UInt8, &settings.mpptWatchdog.intervalFeed },
-        { "mppt.wdt.timeOff", UInt16, &settings.mpptWatchdog.timeOff },
-        { "mppt.wdt.timeout", UInt8, &settings.mpptWatchdog.timeout },
+        { "mppt.wdt.enabled", Boolean, &settings.mppt.watchdog.enabled },
+        { "mppt.wdt.interval", UInt8, &settings.mppt.watchdog.intervalFeed },
+        { "mppt.wdt.timeOff", UInt16, &settings.mppt.watchdog.timeOff },
+        { "mppt.wdt.timeout", UInt8, &settings.mppt.watchdog.timeout },
+        { "mppt.voltLimit.off", UInt16, &settings.mppt.powerOffVoltage },
+        { "mppt.voltLimit.on", UInt16, &settings.mppt.powerOnVoltage }
     };
 
     void* getSettingsPointer(const SettingsGetSetFunction &settingFn, uint32_t index) const;

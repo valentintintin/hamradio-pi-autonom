@@ -41,12 +41,12 @@ void setTimeToInternalRtc(const time_t epoch)
     rtc_set_datetime(&datetime);
 }
 
-void rebootTask(TimerHandle_t xTimer)
+void rebootTask(TimerHandle_t timer)
 {
     rp2040.reboot();
 }
 
-void dfuTask(TimerHandle_t xTimer)
+void dfuTask(TimerHandle_t timer)
 {
     rp2040.rebootToBootloader();
 }

@@ -3,28 +3,40 @@
 #include <ArduinoLog.h>
 
 #include "SettingsManager.hpp"
+#include "controllers/LedController.hpp"
 #include "hal/I2CMasterHal.hpp"
 #include "hal/PicoGpioHal.hpp"
 
-RelayController::RelayController() : relays{}
+RelayController::RelayController()
 {
-    queue = xQueueCreate(2, sizeof(RelayCommand));
+    queue = xQueueCreate(RELAY_MAX_COMMAND, sizeof(RelayCommand));
 
     if (queue == nullptr)
     {
-        Log.errorln(F("Relay Queue creation failed"));
+        Log.errorln("Relay Queue creation failed");
+
+        LedController::getInstance().blink(Error, FreeRtos);
     }
 }
 
 bool RelayController::begin()
 {
-    Log.infoln(F("Relay begin"));
+    Log.infoln("Relay begin");
 
     const bool result = loadRelayFromSettings() > 0;
 
-    if (xTaskCreate(task, "RelayTask", configMINIMAL_STACK_SIZE, this, tskIDLE_PRIORITY, nullptr) != pdPASS)
+    if (result)
     {
-        Log.errorln("Relay task creation failed");
+        if (xTaskCreate(task, "RelayTask", configMINIMAL_STACK_SIZE, this, tskIDLE_PRIORITY, nullptr) != pdPASS)
+        {
+            Log.errorln("Relay task creation failed");
+
+            LedController::getInstance().blink(Error, FreeRtos);
+
+            return false;
+        }
+
+        LedController::getInstance().blink(Success, Relay);
     }
 
     return result;
@@ -52,6 +64,9 @@ uint8_t RelayController::loadRelayFromSettings()
             if (nbRelays >= MAX_GPIO_USED)
             {
                 Log.warningln("Max relay reached %d", nbRelays);
+
+                LedController::getInstance().blink(Error, Relay);
+
                 break;
             }
         }
@@ -70,6 +85,8 @@ bool RelayController::changeState(const uint8_t id, const bool state) const
     if (xQueueSend(queue, &command, 0) != pdTRUE)
     {
         Log.warningln("Relay queue send failed for id %d", id);
+
+        LedController::getInstance().blink(Error, Relay);
 
         return false;
     }
@@ -93,6 +110,9 @@ void RelayController::task(void* pvParameters)
             if (command.id >= ctrl->nbRelays)
             {
                 Log.errorln("No relay for id %d", command.id);
+
+                LedController::getInstance().blink(Error, Relay);
+
                 continue;
             }
 
@@ -103,6 +123,9 @@ void RelayController::task(void* pvParameters)
                 if (!I2CMasterHal::takeSemaphore())
                 {
                     Log.warningln("RelayController can not set relay I2C %d, can not have semaphore", command.id);
+
+                    LedController::getInstance().blink(Error, I2C);
+
                     continue;
                 }
             }
@@ -115,6 +138,8 @@ void RelayController::task(void* pvParameters)
             }
 
             Log.infoln("RelayController message received done for id %d", command.id);
+
+            LedController::getInstance().blink(Success, Relay);
         }
     }
 }

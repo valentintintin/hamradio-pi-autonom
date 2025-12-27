@@ -14,6 +14,12 @@
 
 #define QUERY_DELAY 30000
 
+struct StreamJson
+{
+    JsonWriter jsonWriter;
+    Stream *stream;
+};
+
 class SensorController : BaseController
 {
 public:
@@ -25,7 +31,7 @@ public:
 
     bool begin() override;
     bool queryTelemetries();
-    void printJson();
+    void printJson(StreamJson& streamJson);
 
     bool isInitialized() const
     {
@@ -59,7 +65,18 @@ private:
     bool i2cSlaveInitialized = false;
     I2CSlaveHal i2cSlave = I2CSlaveHal();
 
-    JsonWriter serialJsonWriter = JsonWriter(&Serial);
+    StreamJson serialJson = {
+        .jsonWriter = JsonWriter(&Serial),
+        .stream = &Serial
+    };
+    StreamJson serial1Json = {
+        .jsonWriter = JsonWriter(&Serial1),
+        .stream = &Serial1
+    };
+    StreamJson serial2Json = {
+        .jsonWriter = JsonWriter(&Serial2),
+        .stream = &Serial2
+    };
 
     SensorController();
 

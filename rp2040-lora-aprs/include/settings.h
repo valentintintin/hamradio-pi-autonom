@@ -12,7 +12,7 @@ enum SettingsType
     Boolean, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Char, Float, Double, CharString
 };
 
-// typedef struct {
+// struct {
 //     float frequency = 433.775;
 //     uint16_t bandwidth = 125;
 //     uint8_t spreadingFactor = 12;
@@ -25,7 +25,7 @@ enum SettingsType
 //     uint64_t intervalTimeoutWatchdogTx = 7200000;
 // } SettingsLoRa;
 //
-// typedef struct {
+// struct {
 //     char callsign[CALLSIGN_LENGTH + 1]{};
 //     char destination[CALLSIGN_LENGTH + 1]{};
 //     char path[CALLSIGN_LENGTH * MAX_PATH + 1]{};
@@ -48,14 +48,14 @@ enum SettingsType
 //     uint16_t telemetrySequenceNumber = 0;
 // } SettingsAprs;
 
-typedef struct {
+struct SettingsMpptWatchdog {
     bool enabled = false;
     uint8_t timeout = 255;
     uint8_t intervalFeed = 30;
     uint16_t timeOff = 10;
-} SettingsMpptWatchdog;
+};
 //
-// typedef struct {
+// struct {
 //     bool enabled = true;
 //     uint64_t intervalCheck = 60000;
 //     bool decodeWH65B = false;
@@ -64,33 +64,38 @@ typedef struct {
 
 // enum TypeEnergySensor { dummy, mpptchg, ina, adc };
 
-// typedef struct {
+// struct {
 //     uint64_t intervalCheck = 30000;
 //     TypeEnergySensor type = dummy;
 //     uint8_t adcPin = 26;
 //     ina3221_ch_t inaChannelBattery = INA3221_CH1;
 //     ina3221_ch_t inaChannelSolar = INA3221_CH2;
-//     uint16_t mpptPowerOnVoltage = 12000;
-//     uint16_t mpptPowerOffVoltage = 11550;
 //     bool sendAprsMessageWhenAlert = false;
 //     char callsignToSendMessageAlert[CALLSIGN_LENGTH + 1]{};
 // } SettingsEnergy;
 
-typedef struct {
+struct SettingsMpptCharger
+{
+    uint16_t powerOnVoltage = 12000;
+    uint16_t powerOffVoltage = 11550;
+    SettingsMpptWatchdog watchdog{};
+};
+
+struct SettingsI2CSlave {
     bool enabled = true;
     uint8_t address = 0x11;
-} SettingsI2CSlave;
+};
 
-typedef struct
+struct SettingsPin
 {
     pin_size_t pin = 0;
     PinMode mode = OUTPUT;
     bool inverted = false;
     char name[16 + 1]{};
     uint8_t i2cAddress = 0;
-} SettingsPin;
+};
 
-// typedef struct {
+// struct {
 //     bool enabled = false;
 //     uint64_t intervalTimeoutWatchdog = 300000;
 //     SettingsPin pin{};
@@ -105,12 +110,7 @@ typedef struct
 //     uint16_t altitude = 0;
 // } SettingsWatchdogAndAprsItem;
 
-typedef struct
-{
-    bool enabled = false;
-} SettingsRtc;
-
-typedef struct
+struct Settings
 {
     uint16_t version = SETTINGS_VERSION;
     bool useWatchdog = true;
@@ -118,16 +118,16 @@ typedef struct
 
     SettingsPin pins[MAX_GPIO_USED]{};
     SettingsI2CSlave i2c{};
+    SettingsMpptCharger mppt{};
     // SettingsLoRa lora{};
     // SettingsAprs aprs{};
     // SettingsEnergy energy{};
     // SettingsWeather weather{};
-    SettingsMpptWatchdog mpptWatchdog{};
     // SettingsWatchdogAndAprsItem meshtastic{};
     // SettingsWatchdogAndAprsItem linux{};
-} Settings;
+};
 
-// typedef struct {
+// struct {
 // char callsign[CALLSIGN_LENGTH + 1]{};
 // time_t time = 0;
 // float rssi = 0;
@@ -138,7 +138,7 @@ typedef struct
 // uint8_t digipeaterCount = 0;
 // } SettingsAprsCallsignHeard;
 
-typedef struct
+struct SettingsGetSetFunction
 {
     char name[NAME_SETTING_LENGTH + 1]{};
     SettingsType type = UInt8;
@@ -146,4 +146,4 @@ typedef struct
     uint32_t maxSize = 1;
     size_t parentSize = 0;
     uint32_t maxStringLength = 0;
-} SettingsGetSetFunction;
+};

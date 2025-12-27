@@ -4,6 +4,7 @@
 #include <ArduinoLog.h>
 
 #include "SettingsManager.hpp"
+#include "controllers/LedController.hpp"
 #include "controllers/SensorController.hpp"
 #include "utils/utils.h"
 
@@ -62,12 +63,16 @@ void I2CSlaveController::onRequest()
     {
         Log.warningln("I2C Slave, buffer size 0, sent KO");
 
+        LedController::getInstance().blink(Error, I2CSlave);
+
         return;
     }
 
     Wire1.write(txBuffer, txBufferSize);
 
     Log.infoln("I2C Slave, sent %d bytes OK", txBufferSize);
+
+    LedController::getInstance().blink(Success, I2CSlave);
 }
 
 void I2CSlaveController::preparePongBuffer()
@@ -151,6 +156,8 @@ bool I2CSlaveController::fillBuffer(const void* buffer, const size_t size)
 
         memset(txBuffer, 0, I2C_BUFFER_SIZE);
         txBufferSize = 0;
+
+        LedController::getInstance().blink(Error, I2CSlave);
 
         return false;
     }

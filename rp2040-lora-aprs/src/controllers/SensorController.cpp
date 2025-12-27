@@ -3,6 +3,7 @@
 #include <ArduinoLog.h>
 
 #include "SettingsManager.hpp"
+#include "controllers/LedController.hpp"
 #include "hal/I2CMasterHal.hpp"
 #include "utils/utils.h"
 
@@ -15,10 +16,12 @@ SensorController::SensorController()
     if (timer == nullptr)
     {
         Log.warningln("Timer creation failed");
+
+        LedController::getInstance().blink(Error, FreeRtos);
     }
 }
 
-void SensorController::queryTimer(TimerHandle_t timer)
+void SensorController::queryTimer(const TimerHandle_t timer)
 {
     const auto ctrl = static_cast<SensorController*>(pvTimerGetTimerID(timer));
     ctrl->queryTelemetries();
@@ -32,12 +35,20 @@ bool SensorController::begin()
     if (!I2CMasterHal::takeSemaphore())
     {
         Log.warningln("Sensor can not begin, can not have semaphore");
+
+        LedController::getInstance().blink(Error, I2C);
+
         return false;
     }
 
     const auto result = initMpptCharger() || initIna3221() || initBme280() || initBmp280() || initI2cSlave();
 
     I2CMasterHal::releaseSemaphore();
+
+    if (result)
+    {
+        LedController::getInstance().blink(Success, Sensor);
+    }
 
     return result;
 }
@@ -54,6 +65,9 @@ bool SensorController::queryTelemetries()
     if (!I2CMasterHal::takeSemaphore())
     {
         Log.warningln("Sensor can not query, can not have semaphore");
+
+        LedController::getInstance().blink(Error, I2C);
+
         return false;
     }
 
@@ -68,6 +82,8 @@ bool SensorController::queryTelemetries()
         if (!charger.queryTelemetries(telemetry.battery, telemetry.solar, telemetry.batteryTemperature))
         {
             Log.warningln("MpptCharger in error");
+
+            LedController::getInstance().blink(Error, Sensor);
 
             initMpptCharger();
         }
@@ -91,6 +107,8 @@ bool SensorController::queryTelemetries()
         {
             Log.warningln("INA3221 in error");
 
+            LedController::getInstance().blink(Error, Sensor);
+
             initIna3221();
         }
         else
@@ -109,6 +127,8 @@ bool SensorController::queryTelemetries()
         if (telemetry.box.pressure == NAN)
         {
             Log.warningln("BMP280 in error");
+
+            LedController::getInstance().blink(Error, Sensor);
 
             initBmp280();
         }
@@ -130,6 +150,8 @@ bool SensorController::queryTelemetries()
         {
             Log.warningln("BME280 in error");
 
+            LedController::getInstance().blink(Error, Sensor);
+
             initBme280();
         }
         else
@@ -150,6 +172,8 @@ bool SensorController::queryTelemetries()
         {
             Log.warningln("I2CSlave in error");
 
+            LedController::getInstance().blink(Error, Sensor);
+
             initI2cSlave();
         }
     }
@@ -158,15 +182,19 @@ bool SensorController::queryTelemetries()
 
     if (result)
     {
-        printJson();
+        LedController::getInstance().blink(Success, Sensor);
+
+        printJson(serialJson);
+        printJson(serial1Json);
+        printJson(serial2Json);
     }
 
     return result;
 }
 
-void SensorController::printJson()
+void SensorController::printJson(StreamJson& streamJson)
 {
-    serialJsonWriter.beginObject()
+    streamJson.jsonWriter.beginObject()
     .property("updatedAt", telemetry.updatedAt)
 
     .beginObject("battery")
@@ -217,7 +245,7 @@ void SensorController::printJson()
 
 .endObject();
 
-    Serial.println();
+    streamJson.stream->println();
 }
 
 bool SensorController::initMpptCharger()

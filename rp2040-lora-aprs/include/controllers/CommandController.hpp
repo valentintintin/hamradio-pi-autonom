@@ -28,5 +28,6 @@ private:
     bool doUptimeCommand();
     bool doTelemetriesCommand();
     bool doPingCommand();
+    bool doMpptVoltageLimitsCommand(const char *command);
     bool doMpptWatchdogUserCommand(const char *command);
 };

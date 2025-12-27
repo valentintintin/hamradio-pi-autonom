@@ -2,49 +2,49 @@
 
 #include <Arduino.h>
 
-typedef struct
+struct TelemetryPower
 {
     float voltage;
     float current;
-} TelemetryPower;
+};
 
-typedef struct
+struct TelemetryBasic
 {
     float temperature;
     float humidity;
     float pressure;
-} TelemetryBasic;
+};
 
-typedef struct
+struct TelemetryWind
 {
     uint16_t direction;
     float speedAverage;
     float speedMax;
-} TelemetryWind;
+};
 
-typedef struct
+struct TelemetryLight
 {
     uint32_t uv;
     uint8_t uvIndex;
     float lux;
-} TelemetryLight;
+};
 
-typedef struct
+struct TelemetryOutdoor
 {
     TelemetryBasic basic;
     float rain;
     TelemetryWind wind;
     TelemetryLight light;
-} TelemetryOutdoor;
+};
 
-typedef struct
+struct Position
 {
     double latitude;
     double longitude;
     uint16_t altitude;
-} Position;
+};
 
-typedef struct
+struct Telemetry
 {
     TelemetryPower battery;
     TelemetryPower solar;
@@ -57,4 +57,4 @@ typedef struct
     Position position;
 
     uint32_t updatedAt;
-} Telemetry;
+};

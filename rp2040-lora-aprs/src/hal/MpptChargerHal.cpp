@@ -76,3 +76,35 @@ bool MpptChargerHal::setWatchdog(const uint16_t powerOff, const uint8_t timeout)
 
     return result;
 }
+
+bool MpptChargerHal::setVoltageLimits(const uint16_t powerOff, const uint16_t powerOn)
+{
+    Log.infoln("Mppt charge set limit voltage power off %d and power on %d", powerOff, powerOn);
+
+    if (powerOn < 12000 || powerOn > 13000)
+    {
+        Log.warningln("Power on outside range 12000 - 13000 mV");
+        return false;
+    }
+
+    if (powerOff < 11000 || powerOff > powerOn)
+    {
+        Log.warningln("Power off outside range 11000 - %d mV", powerOn);
+        return false;
+    }
+
+    auto result = begin();
+
+    if (result)
+    {
+        result &= charger.setConfigurationValue(CFG_PWR_ON_TH, powerOn) && charger.setConfigurationValue(CFG_PWR_OFF_TH, powerOff);
+
+        Log.infoln("Mppt charger set limit voltage OK");
+    }
+    else
+    {
+        Log.warningln("Mppt charger set limit voltage failed");
+    }
+
+    return result;
+}

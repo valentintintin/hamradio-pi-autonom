@@ -7,6 +7,8 @@
 
 #include <queue.h>
 
+#define RELAY_MAX_COMMAND 4
+
 struct RelayCommand
 {
     uint8_t id;

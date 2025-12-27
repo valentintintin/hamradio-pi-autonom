@@ -4,8 +4,7 @@
 
 #include <timers.h>
 
-#define LED_DELAY 100
-#define LED_MAX_DELAY 5000
+#define WATCHDOG_INTERNAL_MAX_DELAY 4000 // 2 tries for 8.3 seconds
 
 #define MPPT_CHARGER_POWER_OFF 10
 #define MPPT_CHARGER_TIMEOUT 255
@@ -25,7 +24,7 @@ public:
     bool setMpptWatchdogManagedByTask();
 
 private:
-    static void heartbeatAndFeedInternalWatchdog(TimerHandle_t timer);
+    static void feedInternalWatchdog(TimerHandle_t timer);
     static void feedMpptChargerWatchdog(TimerHandle_t timer);
 
     TimerHandle_t timer;
