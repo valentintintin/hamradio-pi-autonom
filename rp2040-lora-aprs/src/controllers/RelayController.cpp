@@ -3,6 +3,7 @@
 #include <ArduinoLog.h>
 
 #include "SettingsManager.hpp"
+#include "hal/I2CMasterHal.hpp"
 #include "hal/PicoGpioHal.hpp"
 
 RelayController::RelayController() : relays{}
@@ -96,7 +97,22 @@ void RelayController::task(void* pvParameters)
             }
 
             const auto relay = ctrl->relays[command.id];
+
+            if (relay->useI2C)
+            {
+                if (!I2CMasterHal::takeSemaphore())
+                {
+                    Log.warningln("RelayController can not set relay I2C %d, can not have semaphore", command.id);
+                    continue;
+                }
+            }
+
             relay->set(command.state);
+
+            if (relay->useI2C)
+            {
+                I2CMasterHal::releaseSemaphore();
+            }
 
             Log.infoln("RelayController message received done for id %d", command.id);
         }

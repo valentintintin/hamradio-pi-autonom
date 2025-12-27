@@ -1,6 +1,6 @@
 #include "hal/Tca9555GpioHal.hpp"
 
-Tca9555GpioHal::Tca9555GpioHal(Tca9555Hal& tca, uint8_t pin, PinMode mode, bool inverted) : tca(tca), GpioHal(pin, mode, inverted)
+Tca9555GpioHal::Tca9555GpioHal(Tca9555Hal& tca, const uint8_t pin, const PinMode mode, const bool inverted) : GpioHal(pin, mode, inverted, true), tca(tca)
 {
 }
 

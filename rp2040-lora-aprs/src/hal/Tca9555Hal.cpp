@@ -2,7 +2,7 @@
 
 #include <ArduinoLog.h>
 
-Tca9555Hal::Tca9555Hal(uint8_t address) : tca(address)
+Tca9555Hal::Tca9555Hal(const uint8_t address) : tca(address)
 {
 }
 

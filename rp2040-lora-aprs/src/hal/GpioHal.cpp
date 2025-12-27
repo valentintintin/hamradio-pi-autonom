@@ -2,7 +2,7 @@
 
 #include <ArduinoLog.h>
 
-GpioHal::GpioHal(const uint8_t pin, const PinMode mode, const bool inverted) : pin(pin), mode(mode), inverted(inverted)
+GpioHal::GpioHal(const uint8_t pin, const PinMode mode, const bool inverted, const bool useI2C) : pin(pin), mode(mode), inverted(inverted), useI2C(useI2C)
 {
 }
 
