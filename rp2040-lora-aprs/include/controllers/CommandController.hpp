@@ -2,7 +2,7 @@
 
 #include "controllers/RelayController.hpp"
 
-#define MAX_RESPONSE_LENGTH 128
+#define MAX_RESPONSE_LENGTH 64
 
 class CommandController : BaseController
 {
@@ -23,9 +23,10 @@ private:
 
     bool doRebootCommand();
     bool doDfuCommand();
-    bool doGpioCommand(uint8_t id, bool state);
+    bool doGpioCommand(const char *command);
     bool doResetReasonCommand();
     bool doUptimeCommand();
     bool doTelemetriesCommand();
     bool doPingCommand();
+    bool doMpptWatchdogUserCommand(const char *command);
 };

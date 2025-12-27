@@ -19,7 +19,7 @@ WatchdogController::WatchdogController()
     const auto& settingsMpptWatchdog = SettingsManager::getSettings().mpptWatchdog;
     if (settingsMpptWatchdog.enabled)
     {
-        timerMpptCharger = xTimerCreate("mpptChargerWatchdog", pdMS_TO_TICKS(settingsMpptWatchdog.intervalFeed), pdTRUE, nullptr, feedMpptChargerWatchdog);
+        timerMpptCharger = xTimerCreate("mpptChargerWatchdog", pdMS_TO_TICKS(settingsMpptWatchdog.intervalFeed * 1000), pdTRUE, nullptr, feedMpptChargerWatchdog);
 
         if (timerMpptCharger == nullptr)
         {
@@ -70,6 +70,48 @@ bool WatchdogController::begin()
     return result;
 }
 
+bool WatchdogController::setMpptWatchdogManagedByUser(const uint16_t timeOff, const uint8_t timeout)
+{
+    if (timerMpptCharger == nullptr)
+    {
+        Log.errorln("Timer mpptChargerWatchdog does not exist");
+
+        return false;
+    }
+
+    if (xTimerStop(timerMpptCharger, 0) == pdFAIL)
+    {
+        Log.errorln("Timer mpptChargerWatchdog stop failed");
+
+        return false;
+    }
+
+    Log.infoln("Timer mpptChargerWatchdog stopped");
+
+    return MpptChargerHal::getInstance().setWatchdog(timeOff, timeout);
+}
+
+bool WatchdogController::setMpptWatchdogManagedByTask()
+{
+    if (timerMpptCharger == nullptr)
+    {
+        Log.errorln("Timer mpptChargerWatchdog does not exist");
+
+        return false;
+    }
+
+    if (xTimerStart(timerMpptCharger, 0) == pdFAIL)
+    {
+        Log.errorln("Timer mpptChargerWatchdog start failed");
+
+        return false;
+    }
+
+    Log.infoln("Timer mpptChargerWatchdog started");
+
+    return true;
+}
+
 void WatchdogController::heartbeatAndFeedInternalWatchdog(TimerHandle_t timer)
 {
     if (SettingsManager::getSettings().useWatchdog)
@@ -95,7 +137,7 @@ void WatchdogController::feedMpptChargerWatchdog(TimerHandle_t timer)
 
     const auto& settingsMpptWatchdog = SettingsManager::getSettings().mpptWatchdog;
 
-    MpptChargerHal::getInstance().feedDog(settingsMpptWatchdog.timeOff, settingsMpptWatchdog.timeout);
+    MpptChargerHal::getInstance().setWatchdog(settingsMpptWatchdog.timeOff, settingsMpptWatchdog.timeout);
 
     I2CMasterHal::releaseSemaphore();
 }

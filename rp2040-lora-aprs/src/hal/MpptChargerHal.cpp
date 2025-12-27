@@ -57,7 +57,7 @@ bool MpptChargerHal::queryTelemetries(TelemetryPower &telemetryBattery, Telemetr
     return result;
 }
 
-bool MpptChargerHal::feedDog(const uint16_t powerOff, const uint8_t timeout)
+bool MpptChargerHal::setWatchdog(const uint16_t powerOff, const uint8_t timeout)
 {
     Log.infoln("Feed Mppt watchdog with power off %d and timeout %d", powerOff, timeout);
 
@@ -65,7 +65,7 @@ bool MpptChargerHal::feedDog(const uint16_t powerOff, const uint8_t timeout)
 
     if (result)
     {
-        result &= charger.setWatchdogPoweroff(powerOff) && charger.setWatchdogTimeout(timeout);
+        result &= charger.setWatchdogPoweroff(powerOff * 1000) && charger.setWatchdogTimeout(timeout);
 
         Log.infoln("Feed Mppt watchdog OK");
     }

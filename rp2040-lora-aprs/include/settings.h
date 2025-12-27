@@ -52,7 +52,7 @@ typedef struct {
     bool enabled = false;
     uint8_t timeout = 255;
     uint8_t intervalFeed = 30;
-    uint16_t timeOff = 10000;
+    uint16_t timeOff = 10;
 } SettingsMpptWatchdog;
 //
 // typedef struct {

@@ -7,6 +7,7 @@
 
 #include "SettingsManager.hpp"
 #include "controllers/SensorController.hpp"
+#include "controllers/WatchdogController.hpp"
 
 bool CommandController::begin()
 {
@@ -38,17 +39,7 @@ bool CommandController::processCommand(const char* command)
 
     if (memcmp(command, "gpio ", 5) == 0)
     {
-        if (memcmp(&command[5], "on ", 3) == 0)
-        {
-            const auto pin = strtol(&command[5 + 3], nullptr, 10);
-            return doGpioCommand(pin, true);
-        }
-
-        if (memcmp(&command[5], "off ", 4) == 0)
-        {
-            const auto pin = strtol(&command[5 + 4], nullptr, 10);
-            return doGpioCommand(pin, false);
-        }
+        doGpioCommand(&command[5]);
     }
 
     if (memcmp(command, "dfu", 3) == 0)
@@ -81,6 +72,11 @@ bool CommandController::processCommand(const char* command)
         return doPingCommand();
     }
 
+    if (memcmp(command, "mppt.wdt ", 9) == 0)
+    {
+        return doMpptWatchdogUserCommand(&command[9]);
+    }
+
     return false;
 }
 
@@ -91,11 +87,11 @@ const char* CommandController::getResponse() const
 
 bool CommandController::doRebootCommand()
 {
-    TimerHandle_t timer = xTimerCreate("timerReboot", pdMS_TO_TICKS(10000), pdFALSE, nullptr, rebootTask);
+    const TimerHandle_t timer = xTimerCreate("timerReboot", pdMS_TO_TICKS(5000), pdFALSE, nullptr, rebootTask);
 
     if (xTimerStart(timer, 0) == pdPASS)
     {
-        strncpy(response, "Reboot in 10s !", MAX_RESPONSE_LENGTH);
+        strncpy(response, "Reboot in 5s !", MAX_RESPONSE_LENGTH);
     }
     else
     {
@@ -108,11 +104,13 @@ bool CommandController::doRebootCommand()
 
 bool CommandController::doDfuCommand()
 {
-    TimerHandle_t timer = xTimerCreate("timerDfu", pdMS_TO_TICKS(10000), pdFALSE, nullptr, dfuTask);
+    const TimerHandle_t timer = xTimerCreate("timerDfu", pdMS_TO_TICKS(5000), pdFALSE, nullptr, dfuTask);
+
+    WatchdogController::getInstance().setMpptWatchdogManagedByUser(5);
 
     if (xTimerStart(timer, 0) == pdPASS)
     {
-        strncpy(response, "DFU in 10s !", MAX_RESPONSE_LENGTH);
+        strncpy(response, "DFU in 5s !", MAX_RESPONSE_LENGTH);
     }
     else
     {
@@ -123,8 +121,23 @@ bool CommandController::doDfuCommand()
     return true;
 }
 
-bool CommandController::doGpioCommand(const uint8_t id, const bool state)
+bool CommandController::doGpioCommand(const char *command)
 {
+    uint8_t id = 255;
+    bool state = false;
+
+    if (memcmp(command, "on ", 3) == 0)
+    {
+        id = strtol(&command[3], nullptr, 10);
+        state = true;
+    }
+
+    if (memcmp(command, "off ", 4) == 0)
+    {
+        id = strtol(&command[4], nullptr, 10);
+        state = false;
+    }
+
     if (RelayController::getInstance().changeState(id, state))
     {
         snprintf(response, MAX_RESPONSE_LENGTH, "OK. GPIO %d is %d", id, state);
@@ -171,4 +184,28 @@ bool CommandController::doPingCommand()
     snprintf(response, MAX_RESPONSE_LENGTH, "Pong!\n%s", dateString);
 
     return true;
+}
+
+bool CommandController::doMpptWatchdogUserCommand(const char *command)
+{
+    const char* space = strchr(command, ' ');
+    if (!space)
+    {
+        strncpy(response, "KO args: TOff TOn -> sec", MAX_RESPONSE_LENGTH);
+        return false;
+    }
+
+    char* endPointer = nullptr;
+
+    const auto timeOff = static_cast<uint16_t>(strtol(command, &endPointer, 10));
+    const auto timeout = static_cast<uint8_t>(strtol(space + 1, &endPointer, 10));
+
+    if (WatchdogController::getInstance().setMpptWatchdogManagedByUser(timeOff, timeout))
+    {
+        snprintf(response, MAX_RESPONSE_LENGTH, "OK. TOff %ds, TOn %ds", timeOff, timeout);
+        return true;
+    }
+
+    snprintf(response, MAX_RESPONSE_LENGTH, "KO. TOff %ds, TOn %ds", timeOff, timeout);
+    return false;
 }

@@ -21,11 +21,13 @@ public:
     }
 
     bool begin() override;
+    bool setMpptWatchdogManagedByUser(uint16_t timeOff, uint8_t timeout = 255);
+    bool setMpptWatchdogManagedByTask();
 
+private:
     static void heartbeatAndFeedInternalWatchdog(TimerHandle_t timer);
     static void feedMpptChargerWatchdog(TimerHandle_t timer);
 
-private:
     TimerHandle_t timer;
     TimerHandle_t timerMpptCharger;
 

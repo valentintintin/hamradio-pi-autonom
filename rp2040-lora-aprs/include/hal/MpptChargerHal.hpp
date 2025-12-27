@@ -14,7 +14,7 @@ public:
 
     bool begin();
     bool queryTelemetries(TelemetryPower &telemetryBattery, TelemetryPower &telemetrySolar, float &temperature);
-    bool feedDog(uint16_t powerOff = 10, uint8_t timeout = 255);
+    bool setWatchdog(uint16_t powerOff = 10, uint8_t timeout = 255);
 
     bool isInitialized() const
     {
