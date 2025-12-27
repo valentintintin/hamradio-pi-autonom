@@ -88,7 +88,7 @@ void I2CSlaveController::prepareClockBuffer()
 
 void I2CSlaveController::prepareTelemetryBuffer(const I2CSlaveRegisterValue what)
 {
-    const Telemetry& telemetry = SensorController::getTelemetry();
+    const auto& telemetry = SensorController::getTelemetry();
     auto pointer = reinterpret_cast<const uint8_t*>(&telemetry);
     auto size = 1;
 

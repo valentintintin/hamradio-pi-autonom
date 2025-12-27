@@ -4,6 +4,7 @@
 #include <ArduinoLog.h>
 #include <timers.h>
 
+#include "SettingsManager.hpp"
 #include "hal/I2CMasterHal.hpp"
 
 WatchdogController::WatchdogController()
@@ -15,11 +16,15 @@ WatchdogController::WatchdogController()
         Log.errorln("Timer heartBeatAndInternal creation failed");
     }
 
-    timerMpptCharger = xTimerCreate("mpptChargerWatchdog", pdMS_TO_TICKS(MPPT_CHARGER_DELAY), pdTRUE, nullptr, feedMpptChargerWatchdog);
-
-    if (timerMpptCharger == nullptr)
+    const auto& settingsMpptWatchdog = SettingsManager::getSettings().mpptWatchdog;
+    if (settingsMpptWatchdog.enabled)
     {
-        Log.errorln("Timer mpptChargerWatchdog creation failed");
+        timerMpptCharger = xTimerCreate("mpptChargerWatchdog", pdMS_TO_TICKS(settingsMpptWatchdog.intervalFeed), pdTRUE, nullptr, feedMpptChargerWatchdog);
+
+        if (timerMpptCharger == nullptr)
+        {
+            Log.errorln("Timer mpptChargerWatchdog creation failed");
+        }
     }
 }
 
@@ -35,7 +40,12 @@ bool WatchdogController::begin()
         }
         else
         {
-            rp2040.wdt_begin(8300);
+            if (SettingsManager::getSettings().useWatchdog)
+            {
+                Log.infoln("Use internal watchdog (8300ms)");
+
+                rp2040.wdt_begin(8300);
+            }
 
             result = true;
 
@@ -45,28 +55,15 @@ bool WatchdogController::begin()
 
     if (timerMpptCharger)
     {
-        if (!I2CMasterHal::takeSemaphore())
+        if (xTimerStart(timerMpptCharger, 0) == pdFAIL)
         {
-            Log.warningln("Watchdog mppt can not begin, can not have semaphore");
-            // TODO retry
+            Log.errorln("Timer mpptChargerWatchdog start failed");
         }
         else
         {
-            if (MpptChargerHal::getInstance().begin())
-            {
-                if (xTimerStart(timerMpptCharger, 0) == pdFAIL)
-                {
-                    Log.errorln("Timer mpptChargerWatchdog start failed");
-                }
-                else
-                {
-                    result &= true;
+            result &= true;
 
-                    Log.infoln("Timer mpptChargerWatchdog started");
-                }
-            }
-
-            I2CMasterHal::releaseSemaphore();
+            Log.infoln("Timer mpptChargerWatchdog started");
         }
     }
 
@@ -75,7 +72,10 @@ bool WatchdogController::begin()
 
 void WatchdogController::heartbeatAndFeedInternalWatchdog(TimerHandle_t timer)
 {
-    rp2040.wdt_reset();
+    if (SettingsManager::getSettings().useWatchdog)
+    {
+        rp2040.wdt_reset();
+    }
 
     digitalWrite(LED_BUILTIN, HIGH);
     vTaskDelay(pdMS_TO_TICKS(LED_DELAY));
@@ -91,12 +91,11 @@ void WatchdogController::feedMpptChargerWatchdog(TimerHandle_t timer)
         return;
     }
 
-    if (MpptChargerHal::getInstance().isInitialized())
-    {
-        Log.infoln("Try to feed Mppt watchdog");
+    Log.infoln("Feed Mppt watchdog");
 
-        MpptChargerHal::getInstance().feedDog(MPPT_CHARGER_POWER_OFF, MPPT_CHARGER_TIMEOUT);
-    }
+    const auto& settingsMpptWatchdog = SettingsManager::getSettings().mpptWatchdog;
+
+    MpptChargerHal::getInstance().feedDog(settingsMpptWatchdog.timeOff, settingsMpptWatchdog.timeout);
 
     I2CMasterHal::releaseSemaphore();
 }

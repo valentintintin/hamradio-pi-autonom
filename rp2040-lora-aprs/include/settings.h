@@ -48,12 +48,12 @@ enum SettingsType
 //     uint16_t telemetrySequenceNumber = 0;
 // } SettingsAprs;
 
-// typedef struct {
-//     bool enabled = false;
-//     uint8_t timeout = 90;
-//     uint64_t intervalFeed = 30000;
-//     uint16_t timeOff = 30000;
-// } SettingsMpptWatchdog;
+typedef struct {
+    bool enabled = false;
+    uint8_t timeout = 255;
+    uint8_t intervalFeed = 30;
+    uint16_t timeOff = 10000;
+} SettingsMpptWatchdog;
 //
 // typedef struct {
 //     bool enabled = true;
@@ -113,6 +113,7 @@ typedef struct
 typedef struct
 {
     uint16_t version = SETTINGS_VERSION;
+    bool useWatchdog = true;
     bool useSlowClock = false;
 
     SettingsPin pins[MAX_GPIO_USED]{};
@@ -121,7 +122,7 @@ typedef struct
     // SettingsAprs aprs{};
     // SettingsEnergy energy{};
     // SettingsWeather weather{};
-    // SettingsMpptWatchdog mpptWatchdog{};
+    SettingsMpptWatchdog mpptWatchdog{};
     // SettingsWatchdogAndAprsItem meshtastic{};
     // SettingsWatchdogAndAprsItem linux{};
 } Settings;

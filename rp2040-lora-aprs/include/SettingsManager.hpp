@@ -25,6 +25,7 @@ private:
 
     SettingsGetSetFunction settingsGetSetFunctions[NB_SETTINGS] = {
         { "version", UInt16, &settings.version },
+        { "wdt", Boolean, &settings.useWatchdog },
         { "slowClock", Boolean, &settings.useSlowClock },
         { "pin.pin", UInt8, &settings.pins[0].pin, MAX_GPIO_USED, sizeof(SettingsPin) },
         { "pin.mode", UInt8, &settings.pins[0].mode, MAX_GPIO_USED, sizeof(SettingsPin) },
@@ -33,6 +34,10 @@ private:
         { "pin.name", CharString, &settings.pins[0].name, MAX_GPIO_USED, sizeof(SettingsPin), sizeof(decltype(SettingsPin::name)) },
         { "i2cSlave.enabled", Boolean, &settings.i2c.address },
         { "i2cSlave.address", UInt8, &settings.i2c.address },
+        { "mppt.wdt.enabled", Boolean, &settings.mpptWatchdog.enabled },
+        { "mppt.wdt.interval", UInt8, &settings.mpptWatchdog.intervalFeed },
+        { "mppt.wdt.timeOff", UInt16, &settings.mpptWatchdog.timeOff },
+        { "mppt.wdt.timeout", UInt8, &settings.mpptWatchdog.timeout },
     };
 
     void* getSettingsPointer(const SettingsGetSetFunction &settingFn, uint32_t index) const;
