@@ -65,14 +65,14 @@ void SettingsManager::loadDefaults()
 {
     uint8_t i = 0;
 
-    settings.pins[i].pin = 11;
-    strcpy(settings.pins[i++].name, "wifi");
+    settings.gpio[i].enabled = true;
+    settings.gpio[i++].pin = 11;
 
-    settings.pins[i].pin = 12;
-    strcpy(settings.pins[i++].name, "linux");
+    settings.gpio[i].enabled = true;
+    settings.gpio[i++].pin = 12;
 
-    settings.pins[i].pin = 10;
-    strcpy(settings.pins[i++].name, "msh");
+    settings.gpio[i].enabled = true;
+    settings.gpio[i++].pin = 10;
 }
 
 bool SettingsManager::saveSettings() const

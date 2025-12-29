@@ -44,9 +44,14 @@ bool RelayController::begin()
 
 uint8_t RelayController::loadRelayFromSettings()
 {
-    for (const auto pin : SettingsManager::getSettings().pins)
+    for (const auto pin : SettingsManager::getSettings().gpio)
     {
-        if (pin.i2cAddress == 0 && strlen(pin.name) > 0)
+        if (!pin.enabled)
+        {
+            continue;
+        }
+
+        if (pin.i2cAddress == 0)
         {
             const auto gpio = new PicoGpioHal(pin.pin, pin.mode, pin.inverted);
 

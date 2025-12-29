@@ -85,12 +85,12 @@ struct SettingsI2CSlave {
     uint8_t address = 0x11;
 };
 
-struct SettingsPin
+struct SettingsGpio
 {
+    bool enabled = false;
     pin_size_t pin = 0;
     PinMode mode = OUTPUT;
     bool inverted = false;
-    char name[16 + 1]{};
     uint8_t i2cAddress = 0;
 };
 
@@ -115,7 +115,7 @@ struct Settings
     bool useWatchdog = true;
     bool useSlowClock = false;
 
-    SettingsPin pins[MAX_GPIO_USED]{};
+    SettingsGpio gpio[MAX_GPIO_USED]{};
     SettingsI2CSlave i2c{};
     SettingsMpptCharger mppt{};
     // SettingsLoRa lora{};
