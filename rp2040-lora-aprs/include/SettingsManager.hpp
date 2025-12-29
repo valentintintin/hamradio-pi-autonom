@@ -16,14 +16,18 @@ public:
     }
 
     bool begin();
+    bool loadSaved();
     void loadDefaults();
+    bool saveSettings() const;
+
+    void printSettings();
 
     bool getSettingFromString(const char *source, char* valueOut, size_t lengthValueOut);
     bool setSettingFromString(const char *source, const char* value);
 private:
     Settings settings{};
 
-    SettingsGetSetFunction settingsGetSetFunctions[NB_SETTINGS] = {
+    SettingsGetSetFunction settingsGetSetFunctions[16] = {
         { "version", UInt16, &settings.version },
         { "wdt", Boolean, &settings.useWatchdog },
         { "slowClock", Boolean, &settings.useSlowClock },
@@ -45,4 +49,5 @@ private:
     void* getSettingsPointer(const SettingsGetSetFunction &settingFn, uint32_t index) const;
     uint8_t parseNameIndex(const char* source, char* name);
     size_t getElementSize(SettingsType type) const;
+    void printSettings(const SettingsGetSetFunction &settingFn, uint32_t index = 0) const;
 };

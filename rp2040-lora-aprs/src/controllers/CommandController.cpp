@@ -22,26 +22,22 @@ bool CommandController::processCommand(const char* command)
 
     if (memcmp(command, "get ", 4) == 0)
     {
-        const char* configKey = &command[4];
-        return SettingsManager::getInstance().getSettingFromString(configKey, response, MAX_RESPONSE_LENGTH);
+        return doGetCommand(&command[4]);
     }
 
     if (memcmp(command, "set ", 4) == 0)
     {
-        const char* configKey = &command[4];
+        return doSetCommand(&command[4]);
+    }
 
-        const char* value = strchr(configKey, ' ');
-        if (value != nullptr && strlen(value) >= 2) // espace + valeur à minima 1 caractère
-        {
-            return SettingsManager::getInstance().setSettingFromString(configKey, value + 1);
-        }
-
-        return false;
+    if (memcmp(command, "save", 4) == 0)
+    {
+        return doSaveSettingsCommand();
     }
 
     if (memcmp(command, "gpio ", 5) == 0)
     {
-        doGpioCommand(&command[5]);
+        return doGpioCommand(&command[5]);
     }
 
     if (memcmp(command, "dfu", 3) == 0)
@@ -92,6 +88,34 @@ bool CommandController::processCommand(const char* command)
 const char* CommandController::getResponse() const
 {
     return response;
+}
+
+bool CommandController::doGetCommand(const char* command)
+{
+    return SettingsManager::getInstance().getSettingFromString(command, response, MAX_RESPONSE_LENGTH);
+}
+
+bool CommandController::doSetCommand(const char* command)
+{
+    const char* value = strchr(command, ' ');
+    if (value != nullptr && strlen(value) >= 2) // espace + valeur à minima 1 caractère
+    {
+        return SettingsManager::getInstance().setSettingFromString(command, value + 1);
+    }
+
+    return false;
+}
+
+bool CommandController::doResetSettingsCommand()
+{
+    SettingsManager::getInstance().loadDefaults();
+
+    return true;
+}
+
+bool CommandController::doSaveSettingsCommand()
+{
+    return SettingsManager::getInstance().saveSettings();
 }
 
 bool CommandController::doRebootCommand()

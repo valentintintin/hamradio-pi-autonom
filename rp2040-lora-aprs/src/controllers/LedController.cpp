@@ -55,11 +55,6 @@ void LedController::task(void* pvParameters)
     {
         if (xQueueReceive(ctrl->queue, &command, portMAX_DELAY) == pdTRUE)
         {
-            if (command.origin != Watchdog)
-            {
-                Log.traceln("Led for %d as %d", command.origin, command.state);
-            }
-
             for (uint8_t i = 0; i < command.origin; i++)
             {
                 digitalWrite(LED_BUILTIN, HIGH);

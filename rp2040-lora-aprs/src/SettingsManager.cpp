@@ -4,11 +4,38 @@
 #include <LittleFS.h>
 #include <bits/ios_base.h>
 
+#include "controllers/LedController.hpp"
+
 bool SettingsManager::begin()
 {
     LittleFS.begin();
 
-    loadDefaults();
+    loadSaved();
+
+    printSettings();
+
+    return true;
+}
+
+bool SettingsManager::loadSaved()
+{
+    File file = LittleFS.open("/config.dat", "r");
+    if (!file) {
+        Log.warningln("Fail to open settings, use default one");
+
+        loadDefaults();
+
+        LedController::getInstance().blink(Error, Settings);
+
+        return false;
+    }
+
+    file.read(reinterpret_cast<uint8_t *>(&settings), sizeof(settings));
+    file.close();
+
+    Log.infoln("Settings read correctly");
+
+    LedController::getInstance().blink(Success, Settings);
 
     return true;
 }
@@ -27,6 +54,49 @@ void SettingsManager::loadDefaults()
     strcpy(settings.pins[i++].name, "msh");
 }
 
+bool SettingsManager::saveSettings() const
+{
+    File file = LittleFS.open("/config.dat", "w");
+    if (!file) {
+        Log.errorln("Fail to save settings");
+
+        LedController::getInstance().blink(Error, Settings);
+
+        return false;
+    }
+
+    file.write(reinterpret_cast<const uint8_t *>(&settings), sizeof(settings));
+    file.close();
+
+    Log.infoln("Saved settings to FS");
+
+    LedController::getInstance().blink(Success, Settings);
+
+    return true;
+}
+
+void SettingsManager::printSettings()
+{
+    for (const auto &config : settingsGetSetFunctions) {
+        if (config.pointer == 0)
+        {
+            continue;
+        }
+
+        if (config.maxSize == 1)
+        {
+            printSettings(config);
+        }
+        else
+        {
+            for (uint32_t i = 0; i < config.maxSize; i++)
+            {
+                printSettings(config, i);
+            }
+        }
+    }
+}
+
 bool SettingsManager::getSettingFromString(const char* source, char* valueOut, const size_t lengthValueOut)
 {
     for (const auto& settingFn : settingsGetSetFunctions)
@@ -42,7 +112,7 @@ bool SettingsManager::getSettingFromString(const char* source, char* valueOut, c
 
         const auto pointer = getSettingsPointer(settingFn, index);
 
-        Log.infoln("Read setting %s at address %X", settingFn.name, pointer);
+        Log.infoln("Read setting %s at address %X", settingFn.name, index, pointer);
 
         switch (settingFn.type)
         {
@@ -110,7 +180,7 @@ bool SettingsManager::setSettingFromString(const char* source, const char* value
 
         const auto pointer = getSettingsPointer(settingFn, index);
 
-        Log.infoln("Set setting %s at address %X with value %s", settingFn.name, pointer, value);
+        Log.infoln("Set setting %s at address %X with value %s", settingFn.name, index, pointer, value);
 
         switch (settingFn.type)
         {
@@ -220,5 +290,55 @@ size_t SettingsManager::getElementSize(SettingsType type) const
     default:
         Log.errorln("Type not found %d", type);
         return 1;
+    }
+}
+
+void SettingsManager::printSettings(const SettingsGetSetFunction& settingFn, const uint32_t index) const
+{
+    const auto pointer = getSettingsPointer(settingFn, index);
+
+    switch (settingFn.type) {
+    case Boolean:
+        Log.traceln("Settings: %s[%d] = %T", settingFn.name, index, static_cast<bool *>(pointer));
+        break;
+    case Int8:
+        Log.traceln("Settings: %s[%d] = %d", settingFn.name, index, *static_cast<int8_t *>(pointer));
+        break;
+    case Int16:
+        Log.traceln("Settings: %s[%d] = %u", settingFn.name, index, *static_cast<int16_t *>(pointer));
+        break;
+    case Int32:
+        Log.traceln("Settings: %s[%d] = %u", settingFn.name, index, *static_cast<int32_t *>(pointer));
+        break;
+    case Int64:
+        Log.traceln("Settings: %s[%d] = %u", settingFn.name, index, *static_cast<int64_t *>(pointer));
+        break;
+    case UInt8:
+        Log.traceln("Settings: %s[%d] = %d", settingFn.name, index, *static_cast<uint8_t *>(pointer));
+        break;
+    case UInt16:
+        Log.traceln("Settings: %s[%d] = %u", settingFn.name, index, *static_cast<uint16_t *>(pointer));
+        break;
+    case UInt32:
+        Log.traceln("Settings: %s[%d] = %u", settingFn.name, index, *static_cast<uint32_t *>(pointer));
+        break;
+    case UInt64:
+        Log.traceln("Settings: %s[%d] = %u", settingFn.name, index, *static_cast<uint64_t *>(pointer));
+        break;
+    case Char:
+        Log.traceln("Settings: %s[%d] = %c", settingFn.name, index, *static_cast<char *>(pointer));
+        break;
+    case Float:
+        Log.traceln("Settings: %s[%d] = %F", settingFn.name, index, *static_cast<float *>(pointer));
+        break;
+    case Double:
+        Log.traceln("Settings: %s[%d] = %D", settingFn.name, index, *static_cast<double *>(pointer));
+        break;
+    case CharString:
+        Log.traceln("Settings: %s[%d] = %s", settingFn.name, index, static_cast<char*>(pointer));
+        break;
+    default:
+        Log.traceln("Settings: %s[%d] = not implemented", settingFn.name, index);
+        break;
     }
 }

@@ -18,6 +18,7 @@ enum LedOrigin
 {
     Watchdog = 1,
     FreeRtos,
+    Settings,
     Relay,
     I2C,
     I2CSlave,

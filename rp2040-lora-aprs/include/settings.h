@@ -4,7 +4,6 @@
 
 #include "config.h"
 
-#define NB_SETTINGS 82
 #define NAME_SETTING_LENGTH 32
 
 enum SettingsType

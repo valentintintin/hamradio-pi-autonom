@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SettingsManager.hpp"
 #include "controllers/RelayController.hpp"
 
 #define MAX_RESPONSE_LENGTH 64
@@ -21,6 +22,10 @@ public:
 private:
     char response[MAX_RESPONSE_LENGTH]{};
 
+    bool doGetCommand(const char* command);
+    bool doSetCommand(const char* command);
+    bool doResetSettingsCommand();
+    bool doSaveSettingsCommand();
     bool doRebootCommand();
     bool doDfuCommand();
     bool doGpioCommand(const char *command);
