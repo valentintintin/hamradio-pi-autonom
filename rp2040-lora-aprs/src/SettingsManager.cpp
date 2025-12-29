@@ -8,7 +8,28 @@
 
 bool SettingsManager::begin()
 {
-    LittleFS.begin();
+    if (!LittleFS.begin())
+    {
+        Log.warningln("Impossible to mount FS, format");
+
+        if (!LittleFS.format())
+        {
+            Log.errorln("Impossible to format FS");
+
+            LedController::getInstance().blink(Error, Settings);
+
+            return false;
+        }
+
+        if (!LittleFS.begin())
+        {
+            Log.errorln("Impossible to mount FS event after format");
+
+            LedController::getInstance().blink(Error, Settings);
+
+            return false;
+        }
+    }
 
     loadSaved();
 
@@ -19,7 +40,7 @@ bool SettingsManager::begin()
 
 bool SettingsManager::loadSaved()
 {
-    File file = LittleFS.open("/config.dat", "r");
+    File file = LittleFS.open(SETTINGS_FILE_PATH, "r");
     if (!file) {
         Log.warningln("Fail to open settings, use default one");
 
@@ -56,7 +77,7 @@ void SettingsManager::loadDefaults()
 
 bool SettingsManager::saveSettings() const
 {
-    File file = LittleFS.open("/config.dat", "w");
+    File file = LittleFS.open(SETTINGS_FILE_PATH, "w");
     if (!file) {
         Log.errorln("Fail to save settings");
 
@@ -95,6 +116,11 @@ void SettingsManager::printSettings()
             }
         }
     }
+
+    FSInfo info;
+    LittleFS.info(info);
+
+    Log.infoln("FS Used/Total: %u/%u", info.usedBytes, info.totalBytes);
 }
 
 bool SettingsManager::getSettingFromString(const char* source, char* valueOut, const size_t lengthValueOut)

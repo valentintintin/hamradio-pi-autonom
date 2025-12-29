@@ -1,6 +1,8 @@
 #pragma once
 #include "settings.h"
 
+#define SETTINGS_FILE_PATH "/config.dat"
+
 class SettingsManager
 {
 public:

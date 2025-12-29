@@ -2,8 +2,8 @@
 
 #include <Arduino.h>
 
-#include "config.h"
-
+#define MAX_GPIO_USED 16
+#define SETTINGS_VERSION 1
 #define NAME_SETTING_LENGTH 32
 
 enum SettingsType

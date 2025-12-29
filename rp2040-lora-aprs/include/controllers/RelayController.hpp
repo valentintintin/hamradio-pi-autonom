@@ -3,7 +3,6 @@
 
 #include "BaseController.hpp"
 #include "hal/GpioHal.hpp"
-#include "config.h"
 
 #include <queue.h>
 

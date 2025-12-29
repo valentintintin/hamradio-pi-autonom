@@ -1,6 +1,5 @@
 #pragma once
 
-#define MAX_GPIO_USED 16
 #define BUFFER_LENGTH 256
 
 #define LORA_SCK 14  // GPIO14
@@ -17,7 +16,6 @@
 #define LORA_PREAMBLE_LENGTH 8
 #define TRX_BUFFER 256
 
-#define SETTINGS_VERSION 1
 #define DISABLE_SLOW_CLOCK false
 
 #define TIME_SET_MPPT_WATCHDOG_DFU 120000 // 2 minutes
