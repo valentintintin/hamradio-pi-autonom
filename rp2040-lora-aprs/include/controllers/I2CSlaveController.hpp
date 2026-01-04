@@ -24,7 +24,7 @@ enum I2CSlaveRegisterValue
     RegisterClock
 };
 
-class I2CSlaveController : BaseController
+class I2CSlaveController : public BaseController
 {
 public:
     static I2CSlaveController& getInstance()

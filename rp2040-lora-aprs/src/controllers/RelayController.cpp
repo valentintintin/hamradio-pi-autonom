@@ -6,6 +6,7 @@
 #include "controllers/LedController.hpp"
 #include "hal/I2CMasterHal.hpp"
 #include "hal/PicoGpioHal.hpp"
+#include "hal/Tca9555GpioHal.hpp"
 
 RelayController::RelayController()
 {
@@ -44,36 +45,42 @@ bool RelayController::begin()
 
 uint8_t RelayController::loadRelayFromSettings()
 {
-    for (const auto pin : SettingsManager::getSettings().gpio)
+    for (const auto gpioConfig : SettingsManager::getSettings().gpio)
     {
-        if (!pin.enabled)
+        if (!gpioConfig.enabled)
         {
             continue;
         }
 
-        if (pin.i2cAddress == 0)
+        GpioHal *gpio;
+
+        if (gpioConfig.i2cAddress == 0)
         {
-            const auto gpio = new PicoGpioHal(pin.pin, pin.mode, pin.inverted);
+            gpio = new PicoGpioHal(gpioConfig.pin, gpioConfig.mode, gpioConfig.inverted);
+        }
+        else
+        {
+            gpio = new Tca9555GpioHal(Tca9555Hal::getInstance(gpioConfig.i2cAddress), gpioConfig.pin, gpioConfig.mode, gpioConfig.inverted);
+        }
 
-            relays[nbRelays] = gpio;
+        relays[nbRelays] = gpio;
 
-            Log.infoln(F("Relay pin %d added with id %d"), gpio->pin, nbRelays);
+        Log.infoln("Relay pin %d added with id %d", gpio->pin, nbRelays);
 
-            if (!gpio->init())
-            {
-                Log.warningln(F("Relay pin %d added with id %d failed to init"), gpio->pin, nbRelays);
-            }
+        if (!gpio->init())
+        {
+            Log.warningln("Relay pin %d added with id %d failed to init", gpio->pin, nbRelays);
+        }
 
-            nbRelays++;
+        nbRelays++;
 
-            if (nbRelays >= MAX_GPIO_USED)
-            {
-                Log.warningln("Max relay reached %d", nbRelays);
+        if (nbRelays >= MAX_GPIO_USED)
+        {
+            Log.warningln("Max relay reached %d", nbRelays);
 
-                LedController::getInstance().blink(Error, Relay);
+            LedController::getInstance().blink(Error, Relay);
 
-                break;
-            }
+            break;
         }
     }
 

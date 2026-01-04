@@ -34,7 +34,7 @@ struct LedCommand
     LedOrigin origin;
 };
 
-class LedController : BaseController
+class LedController : public BaseController
 {
 public:
     static LedController& getInstance()

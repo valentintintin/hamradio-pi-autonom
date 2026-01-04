@@ -8,6 +8,6 @@ GpioHal::GpioHal(const uint8_t pin, const PinMode mode, const bool inverted, con
 
 bool GpioHal::toggle()
 {
-    Log.infoln(F("Pin %d toggled"), pin);
+    Log.infoln("Pin %d toggled", pin);
     return set(!get());
 }

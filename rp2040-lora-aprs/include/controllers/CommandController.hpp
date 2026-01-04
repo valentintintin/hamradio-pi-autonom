@@ -5,7 +5,7 @@
 
 #define MAX_RESPONSE_LENGTH 64
 
-class CommandController : BaseController
+class CommandController : public BaseController
 {
 public:
     static CommandController& getInstance()

@@ -10,7 +10,7 @@
 #define MPPT_CHARGER_TIMEOUT 255
 #define MPPT_CHARGER_DELAY 60000 // 4 tries for 255 seconds
 
-class WatchdogController : BaseController
+class WatchdogController : public BaseController
 {
 public:
     static WatchdogController& getInstance()

@@ -245,7 +245,7 @@ void SensorController::printJson(StreamJson& streamJson)
 
 .endObject();
 
-    streamJson.stream->println();
+    streamJson.stream.println();
 }
 
 bool SensorController::initMpptCharger()

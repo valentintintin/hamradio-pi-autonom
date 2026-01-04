@@ -17,10 +17,10 @@
 struct StreamJson
 {
     JsonWriter jsonWriter;
-    Stream *stream;
+    Stream& stream;
 };
 
-class SensorController : BaseController
+class SensorController : public BaseController
 {
 public:
     static SensorController& getInstance()
@@ -67,15 +67,15 @@ private:
 
     StreamJson serialJson = {
         .jsonWriter = JsonWriter(&Serial),
-        .stream = &Serial
+        .stream = Serial
     };
     StreamJson serial1Json = {
         .jsonWriter = JsonWriter(&Serial1),
-        .stream = &Serial1
+        .stream = Serial1
     };
     StreamJson serial2Json = {
         .jsonWriter = JsonWriter(&Serial2),
-        .stream = &Serial2
+        .stream = Serial2
     };
 
     SensorController();

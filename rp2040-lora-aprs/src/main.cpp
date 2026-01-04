@@ -3,14 +3,12 @@
 
 #include <FreeRTOS.h>
 #include <task.h>
-#include <queue.h>
 
 #include <LittleFS.h>
 #include <ArduinoLog.h>
 #include <Wire.h>
 #include <DS3231.h>
 
-#include "hal/PicoGpioHal.hpp"
 #include "controllers/RelayController.hpp"
 
 #include "settings.h"
