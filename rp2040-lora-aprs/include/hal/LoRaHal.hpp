@@ -7,14 +7,16 @@
 #include "modules/SX126x/SX1262.h"
 
 #include "config.h"
+#include "modules/SX127x/SX127x.h"
 
 #define TRX_BUFFER 256
 #define LORA_QUEUE_TX_SIZE 10
 #define LORA_QUEUE_RX_SIZE 10
+#define TIMEOUT_CAD_DETECTION 1000
 
 struct LoRaTxMessage
 {
-    uint8_t* data;
+    uint8_t data[TRX_BUFFER];
     size_t length;
 };
 
@@ -35,12 +37,14 @@ public:
         return instance;
     }
 
-    bool begin(float frequency,
+    bool begin(bool txEnabled,
+               float frequency,
                uint16_t bandwidth,
                uint8_t spreadingFactor,
                uint8_t codingRate,
+               uint8_t syncWord,
                uint8_t outputPower,
-               uint8_t syncWord);
+               uint8_t preambleLength = RADIOLIB_SX126X_CMD_SET_TX_INFINITE_PREAMBLE);
 
     bool send(const uint8_t* data, size_t length);
     bool receive(LoRaRxMessage& message, TickType_t timeout = portMAX_DELAY);
@@ -53,13 +57,12 @@ public:
     }
 
 private:
-    LoRaHal();
-
     static void txTask(void* pvParameters);
     static void rxTask(void* pvParameters);
 
-    void processTxQueue();
-    void processRxQueue();
+    static void onRxInterrupt();
+    static void onTxInterrupt();
+    static void onCadInterrupt();
 
     QueueHandle_t txQueue;
     QueueHandle_t rxQueue;
@@ -68,12 +71,13 @@ private:
 
     bool initialized = false;
     bool txEnabled = true;
-    bool cadResult = false;
-    bool cadPending = false;
-    SX1262 radio = SX1262(new Module(LORA_CS, LORA_DIO1, LORA_RESET, LORA_BUSY, SPI1,
-                             SPISettings(4000000, MSBFIRST, SPI_MODE0)));
+    SX1262 radio = SX1262(new Module(LORA_CS, LORA_DIO1, LORA_RESET, LORA_BUSY, SPI1));
 
-    static void onRxInterrupt();
-    static void onTxInterrupt();
-    static void onCadInterrupt();
+    LoRaHal();
+
+    void processTxQueue();
+    void processRxQueue();
+
+    bool startReceive();
+    bool standby();
 };

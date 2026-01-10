@@ -22,6 +22,7 @@
 #include "controllers/SensorController.hpp"
 #include "controllers/WatchdogController.hpp"
 #include "hal/I2CMasterHal.hpp"
+#include "hal/LoRaHal.hpp"
 
 char bufferText[BUFFER_LENGTH];
 
@@ -94,6 +95,27 @@ void setMpptVoltageLimits()
     I2CMasterHal::releaseSemaphore();
 }
 
+void setLora()
+{
+    const auto settingsLora = SettingsManager::getSettings().lora;
+
+    const SettingsLoRaModem lora = settingsLora.modems[settingsLora.mode];
+
+    if (lora.enabled)
+    {
+        LoRaHal::getInstance().begin(
+            settingsLora.txEnabled,
+            lora.frequency,
+            lora.bandwidth,
+            lora.spreadingFactor,
+            lora.codingRate,
+            lora.syncWord,
+            settingsLora.outputPower,
+            lora.preambleLength
+        );
+    }
+}
+
 void setup()
 {
     pinMode(LED_BUILTIN, OUTPUT);
@@ -140,6 +162,11 @@ void setup()
     Wire1.setSDA(2);
     Wire1.setSCL(3);
 
+    // Initialisation SPI pour LoRa (SPI1)
+    SPI1.setRX(LORA_MISO);
+    SPI1.setTX(LORA_MOSI);
+    SPI1.setSCK(LORA_SCK);
+
     SettingsManager::getInstance().begin();
 
     if (SettingsManager::getSettings().useSlowClock)
@@ -179,6 +206,8 @@ void setup()
 
         LedController::getInstance().blink(Error, FreeRtos);
     }
+
+    setLora();
 }
 
 void loop()

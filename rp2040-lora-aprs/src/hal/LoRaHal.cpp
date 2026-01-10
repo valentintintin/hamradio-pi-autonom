@@ -6,77 +6,6 @@
 
 #include "controllers/LedController.hpp"
 
-// Callbacks d'interruption statiques
-void LoRaHal::onRxInterrupt()
-{
-    LoRaHal& hal = getInstance();
-    
-    // DIO1 peut signaler RX_DONE ou TX_DONE, on doit vérifier le statut IRQ
-    uint16_t irqStatus = hal.radio.getIrqStatus();
-    
-    // Vérifier RX_DONE
-    if (irqStatus & RADIOLIB_SX126X_IRQ_RX_DONE)
-    {
-        // Réception terminée, notifier la tâche RX
-        if (hal.rxTaskHandle != nullptr)
-        {
-            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-            vTaskNotifyGiveFromISR(hal.rxTaskHandle, &xHigherPriorityTaskWoken);
-            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-        }
-    }
-    
-    // Vérifier TX_DONE
-    if (irqStatus & RADIOLIB_SX126X_IRQ_TX_DONE)
-    {
-        // Transmission terminée, notifier la tâche TX
-        if (hal.txTaskHandle != nullptr)
-        {
-            BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-            xTaskNotifyFromISR(hal.txTaskHandle, 1UL, eSetBits, &xHigherPriorityTaskWoken);
-            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-        }
-    }
-}
-
-void LoRaHal::onTxInterrupt()
-{
-    // Cette fonction peut être utilisée si on configure DIO2 pour TX_DONE
-    // Pour l'instant, on utilise DIO1 pour les deux
-    onRxInterrupt();
-}
-
-void LoRaHal::onCadInterrupt()
-{
-    LoRaHal& hal = getInstance();
-    
-    // CAD terminé, vérifier le résultat via le statut IRQ
-    uint16_t irqStatus = hal.radio.getIrqStatus();
-    
-    if (irqStatus & RADIOLIB_SX126X_IRQ_CAD_DETECTED)
-    {
-        hal.cadResult = false; // Canal occupé (signal LoRa détecté)
-    }
-    else if (irqStatus & RADIOLIB_SX126X_IRQ_CAD_DONE)
-    {
-        hal.cadResult = true; // Canal libre (pas de signal détecté)
-    }
-    else
-    {
-        hal.cadResult = false; // Erreur ou état inconnu
-    }
-    
-    hal.cadPending = false;
-    
-    // Notifier la tâche TX
-    if (hal.txTaskHandle != nullptr)
-    {
-        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        xTaskNotifyFromISR(hal.txTaskHandle, 2UL, eSetBits, &xHigherPriorityTaskWoken);
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-    }
-}
-
 LoRaHal::LoRaHal()
 {
     txQueue = xQueueCreate(LORA_QUEUE_TX_SIZE, sizeof(LoRaTxMessage));
@@ -98,82 +27,134 @@ LoRaHal::LoRaHal()
     }
 }
 
-bool LoRaHal::begin(const float frequency,
+bool LoRaHal::begin(const bool txEnabled,
+                    const float frequency,
                     const uint16_t bandwidth,
                     const uint8_t spreadingFactor,
                     const uint8_t codingRate,
+                    const uint8_t syncWord,
                     const uint8_t outputPower,
-                    const uint8_t syncWord)
+                    const uint8_t preambleLength)
 {
-    if (initialized)
-    {
-        return true;
-    }
+    Log.infoln("SX1262 Init");
 
-    // Initialisation SPI pour LoRa (SPI1)
-    SPI1.setRX(LORA_MISO);
-    SPI1.setTX(LORA_MOSI);
-    SPI1.setSCK(LORA_SCK);
     SPI1.begin();
 
-    // Configuration SPI
-    int16_t state = radio.begin(frequency, bandwidth, spreadingFactor, codingRate, syncWord, outputPower, LORA_PREAMBLE_LENGTH);
+    if (txTaskHandle == nullptr && xTaskCreate(txTask, "LoRaTxTask", configMINIMAL_STACK_SIZE, this, tskIDLE_PRIORITY, &txTaskHandle) != pdPASS)
+    {
+        Log.errorln("Échec de création de la tâche TX LoRa");
+
+        LedController::getInstance().blink(Error, Radio);
+
+        return false;
+    }
+
+    if (rxTaskHandle == nullptr && xTaskCreate(rxTask, "LoRaRxTask", configMINIMAL_STACK_SIZE, this, tskIDLE_PRIORITY, &rxTaskHandle) != pdPASS)
+    {
+        Log.errorln("Échec de création de la tâche RX LoRa");
+
+        LedController::getInstance().blink(Error, Radio);
+
+        return false;
+    }
+
+    initialized = false;
+
+    float tcxo = 1.6;
+
+#ifdef LORA_DIO3_TCXO_VOLTAGE
+    tcxo = LORA_DIO3_TCXO_VOLTAGE;
+#endif
+
+    int16_t state = radio.begin(frequency, bandwidth, spreadingFactor, codingRate, syncWord, outputPower, preambleLength, tcxo);
+
+    if (state == RADIOLIB_ERR_SPI_CMD_FAILED || state == RADIOLIB_ERR_SPI_CMD_INVALID)
+    {
+        Log.warningln("SX1262 failed SPI, try with TCXO 0");
+
+        // if radio init fails with -707/-706, try again with tcxo voltage set to 0
+        state = radio.begin(frequency, bandwidth, spreadingFactor, codingRate, syncWord, outputPower, preambleLength, 0);
+    }
 
     if (state != RADIOLIB_ERR_NONE)
     {
         Log.errorln("Échec d'initialisation SX1262: %d", state);
+        LedController::getInstance().blink(Error, Radio);
+
         return false;
     }
 
-    // Configuration des interruptions DIO1 pour RX_DONE et TX_DONE
-    // On utilisera getIrqStatus() dans le callback pour différencier
-    state = radio.setDio1Action(onRxInterrupt);
+    state = radio.setCRC(true);
 
     if (state != RADIOLIB_ERR_NONE)
     {
-        Log.warningln("Impossible de configurer l'interruption DIO1: %d", state);
-    }
+        Log.errorln("Échec d'initialisation SX1262: %d", state);
 
-    // Configuration des interruptions DIO2 pour CAD_DONE (si disponible)
-    // Note: Si DIO2 n'est pas disponible, on peut utiliser DIO3 ou DIO4
-    // Pour SX126x, on peut configurer DIO2 pour CAD_DONE
-    state = radio.setDio2Action(onCadInterrupt);
-    
-    if (state != RADIOLIB_ERR_NONE)
-    {
-        // Essayer avec DIO3 si DIO2 n'est pas disponible
-        state = radio.setDio3Action(onCadInterrupt);
-        
-        if (state != RADIOLIB_ERR_NONE)
-        {
-            Log.warningln("Impossible de configurer l'interruption CAD (DIO2/DIO3): %d", state);
-        }
-    }
+        LedController::getInstance().blink(Error, Radio);
 
-    // Démarrer en mode réception
-    state = radio.startReceive();
-
-    if (state != RADIOLIB_ERR_NONE)
-    {
-        Log.errorln("Impossible de démarrer la réception: %d", state);
         return false;
     }
 
-    // Création des tâches FreeRTOS
-    if (xTaskCreate(txTask, "LoRaTxTask", configMINIMAL_STACK_SIZE * 2, this, tskIDLE_PRIORITY + 1, &txTaskHandle) != pdPASS)
+#ifdef LORA_DIO2_AS_RF_SWITCH
+    state = radio.setDio2AsRfSwitch(LORA_DIO2_AS_RF_SWITCH);
+
+    if (state != RADIOLIB_ERR_NONE)
     {
-        Log.errorln("Échec de création de la tâche TX LoRa");
+        Log.errorln("Échec set dio2 as RF Switch SX1262: %d", state);
+
+        LedController::getInstance().blink(Error, Radio);
+
         return false;
     }
+#endif
 
-    if (xTaskCreate(rxTask, "LoRaRxTask", configMINIMAL_STACK_SIZE * 2, this, tskIDLE_PRIORITY + 1, &rxTaskHandle) != pdPASS)
+#ifdef LORA_CURRENT_LIMIT
+    state = radio.setCurrentLimit(LORA_CURRENT_LIMIT);
+
+    if (state != RADIOLIB_ERR_NONE)
     {
-        Log.errorln("Échec de création de la tâche RX LoRa");
+        Log.warningln("Échec set current limit SX1262: %d", state);
+
+        LedController::getInstance().blink(Error, Radio);
+    }
+#endif
+
+#ifdef LORA_RX_BOOSTED_GAIN
+    state = radio.setRxBoostedGainMode(LORA_RX_BOOSTED_GAIN);
+
+    if (state != RADIOLIB_ERR_NONE)
+    {
+        Log.warningln("Échec set rx boosted SX1262: %d", state);
+
+        LedController::getInstance().blink(Error, Radio);
+    }
+#endif
+
+#if defined(LORA_RXEN) || defined(LORA_TXEN)
+#ifndef LORA_RXEN
+#define LORA_RXEN RADIOLIB_NC
+#endif
+#ifndef LORA_TXEN
+#define LORA_TXEN RADIOLIB_NC
+#endif
+    radio.setRfSwitchPins(LORA_RXEN, LORA_TXEN);
+#endif
+
+    if (!startReceive())
+    {
+        Log.errorln("Impossible de démarrer la réception");
+
+        LedController::getInstance().blink(Error, Radio);
+
         return false;
     }
 
     initialized = true;
-    Log.infoln("LoRaHal initialisé avec succès");
+    this->txEnabled = txEnabled;
+
+    Log.infoln("SX1262 initialisé avec succès");
+
+    LedController::getInstance().blink(Success, Radio);
     
     return true;
 }
@@ -198,76 +179,23 @@ bool LoRaHal::send(const uint8_t* data, const size_t length)
         return false;
     }
 
-    // Allouer de la mémoire pour le message
-    uint8_t* messageData = new uint8_t[length];
-    if (messageData == nullptr)
-    {
-        Log.errorln("Échec d'allocation mémoire pour message TX");
-        return false;
-    }
-
-    memcpy(messageData, data, length);
-
     LoRaTxMessage msg;
-    msg.data = messageData;
+    memcpy(msg.data, data, length);
     msg.length = length;
 
     if (xQueueSend(txQueue, &msg, portMAX_DELAY) != pdTRUE)
     {
-        delete[] messageData;
-        Log.errorln("Échec d'envoi dans la queue TX");
+        Log.errorln("Queue TX pleine");
         return false;
     }
 
-    return true;
-}
-
-bool LoRaHal::receive(LoRaRxMessage& message, const TickType_t timeout)
-{
-    if (!initialized)
-    {
-        Log.warningln("LoRaHal non initialisé");
-        return false;
-    }
-
-    if (xQueueReceive(rxQueue, &message, timeout) == pdTRUE)
-    {
-        return true;
-    }
-
-    return false;
-}
-
-bool LoRaHal::startChannelScan()
-{
-    if (!initialized)
-    {
-        return false;
-    }
-
-    // Démarrer la détection de canal (CAD) de manière non-bloquante
-    int16_t state = radio.startChannelScan();
-
-    if (state != RADIOLIB_ERR_NONE)
-    {
-        Log.warningln("Erreur startChannelScan: %d", state);
-        return false;
-    }
-
-    cadPending = true;
     return true;
 }
 
 void LoRaHal::txTask(void* pvParameters)
 {
-    LoRaHal* hal = static_cast<LoRaHal*>(pvParameters);
+    const auto hal = static_cast<LoRaHal*>(pvParameters);
     hal->processTxQueue();
-}
-
-void LoRaHal::rxTask(void* pvParameters)
-{
-    LoRaHal* hal = static_cast<LoRaHal*>(pvParameters);
-    hal->processRxQueue();
 }
 
 void LoRaHal::processTxQueue()
@@ -282,7 +210,7 @@ void LoRaHal::processTxQueue()
             // Attendre que le canal soit libre avec CAD en interruption
             bool channelFree = false;
             int retries = 10; // Maximum 10 tentatives de CAD
-            
+
             while (!channelFree && retries > 0)
             {
                 // Démarrer le CAD en interruption
@@ -291,25 +219,25 @@ void LoRaHal::processTxQueue()
                     Log.warningln("Échec du démarrage du CAD");
                     break;
                 }
-                
-                // Réinitialiser les notifications
-                uint32_t ulNotificationValue;
-                ulTaskNotifyWait(0, ULONG_MAX, &ulNotificationValue, 0);
-                
-                // Attendre la notification de fin de CAD (timeout de 1 seconde)
-                if (ulTaskNotifyWait(0, ULONG_MAX, &ulNotificationValue, pdMS_TO_TICKS(1000)) == pdTRUE)
+
+                // Attendre la notification de fin de CAD
+                if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(TIMEOUT_CAD_DETECTION)) == pdTRUE)
                 {
-                    // Vérifier si c'est une notification CAD (bit 1)
-                    if (ulNotificationValue & 2UL)
+                    // CAD terminé, vérifier le résultat via le statut IRQ
+                    const auto irqStatus = radio.getIrqFlags();
+
+                    if (irqStatus & RADIOLIB_SX126X_IRQ_CAD_DONE)
                     {
-                        channelFree = cadResult;
-                        
-                        if (!channelFree)
-                        {
-                            Log.traceln("Canal occupé, attente...");
-                            vTaskDelay(pdMS_TO_TICKS(100)); // Attendre 100ms avant de réessayer
-                            retries--;
-                        }
+                        channelFree = true;
+
+                        Log.traceln("Canal libre !");
+                    }
+                    else
+                    {
+                        channelFree = false;
+                        retries--;
+
+                        Log.traceln("Canal occupé (%d), tentatives restantes : %d", irqStatus, retries);
                     }
                 }
                 else
@@ -324,71 +252,128 @@ void LoRaHal::processTxQueue()
                 Log.warningln("Canal toujours occupé après plusieurs tentatives");
             }
 
-            // Arrêter la réception temporairement
-            radio.standby();
+            standby();
 
-            // Démarrer la transmission de manière non-bloquante
+            Log.infoln("TX !");
+
+            radio.setDio1Action(onTxInterrupt);
             int16_t state = radio.startTransmit(msg.data, msg.length);
 
             if (state != RADIOLIB_ERR_NONE)
             {
                 Log.errorln("Erreur startTransmit: %d", state);
-                
-                // Libérer la mémoire en cas d'erreur
-                if (msg.data != nullptr)
-                {
-                    delete[] msg.data;
-                }
-                
-                // Remettre en mode réception
-                radio.startReceive();
+
+                startReceive();
                 continue;
             }
 
-            // Attendre la notification d'interruption de fin de transmission
-            // Réinitialiser les notifications en lisant toutes les notifications en attente
-            uint32_t ulNotificationValue;
-            ulTaskNotifyWait(0, ULONG_MAX, &ulNotificationValue, 0);
-            
             // Attendre la notification (timeout de 5 secondes pour sécurité)
-            if (ulTaskNotifyWait(0, ULONG_MAX, &ulNotificationValue, pdMS_TO_TICKS(5000)) == pdTRUE)
+            if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(5000)) == pdTRUE)
             {
-                // Vérifier si c'est une notification TX (bit 0)
-                if (ulNotificationValue & 1UL)
+                state = radio.finishTransmit();
+
+                if (state == RADIOLIB_ERR_NONE)
                 {
-                    // Vérifier le statut de la radio
-                    state = radio.finishTransmit();
-                    
-                    if (state == RADIOLIB_ERR_NONE)
-                    {
-                        Log.traceln("Message TX envoyé: %d octets", msg.length);
-                    }
-                    else if (state == RADIOLIB_ERR_TX_TIMEOUT)
-                    {
-                        Log.warningln("Timeout de transmission");
-                    }
-                    else
-                    {
-                        Log.errorln("Erreur finishTransmit: %d", state);
-                    }
+                    Log.traceln("Message TX envoyé: %d octets", msg.length);
+                }
+                else if (state == RADIOLIB_ERR_TX_TIMEOUT)
+                {
+                    Log.warningln("Timeout de transmission");
+                }
+                else
+                {
+                    Log.errorln("Erreur finishTransmit: %d", state);
                 }
             }
             else
             {
                 Log.errorln("Timeout en attente de notification de fin de transmission");
-                radio.standby(); // Forcer l'arrêt
-            }
-
-            // Libérer la mémoire
-            if (msg.data != nullptr)
-            {
-                delete[] msg.data;
+                standby(); // Forcer l'arrêt
             }
 
             // Remettre en mode réception
-            radio.startReceive();
+            startReceive();
         }
     }
+}
+
+bool LoRaHal::startChannelScan()
+{
+    if (!initialized)
+    {
+        return false;
+    }
+
+    Log.infoln("SX1262, démarrage de la détection");
+
+    const int16_t state = radio.startChannelScan();
+
+    if (state != RADIOLIB_ERR_NONE)
+    {
+        Log.warningln("Erreur startChannelScan: %d", state);
+        return false;
+    }
+
+    return true;
+}
+
+void LoRaHal::onCadInterrupt()
+{
+    const auto& hal = getInstance();
+
+    if (hal.txTaskHandle != nullptr)
+    {
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        vTaskNotifyGiveFromISR(hal.txTaskHandle, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
+
+void LoRaHal::onTxInterrupt()
+{
+    const auto& hal = getInstance();
+
+    if (hal.txTaskHandle != nullptr)
+    {
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        vTaskNotifyGiveFromISR(hal.txTaskHandle, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
+
+void LoRaHal::onRxInterrupt()
+{
+    const auto& hal = getInstance();
+
+    if (hal.rxTaskHandle != nullptr)
+    {
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        vTaskNotifyGiveFromISR(hal.rxTaskHandle, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+}
+
+bool LoRaHal::receive(LoRaRxMessage& message, const TickType_t timeout)
+{
+    if (!initialized)
+    {
+        Log.warningln("LoRaHal non initialisé");
+        return false;
+    }
+
+    if (xQueueReceive(rxQueue, &message, timeout) == pdTRUE)
+    {
+        // TODO décodage APRS/MT/MC
+        return true;
+    }
+
+    return false;
+}
+
+void LoRaHal::rxTask(void* pvParameters)
+{
+    const auto hal = static_cast<LoRaHal*>(pvParameters);
+    hal->processRxQueue();
 }
 
 void LoRaHal::processRxQueue()
@@ -397,35 +382,60 @@ void LoRaHal::processRxQueue()
 
     while (true)
     {
-        // Attendre la notification d'interruption de réception
-        // Réinitialiser les notifications en lisant toutes les notifications en attente
-        uint32_t ulNotificationValue;
-        ulTaskNotifyWait(0, ULONG_MAX, &ulNotificationValue, 0);
-        
-        // Attendre la notification (timeout infini)
-        if (ulTaskNotifyWait(0, ULONG_MAX, &ulNotificationValue, portMAX_DELAY) == pdTRUE)
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+        const size_t length = radio.readData(msg.data, TRX_BUFFER);
+
+        if (length > 0)
         {
-            // Lire directement le paquet (pas besoin de vérifier available())
-            size_t length = radio.readData(msg.data, TRX_BUFFER);
-            
-            if (length > 0)
+            msg.length = length;
+            msg.rssi = radio.getRSSI();
+            msg.snr = radio.getSNR();
+
+            Log.traceln("Message RX reçu: %d octets, RSSI: %.2f, SNR: %.2f", length, msg.rssi, msg.snr);
+
+            if (xQueueSend(rxQueue, &msg, 0) != pdTRUE)
             {
-                msg.length = length;
-                msg.rssi = radio.getRSSI();
-                msg.snr = radio.getSNR();
-
-                Log.traceln("Message RX reçu: %d octets, RSSI: %.2f, SNR: %.2f", 
-                           length, msg.rssi, msg.snr);
-
-                // Envoyer dans la queue RX (non-bloquant)
-                if (xQueueSend(rxQueue, &msg, 0) != pdTRUE)
-                {
-                    Log.warningln("Queue RX pleine, message perdu");
-                }
+                Log.warningln("Queue RX pleine, message perdu");
             }
-
-            // Remettre en mode réception
-            radio.startReceive();
         }
+
+        startReceive();
     }
+}
+
+bool LoRaHal::startReceive()
+{
+    radio.setDio1Action(onRxInterrupt);
+
+    const auto state = radio.startReceive();
+
+    if (state != RADIOLIB_ERR_NONE)
+    {
+        Log.errorln("Impossible de démarrer la réception: %d", state);
+
+        LedController::getInstance().blink(Error, Radio);
+
+        return false;
+    }
+
+    return true;
+}
+
+bool LoRaHal::standby()
+{
+    radio.clearDio1Action();
+
+    const auto state = radio.standby();
+
+    if (state != RADIOLIB_ERR_NONE)
+    {
+        Log.errorln("Impossible de se mettre en standby: %d", state);
+
+        LedController::getInstance().blink(Error, Radio);
+
+        return false;
+    }
+
+    return true;
 }

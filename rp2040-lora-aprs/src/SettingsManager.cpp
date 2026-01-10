@@ -73,6 +73,40 @@ void SettingsManager::loadDefaults()
 
     settings.gpio[i].enabled = true;
     settings.gpio[i++].pin = 10;
+
+    i = 0;
+    settings.lora.modems[i++] = { // APRS
+        .mode = LoRaModeAprs,
+        .enabled = true,
+        .frequency = 433.775,
+        .bandwidth = 125,
+        .spreadingFactor = 12,
+        .codingRate = 5,
+    };
+
+    settings.lora.modems[i++] = { // Meshcore Narrow UK
+        .mode = LoRaModeMeshcore,
+        .frequency = 869.618,
+        .bandwidth = 62.5,
+        .spreadingFactor = 8,
+        .codingRate = 8,
+    };
+
+    settings.lora.modems[i++] = { // Meshtastic LongModerate
+        .mode = LoRaModeMeshtasticLM,
+        .frequency = 869.4625,
+        .bandwidth = 125,
+        .spreadingFactor = 11,
+        .codingRate = 8,
+    };
+
+    settings.lora.modems[i] = { // Meshtastic LongFast
+        .mode = LoRaModeMeshtasticLF,
+        .frequency = 869.525,
+        .bandwidth = 250,
+        .spreadingFactor = 11,
+        .codingRate = 5,
+    };
 }
 
 bool SettingsManager::saveSettings() const

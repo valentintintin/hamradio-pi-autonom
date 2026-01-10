@@ -25,36 +25,38 @@ bool MpptChargerHal::begin()
     return initialized;
 }
 
-bool MpptChargerHal::queryTelemetries(TelemetryPower &telemetryBattery, TelemetryPower &telemetrySolar, float &temperature)
+bool MpptChargerHal::query(Telemetry& telemetry)
 {
     Log.infoln("Query Mppt telemetries");
 
-    bool result = begin();
+    bool result = false;
 
     int16_t tempVariable;
     result &= charger.getIndexedValue(VAL_INT_TEMP, &tempVariable);
-    temperature = tempVariable / 10.0f;
+    telemetry.mppt.temperature = tempVariable / 10.0f;
 
     result &= charger.getIndexedValue(VAL_VB, &tempVariable);
-    telemetryBattery.voltage = tempVariable / 1000.0f;
+    telemetry.mppt.battery.voltage = tempVariable / 1000.0f;
     result &= charger.getIndexedValue(VAL_IB, &tempVariable);
-    telemetryBattery.current = tempVariable;
+    telemetry.mppt.battery.current = tempVariable;
 
     result &= charger.getIndexedValue(VAL_VS, &tempVariable);
-    telemetrySolar.voltage = tempVariable / 1000.0f;
+    telemetry.mppt.solar.voltage = tempVariable / 1000.0f;
     result &= charger.getIndexedValue(VAL_IS, &tempVariable);
-    telemetrySolar.current = tempVariable;
+    telemetry.mppt.solar.current = tempVariable;
 
-    if (result)
+    if (!result || telemetry.mppt.battery.voltage == NAN)
     {
-        Log.infoln("Query Mppt telemetries OK");
-    }
-    else
-    {
-        Log.warningln("Query Mppt telemetries failed");
+        Log.warningln("INA3221 in error");
+
+        LedController::getInstance().blink(Error, Sensor);
+
+        initialized = false;
+
+        return false;
     }
 
-    return result;
+    return true;
 }
 
 bool MpptChargerHal::setWatchdog(const uint16_t powerOff, const uint8_t timeout)

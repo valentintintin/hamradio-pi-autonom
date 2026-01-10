@@ -6,6 +6,8 @@
 
 #include <queue.h>
 
+#include "settings.h"
+
 #define RELAY_MAX_COMMAND 4
 
 struct RelayCommand

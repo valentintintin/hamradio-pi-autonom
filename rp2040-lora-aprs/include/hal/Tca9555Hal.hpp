@@ -9,10 +9,6 @@ public:
     {
         switch (address)
         {
-        default:
-        case 0x20:
-            static Tca9555Hal instance20(address);
-            return instance20;
         case 0x21:
             static Tca9555Hal instance21(address);
             return instance21;
@@ -34,6 +30,10 @@ public:
         case 0x27:
             static Tca9555Hal instance27(address);
             return instance27;
+        default:
+        case 0x20:
+            static Tca9555Hal instance20(address);
+            return instance20;
         }
     }
 

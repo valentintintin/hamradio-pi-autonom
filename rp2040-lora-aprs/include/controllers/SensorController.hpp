@@ -2,15 +2,15 @@
 
 #include "BaseController.hpp"
 #include "telemetry.h"
-#include "hal/MpptChargerHal.hpp"
 
-#include <Adafruit_BME280.h>
-#include <Adafruit_BMP280.h>
-#include <Adafruit_INA3221.h>
 #include <timers.h>
 #include <JsonWriter.h>
 
+#include "hal/Bme280Hal.hpp"
 #include "hal/I2CSlaveHal.hpp"
+#include "hal/Ina3221Hal.hpp"
+#include "hal/MpptChargerHal.hpp"
+#include "hal/SensorHal.hpp"
 
 #define QUERY_DELAY 30000
 
@@ -33,10 +33,7 @@ public:
     bool queryTelemetries();
     void printJson(StreamJson& streamJson);
 
-    bool isInitialized() const
-    {
-        return mpptChgInitialized || bmp280Initialized || bme280Initialized || ina3221Initialized || i2cSlaveInitialized;
-    }
+    bool isInitialized() const;
 
     static const Telemetry& getTelemetry()
     {
@@ -50,20 +47,13 @@ private:
 
     TimerHandle_t timer;
 
-    bool mpptChgInitialized = false;
-    MpptChargerHal charger = MpptChargerHal::getInstance();
-
-    bool bmp280Initialized = false;
-    Adafruit_BMP280 bmp280 = Adafruit_BMP280();
-
-    bool bme280Initialized = false;
-    Adafruit_BME280 bme280 = Adafruit_BME280();
-
-    bool ina3221Initialized = false;
-    Adafruit_INA3221 ina3221 = Adafruit_INA3221();
-
-    bool i2cSlaveInitialized = false;
-    I2CSlaveHal i2cSlave = I2CSlaveHal();
+    SensorHal* sensors[5]
+    {
+        &Bme280Hal::getInstance(),
+        &Ina3221Hal::getInstance(),
+        &MpptChargerHal::getInstance(),
+        &I2CSlaveHal::getInstance()
+    };
 
     StreamJson serialJson = {
         .jsonWriter = JsonWriter(&Serial),
@@ -79,10 +69,4 @@ private:
     };
 
     SensorController();
-
-    bool initMpptCharger();
-    bool initIna3221();
-    bool initBme280();
-    bool initBmp280();
-    bool initI2cSlave();
 };

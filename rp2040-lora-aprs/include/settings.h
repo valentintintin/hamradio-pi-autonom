@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #define MAX_GPIO_USED 16
+#define MAX_LORA_MODEM 4
 #define SETTINGS_VERSION 1
 #define NAME_SETTING_LENGTH 32
 
@@ -11,18 +12,37 @@ enum SettingsType
     Boolean, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Char, Float, Double, CharString
 };
 
-// struct {
-//     float frequency = 433.775;
-//     uint16_t bandwidth = 125;
-//     uint8_t spreadingFactor = 12;
-//     uint8_t codingRate = 5;
-//     uint8_t outputPower = 22;
-//     uint8_t syncWord = 0x12;
-//     bool txEnabled = true;
-//     bool boostedRxGain = true;
-//     bool watchdogTxEnabled = true;
-//     uint64_t intervalTimeoutWatchdogTx = 7200000;
-// } SettingsLoRa;
+enum SettingLoRaMode
+{
+    LoRaModeAprs, LoRaModeMeshcore, LoRaModeMeshtasticLM, LoRaModeMeshtasticLF
+};
+
+struct SettingsLoRaModem {
+    SettingLoRaMode mode;
+    bool enabled = false;
+    float frequency = 434;
+    float bandwidth = 125;
+    uint8_t spreadingFactor = 9;
+    uint8_t codingRate = 7;
+    uint8_t syncWord = 0x12;
+    uint8_t preambleLength = 8;
+};
+
+struct SettingsLoRa
+{
+    bool txEnabled = true;
+    uint8_t outputPower = 22;
+
+    // TODO watchdog RX Lora
+    bool watchdogRxEnabled = true;
+    uint32_t intervalTimeoutWatchdogRx = 7200;
+
+    SettingLoRaMode mode = LoRaModeAprs;
+    uint32_t intervalLoopMode = 0;
+
+    SettingsLoRaModem modems[MAX_LORA_MODEM]{};
+};
+
 //
 // struct {
 //     char callsign[CALLSIGN_LENGTH + 1]{};
@@ -61,28 +81,11 @@ struct SettingsMpptWatchdog {
 //     uint64_t intervalWH65B = 300000;
 // } SettingsWeather;
 
-// enum TypeEnergySensor { dummy, mpptchg, ina, adc };
-
-// struct {
-//     uint64_t intervalCheck = 30000;
-//     TypeEnergySensor type = dummy;
-//     uint8_t adcPin = 26;
-//     ina3221_ch_t inaChannelBattery = INA3221_CH1;
-//     ina3221_ch_t inaChannelSolar = INA3221_CH2;
-//     bool sendAprsMessageWhenAlert = false;
-//     char callsignToSendMessageAlert[CALLSIGN_LENGTH + 1]{};
-// } SettingsEnergy;
-
 struct SettingsMpptCharger
 {
     uint16_t powerOnVoltage = 12000;
     uint16_t powerOffVoltage = 11550;
     SettingsMpptWatchdog watchdog{};
-};
-
-struct SettingsI2CSlave {
-    bool enabled = true;
-    uint8_t address = 0x11;
 };
 
 struct SettingsGpio
@@ -114,13 +117,12 @@ struct Settings
     uint16_t version = SETTINGS_VERSION;
     bool useWatchdog = true;
     bool useSlowClock = false;
+    bool i2cSlaveEnabled = true;
 
     SettingsGpio gpio[MAX_GPIO_USED]{};
-    SettingsI2CSlave i2c{};
     SettingsMpptCharger mppt{};
-    // SettingsLoRa lora{};
+    SettingsLoRa lora{}; // TODO setter et getter
     // SettingsAprs aprs{};
-    // SettingsEnergy energy{};
     // SettingsWeather weather{};
     // SettingsWatchdogAndAprsItem meshtastic{};
     // SettingsWatchdogAndAprsItem linux{};

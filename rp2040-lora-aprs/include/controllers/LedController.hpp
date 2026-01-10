@@ -25,6 +25,7 @@ enum LedOrigin
     Sensor,
     MpptCharger,
     Clock,
+    Radio,
     Command,
 };
 

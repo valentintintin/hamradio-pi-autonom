@@ -3,10 +3,10 @@
 #include <Wire.h>
 #include <ArduinoLog.h>
 
-bool I2CSlaveHal::begin(const uint8_t address)
-{
-    slaveAddress = address;
+#include "config.h"
 
+bool I2CSlaveHal::begin()
+{
     uint8_t result = 0;
 
     auto initialized = readRegister(RegisterPing, &result, sizeof(result));
@@ -18,7 +18,7 @@ bool I2CSlaveHal::begin(const uint8_t address)
     return initialized;
 }
 
-bool I2CSlaveHal::queryTelemetries(Telemetry& telemetry)
+bool I2CSlaveHal::query(Telemetry& telemetry)
 {
     Log.traceln("I2C Slave queries");
 
@@ -37,7 +37,7 @@ bool I2CSlaveHal::queryTelemetries(Telemetry& telemetry)
         return false;
     }
 
-    if (!readRegister(RegisterTelemetryOutdoorBasic, &telemetry.outdoor.basic, sizeof(telemetry.outdoor.basic)))
+    if (!readRegister(RegisterTelemetryOutdoor, &telemetry.outdoor.basic, sizeof(telemetry.outdoor.basic)))
     {
         return false;
     }
@@ -45,7 +45,7 @@ bool I2CSlaveHal::queryTelemetries(Telemetry& telemetry)
     return true;
 }
 
-bool I2CSlaveHal::queryClock(uint32_t& now)
+bool I2CSlaveHal::queryClock(uint32_t& now) const
 {
     if (!readRegister(RegisterClock, &now, sizeof(now)))
     {
@@ -59,7 +59,7 @@ void I2CSlaveHal::setRegisterToRead(const I2CSlaveRegisterValue reg) const
 {
     Log.traceln("I2C Slave query ask for %d", reg);
 
-    Wire.beginTransmission(slaveAddress);
+    Wire.beginTransmission(I2C_SLAVE_ADDRESS);
     Wire.write(reg);
     Wire.endTransmission();
 }
@@ -75,7 +75,7 @@ bool I2CSlaveHal::readRegister(const I2CSlaveRegisterValue reg, void* dest, cons
 
     setRegisterToRead(reg);
 
-    const size_t sizeToReceive = Wire.requestFrom(slaveAddress, size);
+    const size_t sizeToReceive = Wire.requestFrom(I2C_SLAVE_ADDRESS, size);
 
     Log.traceln("I2C Slave query %d for size %d", reg, size);
 

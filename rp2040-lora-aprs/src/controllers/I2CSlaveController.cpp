@@ -3,6 +3,7 @@
 #include <Wire.h>
 #include <ArduinoLog.h>
 
+#include "config.h"
 #include "SettingsManager.hpp"
 #include "controllers/LedController.hpp"
 #include "controllers/SensorController.hpp"
@@ -13,19 +14,17 @@ size_t I2CSlaveController::txBufferSize = 0;
 
 bool I2CSlaveController::begin()
 {
-    const auto [enabled, address] = SettingsManager::getSettings().i2c;
-
-    if (!enabled)
+    if (!SettingsManager::getSettings().i2cSlaveEnabled)
     {
         Log.noticeln("I2C Slave not enabled");
         return false;
     }
 
-    Wire1.begin(address);
+    Wire1.begin(I2C_SLAVE_ADDRESS);
     Wire1.onReceive(onReceive);
     Wire1.onRequest(onRequest);
 
-    Log.infoln("I2C Slave init on address %X OK", address);
+    Log.infoln("I2C Slave init on address %X OK", I2C_SLAVE_ADDRESS);
 
     return true;
 }
@@ -104,18 +103,34 @@ void I2CSlaveController::prepareTelemetryBuffer(const I2CSlaveRegisterValue what
         size = sizeof(telemetry.updatedAt);
         break;
     case RegisterTelemetryBattery:
-        pointer += offsetof(Telemetry, battery);
-        size = sizeof(telemetry.battery);
+        if (telemetry.mppt.battery.voltage > 0)
+        {
+            pointer += offsetof(Telemetry, mppt) + offsetof(Mppt, battery);
+            size = sizeof(telemetry.mppt.battery);
+        }
+        else
+        {
+            pointer += offsetof(Telemetry, battery);
+            size = sizeof(telemetry.battery);
+        }
         break;
     case RegisterTelemetrySolar:
-        pointer += offsetof(Telemetry, solar);
-        size = sizeof(telemetry.solar);
+        if (telemetry.mppt.battery.voltage > 0) // Pas de check sur le solaire, car la nuit == 0V ~
+        {
+            pointer += offsetof(Telemetry, mppt) + offsetof(Mppt, solar);
+            size = sizeof(telemetry.mppt.solar);
+        }
+        else
+        {
+            pointer += offsetof(Telemetry, solar);
+            size = sizeof(telemetry.solar);
+        }
         break;
     case RegisterTelemetryBox:
         pointer += offsetof(Telemetry, box);
         size = sizeof(telemetry.box);
         break;
-    case RegisterTelemetryOutdoorBasic:
+    case RegisterTelemetryOutdoor:
         pointer += offsetof(Telemetry, outdoor) + offsetof(TelemetryOutdoor, basic);
         size = sizeof(telemetry.outdoor.basic);
         break;
@@ -131,9 +146,9 @@ void I2CSlaveController::prepareTelemetryBuffer(const I2CSlaveRegisterValue what
         pointer += offsetof(Telemetry, outdoor) + offsetof(TelemetryOutdoor, light);
         size = sizeof(telemetry.outdoor.light);
         break;
-    case RegisterTelemetryTempBatteryTemperature:
-        pointer += offsetof(Telemetry, batteryTemperature);
-        size = sizeof(telemetry.batteryTemperature);
+    case RegisterTelemetryBatteryTemperature:
+        pointer += offsetof(Telemetry, mppt) + offsetof(Mppt, temperature);
+        size = sizeof(telemetry.mppt.temperature);
         break;
     case RegisterPosition:
         pointer += offsetof(Telemetry, position);

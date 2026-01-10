@@ -44,12 +44,21 @@ struct Position
     uint16_t altitude;
 };
 
+struct Mppt
+{
+    TelemetryPower battery;
+    TelemetryPower solar;
+    float temperature;
+    uint8_t status;
+};
+
 struct Telemetry
 {
     TelemetryPower battery;
     TelemetryPower solar;
+    TelemetryPower board;
 
-    float batteryTemperature;
+    Mppt mppt;
 
     TelemetryBasic box;
     TelemetryOutdoor outdoor;
