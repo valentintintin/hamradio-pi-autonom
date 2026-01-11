@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Arduino.h>
 #include "settings.h"
 
 #define SETTINGS_FILE_PATH "/config.dat"

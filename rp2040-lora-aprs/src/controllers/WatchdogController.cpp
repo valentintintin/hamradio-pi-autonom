@@ -1,10 +1,10 @@
 #include "controllers/WatchdogController.hpp"
-#include "hal/MpptChargerHal.hpp"
 
 #include <ArduinoLog.h>
 #include <timers.h>
 
 #include "SettingsManager.hpp"
+#include "hal/MpptChargerHal.hpp"
 #include "controllers/LedController.hpp"
 #include "hal/I2CMasterHal.hpp"
 

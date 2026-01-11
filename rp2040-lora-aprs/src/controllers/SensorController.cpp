@@ -2,7 +2,6 @@
 
 #include <ArduinoLog.h>
 
-#include "SettingsManager.hpp"
 #include "controllers/LedController.hpp"
 #include "hal/I2CMasterHal.hpp"
 #include "utils/utils.h"

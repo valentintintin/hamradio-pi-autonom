@@ -19,5 +19,5 @@ public:
     virtual ~SensorHal() = default;
 protected:
     bool initialized = false;
-    SensorHal();
+    SensorHal() = default;
 };

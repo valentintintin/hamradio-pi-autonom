@@ -7,7 +7,6 @@
 #include "modules/SX126x/SX1262.h"
 
 #include "config.h"
-#include "modules/SX127x/SX127x.h"
 
 #define TRX_BUFFER 256
 #define LORA_QUEUE_TX_SIZE 10
