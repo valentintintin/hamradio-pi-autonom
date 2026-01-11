@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 
-#define MAX_GPIO_USED 16
+#define MAX_GPIO_USED 32
 #define MAX_LORA_MODEM 4
 #define SETTINGS_VERSION 1
 #define NAME_SETTING_LENGTH 32
@@ -92,6 +92,7 @@ struct SettingsGpio
 {
     bool enabled = false;
     pin_size_t pin = 0;
+    pin_size_t pinToLow = 0;
     PinMode mode = OUTPUT;
     bool inverted = false;
     uint8_t i2cAddress = 0;
@@ -115,6 +116,8 @@ struct SettingsGpio
 struct Settings
 {
     uint16_t version = SETTINGS_VERSION;
+
+
     bool useWatchdog = true;
     bool useSlowClock = false;
     bool i2cSlaveEnabled = true;
@@ -122,10 +125,6 @@ struct Settings
     SettingsGpio gpio[MAX_GPIO_USED]{};
     SettingsMpptCharger mppt{};
     SettingsLoRa lora{}; // TODO setter et getter
-    // SettingsAprs aprs{};
-    // SettingsWeather weather{};
-    // SettingsWatchdogAndAprsItem meshtastic{};
-    // SettingsWatchdogAndAprsItem linux{};
 };
 
 // struct {

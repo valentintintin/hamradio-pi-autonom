@@ -4,6 +4,7 @@
 #include "settings.h"
 
 #define SETTINGS_FILE_PATH "/config.dat"
+#define SECONDARY_EEPROM_SETTINGS_ADDRESS 256 // First element of second page (of 8)
 
 class SettingsManager
 {
@@ -30,6 +31,7 @@ public:
     bool setSettingFromString(const char *source, const char* value);
 private:
     Settings settings{};
+    bool hasSecondaryEeprom = false;
 
     SettingsGetSetFunction settingsGetSetFunctions[29] = {
         { "version", UInt16, &settings.version },
@@ -67,4 +69,6 @@ private:
     uint8_t parseNameIndex(const char* source, char* name);
     size_t getElementSize(SettingsType type) const;
     void printSettings(const SettingsGetSetFunction &settingFn, uint32_t index = 0) const;
+
+    uint16_t crc16_ccitt(const uint8_t *data, size_t len);
 };

@@ -4,8 +4,9 @@
 class PicoGpioHal : public GpioHal
 {
 public:
-    explicit PicoGpioHal(uint8_t pin, PinMode mode, bool inverted = false);
-    bool init() override;
-    bool set(bool level) override;
-    bool get() override;
+    explicit PicoGpioHal(uint8_t pin, PinMode mode, bool inverted = false, GpioHal* gpioToLow = nullptr);
+protected:
+    bool doInit() override;
+    bool doSet(PinStatus state) override;
+    PinStatus doRead() override;
 };

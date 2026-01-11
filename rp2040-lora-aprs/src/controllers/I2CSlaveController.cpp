@@ -62,7 +62,7 @@ void I2CSlaveController::onRequest()
     {
         Log.warningln("I2C Slave, buffer size 0, sent KO");
 
-        LedController::getInstance().blink(Error, I2CSlave);
+        LedController::getInstance().blink(LedError, LedI2CSlave);
 
         return;
     }
@@ -71,7 +71,7 @@ void I2CSlaveController::onRequest()
 
     Log.infoln("I2C Slave, sent %d bytes OK", txBufferSize);
 
-    LedController::getInstance().blink(Success, I2CSlave);
+    LedController::getInstance().blink(LedSuccess, LedI2CSlave);
 }
 
 void I2CSlaveController::preparePongBuffer()
@@ -172,7 +172,7 @@ bool I2CSlaveController::fillBuffer(const void* buffer, const size_t size)
         memset(txBuffer, 0, I2C_BUFFER_SIZE);
         txBufferSize = 0;
 
-        LedController::getInstance().blink(Error, I2CSlave);
+        LedController::getInstance().blink(LedError, LedI2CSlave);
 
         return false;
     }

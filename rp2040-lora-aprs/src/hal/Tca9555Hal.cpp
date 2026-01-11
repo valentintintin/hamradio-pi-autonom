@@ -54,7 +54,7 @@ bool Tca9555Hal::setMode(uint8_t pin, PinMode mode)
     return initialized;
 }
 
-bool Tca9555Hal::write(uint8_t pin, bool value)
+bool Tca9555Hal::write(uint8_t pin, PinStatus value)
 {
     Log.infoln("TCA9555 %X pin write %d to %d", tca.getAddress(), pin, value);
 

@@ -9,29 +9,30 @@
 
 enum LedState
 {
-    Success = 100,
-    Normal = 250,
-    Error = 500,
+    LedSuccess = 100,
+    LedNormal = 250,
+    LedError = 500,
 };
 
 enum LedOrigin
 {
-    Watchdog = 1,
-    FreeRtos,
-    Settings,
-    Relay,
-    I2C,
-    I2CSlave,
-    Sensor,
-    MpptCharger,
-    Clock,
-    Radio,
-    Command,
+    LedWatchdog = 1,
+    LedFreeRtos,
+    LedSettings,
+    LedRelay,
+    LedI2C,
+    LedI2CSlave,
+    LedSensor,
+    LedMpptCharger,
+    LedEEProm,
+    LedClock,
+    LedRadio,
+    LedUserCommand,
 };
 
 struct LedCommand
 {
-    LedState state = Normal;
+    LedState state = LedNormal;
     LedOrigin origin;
 };
 

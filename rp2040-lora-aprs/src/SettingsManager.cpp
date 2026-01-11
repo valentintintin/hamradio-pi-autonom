@@ -5,6 +5,7 @@
 #include <bits/ios_base.h>
 
 #include "controllers/LedController.hpp"
+#include "hal/M24M02Hal.hpp"
 
 bool SettingsManager::begin()
 {
@@ -16,7 +17,7 @@ bool SettingsManager::begin()
         {
             Log.errorln("Impossible to format FS");
 
-            LedController::getInstance().blink(Error, Settings);
+            LedController::getInstance().blink(LedError, LedSettings);
 
             return false;
         }
@@ -25,11 +26,13 @@ bool SettingsManager::begin()
         {
             Log.errorln("Impossible to mount FS event after format");
 
-            LedController::getInstance().blink(Error, Settings);
+            LedController::getInstance().blink(LedError, LedSettings);
 
             return false;
         }
     }
+
+    hasSecondaryEeprom = M24M02Hal::getInstance().begin();
 
     loadSaved();
 
@@ -46,7 +49,7 @@ bool SettingsManager::loadSaved()
 
         loadDefaults();
 
-        LedController::getInstance().blink(Error, Settings);
+        LedController::getInstance().blink(LedError, LedSettings);
 
         return false;
     }
@@ -56,7 +59,31 @@ bool SettingsManager::loadSaved()
 
     Log.infoln("Settings read correctly");
 
-    LedController::getInstance().blink(Success, Settings);
+    LedController::getInstance().blink(LedSuccess, LedSettings);
+
+    if (hasSecondaryEeprom)
+    {
+        const auto eepromSettingsVersion = M24M02Hal::getInstance().read(SECONDARY_EEPROM_SETTINGS_ADDRESS);
+
+        Log.infoln("Read settings on second memory. Version: %d, current: %d", eepromSettingsVersion, settings.version);
+
+        if (settings.version > eepromSettingsVersion)
+        {
+            const auto settingsCrc = crc16_ccitt(reinterpret_cast<const uint8_t*>(&settings), sizeof(settings));
+
+            Settings eepromSettings;
+            M24M02Hal::getInstance().read(SECONDARY_EEPROM_SETTINGS_ADDRESS, reinterpret_cast<uint8_t*>(&eepromSettings), sizeof(eepromSettings));
+
+            const auto eepromSettingsCrc = crc16_ccitt(reinterpret_cast<const uint8_t*>(&eepromSettings), sizeof(eepromSettings));
+
+            if (settingsCrc != eepromSettingsCrc)
+            {
+                Log.warning("Read settings on second memory. CRC different");
+
+                // TODO gérer les settings différents
+            }
+        }
+    }
 
     return true;
 }
@@ -115,7 +142,7 @@ bool SettingsManager::saveSettings() const
     if (!file) {
         Log.errorln("Fail to save settings");
 
-        LedController::getInstance().blink(Error, Settings);
+        LedController::getInstance().blink(LedError, LedSettings);
 
         return false;
     }
@@ -125,7 +152,12 @@ bool SettingsManager::saveSettings() const
 
     Log.infoln("Saved settings to FS");
 
-    LedController::getInstance().blink(Success, Settings);
+    LedController::getInstance().blink(LedSuccess, LedSettings);
+
+    if (hasSecondaryEeprom)
+    {
+        M24M02Hal::getInstance().write(SECONDARY_EEPROM_SETTINGS_ADDRESS, (uint8_t*) &settings, sizeof(settings));
+    }
 
     return true;
 }
@@ -401,4 +433,19 @@ void SettingsManager::printSettings(const SettingsGetSetFunction& settingFn, con
         Log.traceln("Settings: %s[%d] = not implemented", settingFn.name, index);
         break;
     }
+}
+
+uint16_t SettingsManager::crc16_ccitt(const uint8_t *data, const size_t len) {
+    uint16_t crc = 0xFFFF;
+
+    for (size_t i = 0; i < len; i++) {
+        crc ^= static_cast<uint16_t>(data[i]) << 8;
+        for (int b = 0; b < 8; b++) {
+            if (crc & 0x8000)
+                crc = (crc << 1) ^ 0x1021;
+            else
+                crc <<= 1;
+        }
+    }
+    return crc;
 }

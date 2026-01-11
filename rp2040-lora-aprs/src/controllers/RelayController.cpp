@@ -16,7 +16,7 @@ RelayController::RelayController()
     {
         Log.errorln("Relay Queue creation failed");
 
-        LedController::getInstance().blink(Error, FreeRtos);
+        LedController::getInstance().blink(LedError, LedFreeRtos);
     }
 }
 
@@ -32,12 +32,12 @@ bool RelayController::begin()
         {
             Log.errorln("Relay task creation failed");
 
-            LedController::getInstance().blink(Error, FreeRtos);
+            LedController::getInstance().blink(LedError, LedFreeRtos);
 
             return false;
         }
 
-        LedController::getInstance().blink(Success, Relay);
+        LedController::getInstance().blink(LedSuccess, LedRelay);
     }
 
     return result;
@@ -53,14 +53,24 @@ uint8_t RelayController::loadRelayFromSettings()
         }
 
         GpioHal *gpio;
+        GpioHal *gpioToLow = nullptr;
 
         if (gpioConfig.i2cAddress == 0)
         {
-            gpio = new PicoGpioHal(gpioConfig.pin, gpioConfig.mode, gpioConfig.inverted);
+            if (gpioConfig.pinToLow > 0)
+            {
+                gpioToLow = new PicoGpioHal(gpioConfig.pinToLow, gpioConfig.mode, gpioConfig.inverted);
+            }
+            gpio = new PicoGpioHal(gpioConfig.pin, gpioConfig.mode, gpioConfig.inverted, gpioToLow);
         }
         else
         {
-            gpio = new Tca9555GpioHal(Tca9555Hal::getInstance(gpioConfig.i2cAddress), gpioConfig.pin, gpioConfig.mode, gpioConfig.inverted);
+            if (gpioConfig.pinToLow > 0)
+            {
+                gpioToLow = new Tca9555GpioHal(Tca9555Hal::getInstance(gpioConfig.i2cAddress), gpioConfig.pinToLow, gpioConfig.mode, gpioConfig.inverted);
+            }
+
+            gpio = new Tca9555GpioHal(Tca9555Hal::getInstance(gpioConfig.i2cAddress), gpioConfig.pin, gpioConfig.mode, gpioConfig.inverted, gpioToLow);
         }
 
         relays[nbRelays] = gpio;
@@ -78,7 +88,7 @@ uint8_t RelayController::loadRelayFromSettings()
         {
             Log.warningln("Max relay reached %d", nbRelays);
 
-            LedController::getInstance().blink(Error, Relay);
+            LedController::getInstance().blink(LedError, LedRelay);
 
             break;
         }
@@ -98,7 +108,7 @@ bool RelayController::changeState(const uint8_t id, const bool state) const
     {
         Log.warningln("Relay queue send failed for id %d", id);
 
-        LedController::getInstance().blink(Error, Relay);
+        LedController::getInstance().blink(LedError, LedRelay);
 
         return false;
     }
@@ -123,7 +133,7 @@ void RelayController::task(void* pvParameters)
             {
                 Log.errorln("No relay for id %d", command.id);
 
-                LedController::getInstance().blink(Error, Relay);
+                LedController::getInstance().blink(LedError, LedRelay);
 
                 continue;
             }
@@ -136,13 +146,13 @@ void RelayController::task(void* pvParameters)
                 {
                     Log.warningln("RelayController can not set relay I2C %d, can not have semaphore", command.id);
 
-                    LedController::getInstance().blink(Error, I2C);
+                    LedController::getInstance().blink(LedError, LedI2C);
 
                     continue;
                 }
             }
 
-            relay->set(command.state);
+            relay->set(command.state ? HIGH : LOW);
 
             if (relay->useI2C)
             {
@@ -151,7 +161,7 @@ void RelayController::task(void* pvParameters)
 
             Log.infoln("RelayController message received done for id %d", command.id);
 
-            LedController::getInstance().blink(Success, Relay);
+            LedController::getInstance().blink(LedSuccess, LedRelay);
         }
     }
 }

@@ -40,7 +40,7 @@ public:
     bool begin();
 
     bool setMode(uint8_t pin, PinMode mode);
-    bool write(uint8_t pin, bool value);
+    bool write(uint8_t pin, PinStatus value);
     PinStatus read(uint8_t pin);
 
     uint8_t getAddress()

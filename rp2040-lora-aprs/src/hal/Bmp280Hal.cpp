@@ -43,7 +43,7 @@ bool Bmp280Hal::query(Telemetry& telemetry)
     {
         Log.warningln("BMP280 in error");
 
-        LedController::getInstance().blink(Error, Sensor);
+        LedController::getInstance().blink(LedError, LedSensor);
 
         initialized = false;
 

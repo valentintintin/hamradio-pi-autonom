@@ -14,7 +14,7 @@ LoRaHal::LoRaHal()
     {
         Log.errorln("LoRa TX Queue creation failed");
 
-        LedController::getInstance().blink(Error, FreeRtos);
+        LedController::getInstance().blink(LedError, LedFreeRtos);
     }
 
     rxQueue = xQueueCreate(LORA_QUEUE_RX_SIZE, sizeof(LoRaRxMessage));
@@ -23,7 +23,7 @@ LoRaHal::LoRaHal()
     {
         Log.errorln("LoRa RX Queue creation failed");
 
-        LedController::getInstance().blink(Error, FreeRtos);
+        LedController::getInstance().blink(LedError, LedFreeRtos);
     }
 }
 
@@ -44,7 +44,7 @@ bool LoRaHal::begin(const bool txEnabled,
     {
         Log.errorln("Échec de création de la tâche TX LoRa");
 
-        LedController::getInstance().blink(Error, Radio);
+        LedController::getInstance().blink(LedError, LedRadio);
 
         return false;
     }
@@ -53,7 +53,7 @@ bool LoRaHal::begin(const bool txEnabled,
     {
         Log.errorln("Échec de création de la tâche RX LoRa");
 
-        LedController::getInstance().blink(Error, Radio);
+        LedController::getInstance().blink(LedError, LedRadio);
 
         return false;
     }
@@ -79,7 +79,7 @@ bool LoRaHal::begin(const bool txEnabled,
     if (state != RADIOLIB_ERR_NONE)
     {
         Log.errorln("Échec d'initialisation SX1262: %d", state);
-        LedController::getInstance().blink(Error, Radio);
+        LedController::getInstance().blink(LedError, LedRadio);
 
         return false;
     }
@@ -90,7 +90,7 @@ bool LoRaHal::begin(const bool txEnabled,
     {
         Log.errorln("Échec d'initialisation SX1262: %d", state);
 
-        LedController::getInstance().blink(Error, Radio);
+        LedController::getInstance().blink(LedError, LedRadio);
 
         return false;
     }
@@ -102,7 +102,7 @@ bool LoRaHal::begin(const bool txEnabled,
     {
         Log.errorln("Échec set dio2 as RF Switch SX1262: %d", state);
 
-        LedController::getInstance().blink(Error, Radio);
+        LedController::getInstance().blink(LedError, LedRadio);
 
         return false;
     }
@@ -115,7 +115,7 @@ bool LoRaHal::begin(const bool txEnabled,
     {
         Log.warningln("Échec set current limit SX1262: %d", state);
 
-        LedController::getInstance().blink(Error, Radio);
+        LedController::getInstance().blink(LedError, LedRadio);
     }
 #endif
 
@@ -126,7 +126,7 @@ bool LoRaHal::begin(const bool txEnabled,
     {
         Log.warningln("Échec set rx boosted SX1262: %d", state);
 
-        LedController::getInstance().blink(Error, Radio);
+        LedController::getInstance().blink(LedError, LedRadio);
     }
 #endif
 
@@ -144,7 +144,7 @@ bool LoRaHal::begin(const bool txEnabled,
     {
         Log.errorln("Impossible de démarrer la réception");
 
-        LedController::getInstance().blink(Error, Radio);
+        LedController::getInstance().blink(LedError, LedRadio);
 
         return false;
     }
@@ -154,7 +154,7 @@ bool LoRaHal::begin(const bool txEnabled,
 
     Log.infoln("SX1262 initialisé avec succès");
 
-    LedController::getInstance().blink(Success, Radio);
+    LedController::getInstance().blink(LedSuccess, LedRadio);
     
     return true;
 }
@@ -414,7 +414,7 @@ bool LoRaHal::startReceive()
     {
         Log.errorln("Impossible de démarrer la réception: %d", state);
 
-        LedController::getInstance().blink(Error, Radio);
+        LedController::getInstance().blink(LedError, LedRadio);
 
         return false;
     }
@@ -432,7 +432,7 @@ bool LoRaHal::standby()
     {
         Log.errorln("Impossible de se mettre en standby: %d", state);
 
-        LedController::getInstance().blink(Error, Radio);
+        LedController::getInstance().blink(LedError, LedRadio);
 
         return false;
     }

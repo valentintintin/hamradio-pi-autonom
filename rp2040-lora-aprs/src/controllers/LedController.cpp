@@ -4,13 +4,13 @@
 
 LedController::LedController()
 {
-    queue = xQueueCreate(LED_MAX_COMMAND, sizeof(LedCommand));
+    queue = xQueueCreate(LED_MAX_COMMAND, sizeof(LedUserCommand));
 
     if (queue == nullptr)
     {
         Log.errorln("Led Queue creation failed");
 
-        getInstance().blink(Error, FreeRtos);
+        getInstance().blink(LedError, LedFreeRtos);
     }
 }
 
@@ -20,7 +20,7 @@ bool LedController::begin()
     {
         Log.errorln("Relay task creation failed");
 
-        getInstance().blink(Error, FreeRtos);
+        getInstance().blink(LedError, LedFreeRtos);
 
         return false;
     }
@@ -35,7 +35,7 @@ void LedController::blink(const LedState state, const LedOrigin origin) const
         .origin = origin
     };
 
-    if (origin == Watchdog && uxQueueMessagesWaiting(queue) > 0)
+    if (origin == LedWatchdog && uxQueueMessagesWaiting(queue) > 0)
     {
         return;
     }

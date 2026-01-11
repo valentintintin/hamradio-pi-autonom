@@ -80,7 +80,7 @@ bool CommandController::processCommand(const char* command)
         return doMpptVoltageLimitsCommand(&command[15]);
     }
 
-    LedController::getInstance().blink(Error, Command);
+    LedController::getInstance().blink(LedError, LedUserCommand);
 
     return false;
 }
@@ -132,7 +132,7 @@ bool CommandController::doRebootCommand()
         rebootTask(timer);
     }
 
-    LedController::getInstance().blink(Success, Command);
+    LedController::getInstance().blink(LedSuccess, LedUserCommand);
 
     return true;
 }
@@ -153,7 +153,7 @@ bool CommandController::doDfuCommand()
         dfuTask(timer);
     }
 
-    LedController::getInstance().blink(Success, Command);
+    LedController::getInstance().blink(LedSuccess, LedUserCommand);
 
     return true;
 }
@@ -179,12 +179,12 @@ bool CommandController::doGpioCommand(const char *command)
     {
         snprintf(response, MAX_RESPONSE_LENGTH, "OK. GPIO %d is %d", id, state);
 
-        LedController::getInstance().blink(Success, Command);
+        LedController::getInstance().blink(LedSuccess, LedUserCommand);
 
         return true;
     }
 
-    LedController::getInstance().blink(Error, Command);
+    LedController::getInstance().blink(LedError, LedUserCommand);
 
     snprintf(response, MAX_RESPONSE_LENGTH, "KO");
     return false;
@@ -194,7 +194,7 @@ bool CommandController::doResetReasonCommand()
 {
     snprintf(response, MAX_RESPONSE_LENGTH, "Reset reason: %d", rp2040.getResetReason());
 
-    LedController::getInstance().blink(Success, Command);
+    LedController::getInstance().blink(LedSuccess, LedUserCommand);
 
     return true;
 }
@@ -203,7 +203,7 @@ bool CommandController::doUptimeCommand()
 {
     snprintf(response, MAX_RESPONSE_LENGTH, "%lu seconds", millis() / 1000);
 
-    LedController::getInstance().blink(Success, Command);
+    LedController::getInstance().blink(LedSuccess, LedUserCommand);
 
     return true;
 }
@@ -214,14 +214,14 @@ bool CommandController::doTelemetriesCommand()
     {
         strncpy(response, "OK", MAX_RESPONSE_LENGTH);
 
-        LedController::getInstance().blink(Error, Command);
+        LedController::getInstance().blink(LedError, LedUserCommand);
 
         return true;
     }
 
     strncpy(response, "KO", MAX_RESPONSE_LENGTH);
 
-    LedController::getInstance().blink(Success, Command);
+    LedController::getInstance().blink(LedSuccess, LedUserCommand);
 
     return false;
 }
@@ -232,7 +232,7 @@ bool CommandController::doPingCommand()
     getDateTimeStringFromEpoch(getDateTime().unixtime(), dateString, 64);
     snprintf(response, MAX_RESPONSE_LENGTH, "Pong!\n%s", dateString);
 
-    LedController::getInstance().blink(Success, Command);
+    LedController::getInstance().blink(LedSuccess, LedUserCommand);
 
     return true;
 }
@@ -244,7 +244,7 @@ bool CommandController::doMpptVoltageLimitsCommand(const char* command)
     {
         strncpy(response, "KO args: VOff VOn -> mV", MAX_RESPONSE_LENGTH);
 
-        LedController::getInstance().blink(Error, Command);
+        LedController::getInstance().blink(LedError, LedUserCommand);
 
         return false;
     }
@@ -258,7 +258,7 @@ bool CommandController::doMpptVoltageLimitsCommand(const char* command)
     {
         strncpy(response, "KO semaphore", MAX_RESPONSE_LENGTH);
 
-        LedController::getInstance().blink(Error, I2C);
+        LedController::getInstance().blink(LedError, LedI2C);
 
         return false;
     }
@@ -267,7 +267,7 @@ bool CommandController::doMpptVoltageLimitsCommand(const char* command)
     {
         snprintf(response, MAX_RESPONSE_LENGTH, "OK. VOff %dmV, VOn %dmV", powerOff, powerOn);
 
-        LedController::getInstance().blink(Success, Command);
+        LedController::getInstance().blink(LedSuccess, LedUserCommand);
 
         return true;
     }
@@ -276,7 +276,7 @@ bool CommandController::doMpptVoltageLimitsCommand(const char* command)
 
     snprintf(response, MAX_RESPONSE_LENGTH, "KO. VOff %dmV, VOn %dmV", powerOff, powerOn);
 
-    LedController::getInstance().blink(Error, Command);
+    LedController::getInstance().blink(LedError, LedUserCommand);
 
     return false;
 }
@@ -288,7 +288,7 @@ bool CommandController::doMpptWatchdogUserCommand(const char *command)
     {
         strncpy(response, "KO args: TOff TOn -> sec", MAX_RESPONSE_LENGTH);
 
-        LedController::getInstance().blink(Error, Command);
+        LedController::getInstance().blink(LedError, LedUserCommand);
 
         return false;
     }
@@ -302,14 +302,14 @@ bool CommandController::doMpptWatchdogUserCommand(const char *command)
     {
         snprintf(response, MAX_RESPONSE_LENGTH, "OK. TOff %ds, TOn %ds", timeOff, timeout);
 
-        LedController::getInstance().blink(Success, Command);
+        LedController::getInstance().blink(LedSuccess, LedUserCommand);
 
         return true;
     }
 
     snprintf(response, MAX_RESPONSE_LENGTH, "KO. TOff %ds, TOn %ds", timeOff, timeout);
 
-    LedController::getInstance().blink(Error, Command);
+    LedController::getInstance().blink(LedError, LedUserCommand);
 
     return false;
 }

@@ -80,7 +80,7 @@ void setMpptVoltageLimits()
     {
         Log.warningln("Can not set relay Mppt Charger voltage limit, can not have semaphore");
 
-        LedController::getInstance().blink(Error, I2C);
+        LedController::getInstance().blink(LedError, LedI2C);
 
         return;
     }
@@ -89,7 +89,7 @@ void setMpptVoltageLimits()
     {
         Log.warningln("Can not set relay Mppt Charger voltage limit");
 
-        LedController::getInstance().blink(Error, MpptCharger);
+        LedController::getInstance().blink(LedError, LedMpptCharger);
     }
 
     I2CMasterHal::releaseSemaphore();
@@ -188,7 +188,7 @@ void setup()
         setTimeToInternalRtc(0);
         Log.warningln("Wrong rtc time !");
 
-        LedController::getInstance().blink(Error, Clock);
+        LedController::getInstance().blink(LedError, LedClock);
     }
 
     RelayController::getInstance().begin();
@@ -204,7 +204,7 @@ void setup()
     {
         Log.errorln("Serial task KO");
 
-        LedController::getInstance().blink(Error, FreeRtos);
+        LedController::getInstance().blink(LedError, LedFreeRtos);
     }
 
     setLora();

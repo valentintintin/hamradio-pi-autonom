@@ -16,7 +16,7 @@ SensorController::SensorController()
     {
         Log.warningln("Timer creation failed");
 
-        LedController::getInstance().blink(Error, FreeRtos);
+        LedController::getInstance().blink(LedError, LedFreeRtos);
     }
 }
 
@@ -35,7 +35,7 @@ bool SensorController::begin()
     {
         Log.warningln("Sensor can not begin, can not have semaphore");
 
-        LedController::getInstance().blink(Error, I2C);
+        LedController::getInstance().blink(LedError, LedI2C);
 
         return false;
     }
@@ -51,7 +51,7 @@ bool SensorController::begin()
 
     if (result)
     {
-        LedController::getInstance().blink(Success, Sensor);
+        LedController::getInstance().blink(LedSuccess, LedSensor);
     }
 
     return result;
@@ -70,7 +70,7 @@ bool SensorController::queryTelemetries()
     {
         Log.warningln("Sensor can not query, can not have semaphore");
 
-        LedController::getInstance().blink(Error, I2C);
+        LedController::getInstance().blink(LedError, LedI2C);
 
         return false;
     }
@@ -88,7 +88,7 @@ bool SensorController::queryTelemetries()
     {
         telemetry.updatedAt = getDateTime().unixtime();
 
-        LedController::getInstance().blink(Success, Sensor);
+        LedController::getInstance().blink(LedSuccess, LedSensor);
 
         printJson(serialJson);
         printJson(serial1Json);

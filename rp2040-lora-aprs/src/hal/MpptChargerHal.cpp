@@ -49,7 +49,7 @@ bool MpptChargerHal::query(Telemetry& telemetry)
     {
         Log.warningln("INA3221 in error");
 
-        LedController::getInstance().blink(Error, Sensor);
+        LedController::getInstance().blink(LedError, LedSensor);
 
         initialized = false;
 

@@ -18,7 +18,7 @@ WatchdogController::WatchdogController()
         {
             Log.errorln("Timer heartBeatAndInternal creation failed");
 
-            LedController::getInstance().blink(Error, FreeRtos);
+            LedController::getInstance().blink(LedError, LedFreeRtos);
         }
         else
         {
@@ -37,7 +37,7 @@ WatchdogController::WatchdogController()
         {
             Log.errorln("Timer mpptChargerWatchdog creation failed");
 
-            LedController::getInstance().blink(Error, FreeRtos);
+            LedController::getInstance().blink(LedError, LedFreeRtos);
         }
     }
 }
@@ -52,7 +52,7 @@ bool WatchdogController::begin()
         {
             Log.errorln("Timer watchdogInternal start failed");
 
-            LedController::getInstance().blink(Error, FreeRtos);
+            LedController::getInstance().blink(LedError, LedFreeRtos);
         }
         else
         {
@@ -68,7 +68,7 @@ bool WatchdogController::begin()
         {
             Log.errorln("Timer mpptChargerWatchdog start failed");
 
-            LedController::getInstance().blink(Error, FreeRtos);
+            LedController::getInstance().blink(LedError, LedFreeRtos);
         }
         else
         {
@@ -95,7 +95,7 @@ bool WatchdogController::setMpptWatchdogManagedByUser(const uint16_t timeOff, co
     {
         Log.errorln("Timer mpptChargerWatchdog stop failed");
 
-        LedController::getInstance().blink(Error, FreeRtos);
+        LedController::getInstance().blink(LedError, LedFreeRtos);
 
         return false;
     }
@@ -106,7 +106,7 @@ bool WatchdogController::setMpptWatchdogManagedByUser(const uint16_t timeOff, co
     {
         Log.errorln("Set Mppt watchdog to user values failed");
 
-        LedController::getInstance().blink(Error, MpptCharger);
+        LedController::getInstance().blink(LedError, LedMpptCharger);
 
         return false;
     }
@@ -127,7 +127,7 @@ bool WatchdogController::setMpptWatchdogManagedByTask()
     {
         Log.errorln("Timer mpptChargerWatchdog start failed");
 
-        LedController::getInstance().blink(Error, FreeRtos);
+        LedController::getInstance().blink(LedError, LedFreeRtos);
 
         return false;
     }
@@ -145,7 +145,7 @@ void WatchdogController::feedInternalWatchdog(TimerHandle_t timer)
 
     Log.traceln("Feed dog");
 
-    LedController::getInstance().blink(Normal, Watchdog);
+    LedController::getInstance().blink(LedNormal, LedWatchdog);
 }
 
 void WatchdogController::feedMpptChargerWatchdog(TimerHandle_t timer)
@@ -154,7 +154,7 @@ void WatchdogController::feedMpptChargerWatchdog(TimerHandle_t timer)
     {
         Log.warningln("Mppt watchdog can not feed, can not have semaphore");
 
-        LedController::getInstance().blink(Error, I2C);
+        LedController::getInstance().blink(LedError, LedI2C);
 
         return;
     }
@@ -167,7 +167,7 @@ void WatchdogController::feedMpptChargerWatchdog(TimerHandle_t timer)
     {
         Log.warningln("Feed Mppt watchdog KO");
 
-        LedController::getInstance().blink(Error, MpptCharger);
+        LedController::getInstance().blink(LedError, LedMpptCharger);
     }
 
     I2CMasterHal::releaseSemaphore();
