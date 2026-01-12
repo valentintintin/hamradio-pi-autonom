@@ -1,23 +1,21 @@
 #pragma once
 
-#include "telemetry.h"
-
 #include <ArduinoLog.h>
 #include "controllers/LedController.hpp"
 
-class SensorHal
+class Hal
 {
 public:
-    virtual bool begin() = 0;
-    virtual bool query(Telemetry &telemetry) = 0;
+    virtual bool begin();
 
     bool isInitialized() const
     {
         return initialized;
     }
 
-    virtual ~SensorHal() = default;
+    virtual ~Hal() = default;
 protected:
     bool initialized = false;
-    SensorHal() = default;
+
+    virtual bool doBegin() = 0;
 };

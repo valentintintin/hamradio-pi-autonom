@@ -5,8 +5,8 @@
 #include "SettingsManager.hpp"
 #include "controllers/LedController.hpp"
 #include "hal/I2CMasterHal.hpp"
-#include "hal/PicoGpioHal.hpp"
-#include "hal/Tca9555GpioHal.hpp"
+#include "hal/Gpio/PicoGpioHal.hpp"
+#include "hal/Gpio/Tca9555GpioHal.hpp"
 
 RelayController::RelayController()
 {
@@ -77,7 +77,7 @@ uint8_t RelayController::loadRelayFromSettings()
 
         Log.infoln("Relay pin %d added with id %d", gpio->pin, nbRelays);
 
-        if (!gpio->init())
+        if (!gpio->begin())
         {
             Log.warningln("Relay pin %d added with id %d failed to init", gpio->pin, nbRelays);
         }

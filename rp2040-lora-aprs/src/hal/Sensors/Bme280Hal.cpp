@@ -1,10 +1,10 @@
-#include "hal/Bme280Hal.hpp"
+#include "hal/Sensors/Bme280Hal.hpp"
 
 Bme280Hal::Bme280Hal(const uint8_t address) : address(address)
 {
 }
 
-bool Bme280Hal::begin()
+bool Bme280Hal::doBegin()
 {
     if (initialized)
     {

@@ -12,11 +12,11 @@ public:
         return instance;
     }
 
-    bool begin() override;
     bool query(Telemetry& telemetry) override;
-
-    bool queryClock(uint32_t& now) const;
+    bool queryClock(uint32_t& now);
+protected:
+    bool doBegin() override;
 private:
-    void setRegisterToRead(I2CSlaveRegisterValue reg) const;
-    bool readRegister(I2CSlaveRegisterValue reg, void* dest, size_t size) const;
+    bool setRegisterToRead(I2CSlaveRegisterValue reg);
+    bool readRegister(I2CSlaveRegisterValue reg, void* dest, size_t size);
 };

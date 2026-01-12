@@ -5,7 +5,7 @@
 #include <bits/ios_base.h>
 
 #include "controllers/LedController.hpp"
-#include "hal/M24M02Hal.hpp"
+#include "../include/hal/Peripherals/M24M02Hal.hpp"
 
 bool SettingsManager::begin()
 {

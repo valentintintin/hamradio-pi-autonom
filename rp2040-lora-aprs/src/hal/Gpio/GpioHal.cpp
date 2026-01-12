@@ -1,4 +1,4 @@
-#include "hal/GpioHal.hpp"
+#include "hal/Gpio/GpioHal.hpp"
 
 #include <ArduinoLog.h>
 
@@ -7,14 +7,14 @@ GpioHal::GpioHal(const uint8_t pin, const PinMode mode, const bool inverted, con
 {
 }
 
-bool GpioHal::init()
+bool GpioHal::begin()
 {
     Log.infoln("Pin %d set mode to %d", pin, mode);
-    auto result = doInit();
+    auto result = doBegin();
 
     if (gpioToLow)
     {
-        result &= gpioToLow->init();
+        result &= gpioToLow->doBegin();
     }
 
     return result;

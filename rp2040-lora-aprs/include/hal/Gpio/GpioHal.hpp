@@ -2,12 +2,14 @@
 
 #include <Arduino.h>
 
-class GpioHal
+#include "hal/Hal.hpp"
+
+class GpioHal : public Hal
 {
 public:
     GpioHal(uint8_t pin, PinMode mode, bool inverted = false, bool useI2C = false, GpioHal* gpioToLow = nullptr);
 
-    bool init();
+    bool begin() override;
     PinStatus set(PinStatus state);
     PinStatus toggle();
     PinStatus read();
@@ -23,10 +25,7 @@ public:
     const bool useI2C;
     GpioHal* gpioToLow = nullptr;
 
-    virtual ~GpioHal() = default;
-
 protected:
-    virtual bool doInit() = 0;
     virtual bool doSet(PinStatus state) = 0;
     virtual PinStatus doRead() = 0;
 

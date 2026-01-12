@@ -1,8 +1,8 @@
-#include "hal/MpptChargerHal.hpp"
+#include "hal/Sensors/MpptChargerHal.hpp"
 
 #include <ArduinoLog.h>
 
-bool MpptChargerHal::begin()
+bool MpptChargerHal::doBegin()
 {
     if (initialized)
     {
@@ -63,7 +63,7 @@ bool MpptChargerHal::setWatchdog(const uint16_t powerOff, const uint8_t timeout)
 {
     Log.infoln("Feed Mppt watchdog with power off %d and timeout %d", powerOff, timeout);
 
-    auto result = begin();
+    auto result = doBegin();
 
     if (result)
     {
@@ -95,7 +95,7 @@ bool MpptChargerHal::setVoltageLimits(const uint16_t powerOff, const uint16_t po
         return false;
     }
 
-    auto result = begin();
+    auto result = doBegin();
 
     if (result)
     {

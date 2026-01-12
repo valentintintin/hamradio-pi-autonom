@@ -22,7 +22,7 @@
 #include "controllers/SensorController.hpp"
 #include "controllers/WatchdogController.hpp"
 #include "hal/I2CMasterHal.hpp"
-#include "hal/LoRaHal.hpp"
+#include "../include/hal/Peripherals/SX1262Hal.hpp"
 
 char bufferText[BUFFER_LENGTH];
 
@@ -103,7 +103,7 @@ void setLora()
 
     if (lora.enabled)
     {
-        LoRaHal::getInstance().begin(
+        SX1262Hal::getInstance().begin(
             settingsLora.txEnabled,
             lora.frequency,
             lora.bandwidth,

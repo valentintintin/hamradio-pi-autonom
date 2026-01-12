@@ -2,7 +2,9 @@
 
 #include <TCA9555.h>
 
-class Tca9555Hal
+#include "hal/Hal.hpp"
+
+class Tca9555Hal : public Hal
 {
 public:
     static Tca9555Hal& getInstance(const uint8_t address)
@@ -37,8 +39,6 @@ public:
         }
     }
 
-    bool begin();
-
     bool setMode(uint8_t pin, PinMode mode);
     bool write(uint8_t pin, PinStatus value);
     PinStatus read(uint8_t pin);
@@ -47,9 +47,10 @@ public:
     {
         return tca.getAddress();
     }
+protected:
+    bool doBegin() override;
 private:
     explicit Tca9555Hal(uint8_t address);
 
-    bool initialized = false;
     TCA9555 tca;
 };

@@ -4,7 +4,7 @@
 #include <timers.h>
 
 #include "SettingsManager.hpp"
-#include "hal/MpptChargerHal.hpp"
+#include "hal/Sensors/MpptChargerHal.hpp"
 #include "controllers/LedController.hpp"
 #include "hal/I2CMasterHal.hpp"
 

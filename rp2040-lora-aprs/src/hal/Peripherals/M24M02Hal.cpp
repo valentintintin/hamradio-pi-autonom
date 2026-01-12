@@ -1,9 +1,9 @@
-#include "hal/M24M02Hal.hpp"
+#include "hal/Peripherals/M24M02Hal.hpp"
 
 #include <ArduinoLog.h>
 #include "controllers/LedController.hpp"
 
-bool M24M02Hal::begin()
+bool M24M02Hal::doBegin()
 {
     if (initialized)
     {

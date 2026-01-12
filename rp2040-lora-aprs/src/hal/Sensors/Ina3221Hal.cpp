@@ -1,6 +1,6 @@
-#include "hal/Ina3221Hal.hpp"
+#include "hal/Sensors/Ina3221Hal.hpp"
 
-bool Ina3221Hal::begin()
+bool Ina3221Hal::doBegin()
 {
     if (initialized)
     {

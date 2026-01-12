@@ -7,6 +7,7 @@
 #include "modules/SX126x/SX1262.h"
 
 #include "config.h"
+#include "hal/Hal.hpp"
 
 #define TRX_BUFFER 256
 #define LORA_QUEUE_TX_SIZE 10
@@ -27,12 +28,12 @@ struct LoRaRxMessage
     float snr;
 };
 
-class LoRaHal
+class SX1262Hal // : public Hal TODO héir
 {
 public:
-    static LoRaHal& getInstance()
+    static SX1262Hal& getInstance()
     {
-        static LoRaHal instance;
+        static SX1262Hal instance;
         return instance;
     }
 
@@ -72,7 +73,7 @@ private:
     bool txEnabled = true;
     SX1262 radio = SX1262(new Module(LORA_CS, LORA_DIO1, LORA_RESET, LORA_BUSY, SPI1));
 
-    LoRaHal();
+    SX1262Hal();
 
     void processTxQueue();
     void processRxQueue();

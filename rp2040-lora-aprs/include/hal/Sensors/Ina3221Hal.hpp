@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hal/SensorHal.hpp"
+#include "SensorHal.hpp"
 
 #include "Adafruit_INA3221.h"
 
@@ -13,8 +13,9 @@ public:
         return instance;
     }
 
-    bool begin() override;
     bool query(Telemetry &telemetry) override;
+protected:
+    bool doBegin() override;
 private:
     Adafruit_INA3221 ina3221 = Adafruit_INA3221();
 };

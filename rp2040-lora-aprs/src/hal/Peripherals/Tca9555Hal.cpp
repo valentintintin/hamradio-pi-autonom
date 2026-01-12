@@ -1,4 +1,4 @@
-#include "hal/Tca9555Hal.hpp"
+#include "hal/Peripherals/Tca9555Hal.hpp"
 
 #include <ArduinoLog.h>
 
@@ -6,7 +6,7 @@ Tca9555Hal::Tca9555Hal(const uint8_t address) : tca(address)
 {
 }
 
-bool Tca9555Hal::begin()
+bool Tca9555Hal::doBegin()
 {
     if (initialized)
     {
@@ -33,7 +33,7 @@ bool Tca9555Hal::setMode(uint8_t pin, PinMode mode)
 {
     Log.infoln("TCA9555 %X pin mode %d to %d", tca.getAddress(), pin, mode);
 
-    if (!begin())
+    if (!doBegin())
     {
         Log.infoln("TCA9555 %X pin mode %d to %d KO", tca.getAddress(), pin, mode);
 
@@ -58,7 +58,7 @@ bool Tca9555Hal::write(uint8_t pin, PinStatus value)
 {
     Log.infoln("TCA9555 %X pin write %d to %d", tca.getAddress(), pin, value);
 
-    if (!begin())
+    if (!doBegin())
     {
         Log.infoln("TCA9555 %X pin write %d to %d KO", tca.getAddress(), pin, value);
 
@@ -83,7 +83,7 @@ PinStatus Tca9555Hal::read(uint8_t pin)
 {
     Log.infoln("TCA9555 %X pin read %d", tca.getAddress(), pin);
 
-    if (!begin())
+    if (!doBegin())
     {
         Log.infoln("TCA9555 %X pin read %d KO", tca.getAddress(), pin);
 

@@ -2,7 +2,7 @@
 #include <Arduino.h>
 
 #include "BaseController.hpp"
-#include "hal/GpioHal.hpp"
+#include "hal/Gpio/GpioHal.hpp"
 
 #include <queue.h>
 

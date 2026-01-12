@@ -1,4 +1,4 @@
-#include "hal/LoRaHal.hpp"
+#include "hal/Peripherals/SX1262Hal.hpp"
 
 #include <ArduinoLog.h>
 #include <SPI.h>
@@ -6,7 +6,7 @@
 
 #include "controllers/LedController.hpp"
 
-LoRaHal::LoRaHal()
+SX1262Hal::SX1262Hal()
 {
     txQueue = xQueueCreate(LORA_QUEUE_TX_SIZE, sizeof(LoRaTxMessage));
 
@@ -27,7 +27,7 @@ LoRaHal::LoRaHal()
     }
 }
 
-bool LoRaHal::begin(const bool txEnabled,
+bool SX1262Hal::begin(const bool txEnabled,
                     const float frequency,
                     const uint16_t bandwidth,
                     const uint8_t spreadingFactor,
@@ -159,7 +159,7 @@ bool LoRaHal::begin(const bool txEnabled,
     return true;
 }
 
-bool LoRaHal::send(const uint8_t* data, const size_t length)
+bool SX1262Hal::send(const uint8_t* data, const size_t length)
 {
     if (!initialized)
     {
@@ -192,13 +192,13 @@ bool LoRaHal::send(const uint8_t* data, const size_t length)
     return true;
 }
 
-void LoRaHal::txTask(void* pvParameters)
+void SX1262Hal::txTask(void* pvParameters)
 {
-    const auto hal = static_cast<LoRaHal*>(pvParameters);
+    const auto hal = static_cast<SX1262Hal*>(pvParameters);
     hal->processTxQueue();
 }
 
-void LoRaHal::processTxQueue()
+void SX1262Hal::processTxQueue()
 {
     LoRaTxMessage msg;
 
@@ -297,7 +297,7 @@ void LoRaHal::processTxQueue()
     }
 }
 
-bool LoRaHal::startChannelScan()
+bool SX1262Hal::startChannelScan()
 {
     if (!initialized)
     {
@@ -317,7 +317,7 @@ bool LoRaHal::startChannelScan()
     return true;
 }
 
-void LoRaHal::onCadInterrupt()
+void SX1262Hal::onCadInterrupt()
 {
     const auto& hal = getInstance();
 
@@ -329,7 +329,7 @@ void LoRaHal::onCadInterrupt()
     }
 }
 
-void LoRaHal::onTxInterrupt()
+void SX1262Hal::onTxInterrupt()
 {
     const auto& hal = getInstance();
 
@@ -341,7 +341,7 @@ void LoRaHal::onTxInterrupt()
     }
 }
 
-void LoRaHal::onRxInterrupt()
+void SX1262Hal::onRxInterrupt()
 {
     const auto& hal = getInstance();
 
@@ -353,7 +353,7 @@ void LoRaHal::onRxInterrupt()
     }
 }
 
-bool LoRaHal::receive(LoRaRxMessage& message, const TickType_t timeout)
+bool SX1262Hal::receive(LoRaRxMessage& message, const TickType_t timeout)
 {
     if (!initialized)
     {
@@ -370,13 +370,13 @@ bool LoRaHal::receive(LoRaRxMessage& message, const TickType_t timeout)
     return false;
 }
 
-void LoRaHal::rxTask(void* pvParameters)
+void SX1262Hal::rxTask(void* pvParameters)
 {
-    const auto hal = static_cast<LoRaHal*>(pvParameters);
+    const auto hal = static_cast<SX1262Hal*>(pvParameters);
     hal->processRxQueue();
 }
 
-void LoRaHal::processRxQueue()
+void SX1262Hal::processRxQueue()
 {
     LoRaRxMessage msg;
 
@@ -404,7 +404,7 @@ void LoRaHal::processRxQueue()
     }
 }
 
-bool LoRaHal::startReceive()
+bool SX1262Hal::startReceive()
 {
     radio.setDio1Action(onRxInterrupt);
 
@@ -422,7 +422,7 @@ bool LoRaHal::startReceive()
     return true;
 }
 
-bool LoRaHal::standby()
+bool SX1262Hal::standby()
 {
     radio.clearDio1Action();
 

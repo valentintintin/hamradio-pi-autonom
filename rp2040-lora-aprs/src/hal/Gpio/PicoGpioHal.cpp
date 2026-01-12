@@ -1,4 +1,4 @@
-#include "hal/PicoGpioHal.hpp"
+#include "hal/Gpio/PicoGpioHal.hpp"
 
 #include <ArduinoLog.h>
 
@@ -6,7 +6,7 @@ PicoGpioHal::PicoGpioHal(const uint8_t pin, const PinMode mode, const bool inver
 {
 }
 
-bool PicoGpioHal::doInit()
+bool PicoGpioHal::doBegin()
 {
     pinMode(pin, mode);
     return true;

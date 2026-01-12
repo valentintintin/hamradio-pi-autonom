@@ -6,11 +6,11 @@
 #include <timers.h>
 #include <JsonWriter.h>
 
-#include "hal/SensorHal.hpp"
-#include "hal/Bme280Hal.hpp"
-#include "hal/I2CSlaveHal.hpp"
-#include "hal/Ina3221Hal.hpp"
-#include "hal/MpptChargerHal.hpp"
+#include "hal/Sensors/SensorHal.hpp"
+#include "hal/Sensors/Bme280Hal.hpp"
+#include "hal/Sensors/I2CSlaveHal.hpp"
+#include "hal/Sensors/Ina3221Hal.hpp"
+#include "hal/Sensors/MpptChargerHal.hpp"
 
 #define QUERY_DELAY 30000 // TODO settings ?
 

@@ -1,10 +1,10 @@
-#include "hal/Bmp280Hal.hpp"
+#include "hal/Sensors/Bmp280Hal.hpp"
 
 Bmp280Hal::Bmp280Hal(const uint8_t address) : address(address)
 {
 }
 
-bool Bmp280Hal::begin()
+bool Bmp280Hal::doBegin()
 {
     if (initialized)
     {

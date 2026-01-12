@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hal/SensorHal.hpp"
+#include "SensorHal.hpp"
 
 #include "Adafruit_BMP280.h"
 
@@ -21,8 +21,9 @@ public:
         }
     }
 
-    bool begin() override;
     bool query(Telemetry &telemetry) override;
+protected:
+    bool doBegin() override;
 private:
     Adafruit_BMP280 bmp280 = Adafruit_BMP280();
     uint8_t address;
