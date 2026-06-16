@@ -100,6 +100,8 @@ void setup() {
   the_mesh.sendSelfAdvertisement(16000, false);
 #endif
 
+  radio_2_driver.setParams(433.775, RADIOLIB_SX126X_LORA_BW_125_0, 12, RADIOLIB_SX126X_LORA_CR_4_5);
+
   board.onBootComplete();
 }
 
@@ -151,6 +153,8 @@ void loop() {
   ui_task.loop();
 #endif
   rtc_clock.tick();
+
+
 
   if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {
 #if defined(NRF52_PLATFORM)
