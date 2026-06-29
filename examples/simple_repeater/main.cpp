@@ -1,17 +1,21 @@
-#include <Arduino.h>   // needed for PlatformIO
-#include <Mesh.h>
-
+#include "mine/MyAprsMesh.h"
 #include "MyMesh.h"
+
+#include <Arduino.h> // needed for PlatformIO
+#include <Mesh.h>
 
 #ifdef DISPLAY_CLASS
   #include "UITask.h"
   static UITask ui_task(display);
 #endif
 
-StdRNG fast_rng;
+StdRNG fast_rng, fast_rng_2;
 SimpleMeshTables tables;
 
-MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock, tables);
+MyMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng,
+  rtc_clock, tables);
+mine::MyAprsMesh aprs_mesh(board, radio_2_driver, *new ArduinoMillis(), fast_rng_2,
+  rtc_clock);
 
 void halt() {
   while (1) ;
@@ -54,6 +58,7 @@ void setup() {
   }
 
   fast_rng.begin(radio_driver.getRngSeed());
+  fast_rng_2.begin(radio_2_driver.getRngSeed());
 
   FILESYSTEM* fs;
 #if defined(NRF52_PLATFORM) || defined(STM32_PLATFORM)
@@ -91,6 +96,9 @@ void setup() {
 
   the_mesh.begin(fs);
 
+  radio_2_driver.setParams(433.775, RADIOLIB_SX126X_LORA_BW_125_0, 12, RADIOLIB_SX126X_LORA_CR_4_5);
+  aprs_mesh.begin();
+
 #ifdef DISPLAY_CLASS
   ui_task.begin(the_mesh.getNodePrefs(), FIRMWARE_BUILD_DATE, FIRMWARE_VERSION);
 #endif
@@ -99,8 +107,6 @@ void setup() {
 #if ENABLE_ADVERT_ON_BOOT == 1
   the_mesh.sendSelfAdvertisement(16000, false);
 #endif
-
-  radio_2_driver.setParams(433.775, RADIOLIB_SX126X_LORA_BW_125_0, 12, RADIOLIB_SX126X_LORA_CR_4_5);
 
   board.onBootComplete();
 }
@@ -124,7 +130,10 @@ void loop() {
     Serial.print('\n');
     command[len - 1] = 0;  // replace newline with C string null terminator
     char reply[160];
-    the_mesh.handleCommand(0, command, reply);  // NOTE: there is no sender_timestamp via serial!
+    aprs_mesh.handleCommand(0, command, reply);  // NOTE: there is no sender_timestamp via serial!
+    if (!reply[0]) {
+      the_mesh.handleCommand(0, command, reply);  // NOTE: there is no sender_timestamp via serial!
+    }
     if (reply[0]) {
       Serial.print("  -> "); Serial.println(reply);
     }
@@ -148,6 +157,7 @@ void loop() {
 #endif
 
   the_mesh.loop();
+  aprs_mesh.loop();
   sensors.loop();
 #ifdef DISPLAY_CLASS
   ui_task.loop();

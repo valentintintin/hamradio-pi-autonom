@@ -1,4 +1,6 @@
-#include "MyDispatcher.h"
+#include "MyAprsDispatcher.h"
+
+#include <SerialUSB.h>
 
 #if MESH_PACKET_LOGGING
   #include <Arduino.h>
@@ -14,28 +16,28 @@ namespace mine {
   #define NOISE_FLOOR_CALIB_INTERVAL   2000     // 2 seconds
 #endif
 
-void MyDispatcher::begin() {
-  n_sent_flood = n_sent_direct = 0;
-  n_recv_flood = n_recv_direct = 0;
+void MyAprsDispatcher::begin() {
   _err_flags = 0;
   radio_nonrx_start = _ms->getMillis();
 
   _radio->begin();
   prev_isrecv_mode = _radio->isInRecvMode();
+
+  resetStats();
 }
 
-int MyDispatcher::calcRxDelay(float score, uint32_t air_time) const {
+int MyAprsDispatcher::calcRxDelay(float score, uint32_t air_time) const {
   return (int) ((pow(10, 0.85f - score) - 1.0) * air_time);
 }
 
-uint32_t MyDispatcher::getCADFailRetryDelay() const {
+uint32_t MyAprsDispatcher::getCADFailRetryDelay() const {
   return 200;
 }
-uint32_t MyDispatcher::getCADFailMaxDuration() const {
+uint32_t MyAprsDispatcher::getCADFailMaxDuration() const {
   return 4000;   // 4 seconds
 }
 
-void MyDispatcher::loop() {
+void MyAprsDispatcher::loop() {
   if (millisHasNowPassed(next_floor_calib_time)) {
     _radio->triggerNoiseFloorCalibrate(getInterferenceThreshold());
     next_floor_calib_time = futureMillis(NOISE_FLOOR_CALIB_INTERVAL);
@@ -56,27 +58,23 @@ void MyDispatcher::loop() {
 
   if (outbound) {  // waiting for outbound send to be completed
     if (_radio->isSendComplete()) {
-      long t = _ms->getMillis() - outbound_start;
+      const long t = _ms->getMillis() - outbound_start;
       total_air_time += t;
       //Serial.print("  airtime="); Serial.println(t);
 
       _radio->onSendFinished();
-      logTx(outbound, 2 + outbound->getPathByteLen() + outbound->payload_len);
-      if (outbound->isRouteFlood()) {
-        n_sent_flood++;
-      } else {
-        n_sent_direct++;
-      }
+      logTx(outbound);
+      n_sent++;
       releasePacket(outbound);  // return to pool
-      outbound = NULL;
+      outbound = nullptr;
     } else if (millisHasNowPassed(outbound_expiry)) {
       MESH_DEBUG_PRINTLN("%s MyDispatcher::loop(): WARNING: outbound packed send timed out!", getLogDateTime());
 
       _radio->onSendFinished();
-      logTxFail(outbound, 2 + outbound->getPathByteLen() + outbound->payload_len);
+      logTxFail(outbound);
 
       releasePacket(outbound);  // return to pool
-      outbound = NULL;
+      outbound = nullptr;
     } else {
       return;  // can't do any more radio activity until send is complete or timed out
     }
@@ -92,7 +90,7 @@ void MyDispatcher::loop() {
 
   // check inbound (delayed) queue
   {
-    aprs::packet* pkt = _mgr->getNextInbound(_ms->getMillis());
+    AprsPacket* pkt = _mgr->getNextInbound(_ms->getMillis());
     if (pkt) {
       processRecvPacket(pkt);
     }
@@ -101,50 +99,16 @@ void MyDispatcher::loop() {
   checkSend();
 }
 
-bool MyDispatcher::tryParsePacket(aprs::packet* pkt, const uint8_t* raw, int len) {
+bool MyAprsDispatcher::tryParsePacket(AprsPacket* pkt, const uint8_t* raw, int len) {
   int i = 0;
-
-  pkt->header = raw[i++];
-  if (pkt->getPayloadVer() > PAYLOAD_VER_1) {
-    MESH_DEBUG_PRINTLN("%s MyDispatcher::checkRecv(): unsupported packet version", getLogDateTime());
-    return false;
-  }
-
-  if (pkt->hasTransportCodes()) {
-    memcpy(&pkt->transport_codes[0], &raw[i], 2); i += 2;
-    memcpy(&pkt->transport_codes[1], &raw[i], 2); i += 2;
-  } else {
-    pkt->transport_codes[0] = pkt->transport_codes[1] = 0;
-  }
-
-  pkt->path_len = raw[i++];
-  uint8_t path_mode = pkt->path_len >> 6;  // upper 2 bits (legacy firmware: 00)
-  if (path_mode == 3) {   // Reserved for future
-    MESH_DEBUG_PRINTLN("%s MyDispatcher::checkRecv(): unsupported path mode: 3", getLogDateTime());
-    return false;
-  }
-
-  uint8_t path_byte_len = (pkt->path_len & 63) * pkt->getPathHashSize();
-  if (path_byte_len > MAX_PATH_SIZE || i + path_byte_len > len) {
-    MESH_DEBUG_PRINTLN("%s MyDispatcher::checkRecv(): partial or corrupt packet received, len=%d", getLogDateTime(), len);
-    return false;
-  }
-
-  memcpy(pkt->path, &raw[i], path_byte_len); i += path_byte_len;
-
-  pkt->payload_len = len - i;  // payload is remainder
-  if (pkt->payload_len > sizeof(pkt->payload)) {
-    MESH_DEBUG_PRINTLN("%s MyDispatcher::checkRecv(): packet payload too big, payload_len=%d", getLogDateTime(), (uint32_t)pkt->payload_len);
-    return false;
-  }
 
   memcpy(pkt->payload, &raw[i], pkt->payload_len);
 
   return true;  // success
 }
 
-void MyDispatcher::checkRecv() {
-  aprs::packet* pkt;
+void MyAprsDispatcher::checkRecv() {
+  AprsPacket* pkt;
   float score;
   uint32_t air_time;
   {
@@ -154,66 +118,49 @@ void MyDispatcher::checkRecv() {
       logRxRaw(_radio->getLastSNR(), _radio->getLastRSSI(), raw, len);
 
       pkt = _mgr->allocNew();
-      if (pkt == NULL) {
+      if (pkt == nullptr) {
         MESH_DEBUG_PRINTLN("%s MyDispatcher::checkRecv(): WARNING: received data, no unused packets available!", getLogDateTime());
       } else {
         if (tryParsePacket(pkt, raw, len)) {
-          pkt->_snr = _radio->getLastSNR() * 4.0f;
+          pkt->snr = _radio->getLastSNR() * 4.0f;
           score = _radio->packetScore(_radio->getLastSNR(), len);
           air_time = _radio->getEstAirtimeFor(len);
           rx_air_time += air_time;
         } else {
           _mgr->free(pkt);  // put back into pool
-          pkt = NULL;
+          pkt = nullptr;
         }
       }
     } else {
-      pkt = NULL;
+      pkt = nullptr;
     }
   }
   if (pkt) {
-    #if MESH_PACKET_LOGGING
+    #if APRS_PACKET_LOGGING
     Serial.print(getLogDateTime());
-    Serial.printf(": RX, len=%d (type=%d, route=%s, payload_len=%d) SNR=%d RSSI=%d score=%d time=%d", 
-            pkt->getRawLength(), pkt->getPayloadType(), pkt->isRouteDirect() ? "D" : "F", pkt->payload_len,
-            (int)pkt->getSNR(), (int)_radio->getLastRSSI(), (int)(score*1000), air_time);
+    Serial.printf(": RX, len=%d (type=%d, route=%s, payload_len=%d) SNR=%d RSSI=%d score=%d time=%d",
+            pkt->size, pkt->packet.type, pkt->packet.path, strlen(pkt->packet.content),
+            (int)pkt->snr, (int)_radio->getLastRSSI(), (int)(score*1000), air_time);
+#endif
+    logRx(pkt, score);   // hook for custom logging
 
-    static uint8_t packet_hash[MAX_HASH_SIZE];
-    pkt->calculatePacketHash(packet_hash);
-    Serial.print(" hash=");
-    mesh::Utils::printHex(Serial, packet_hash, MAX_HASH_SIZE);
+    n_recv++;
 
-    if (pkt->getPayloadType() == PAYLOAD_TYPE_PATH || pkt->getPayloadType() == PAYLOAD_TYPE_REQ
-        || pkt->getPayloadType() == PAYLOAD_TYPE_RESPONSE || pkt->getPayloadType() == PAYLOAD_TYPE_TXT_MSG) {
-      Serial.printf(" [%02X -> %02X]\n", (uint32_t)pkt->payload[1], (uint32_t)pkt->payload[0]);
+    int _delay = calcRxDelay(score, air_time);
+    if (_delay < 50) {
+      MESH_DEBUG_PRINTLN("%s MyDispatcher::checkRecv(), score delay below threshold (%d)", getLogDateTime(), _delay);
+      processRecvPacket(pkt);   // is below the score delay threshold, so process immediately
     } else {
-      Serial.printf("\n");
-    }
-    #endif
-    logRx(pkt, pkt->getRawLength(), score);   // hook for custom logging
-
-    if (pkt->isRouteFlood()) {
-      n_recv_flood++;
-
-      int _delay = calcRxDelay(score, air_time);
-      if (_delay < 50) {
-        MESH_DEBUG_PRINTLN("%s MyDispatcher::checkRecv(), score delay below threshold (%d)", getLogDateTime(), _delay);
-        processRecvPacket(pkt);   // is below the score delay threshold, so process immediately
-      } else {
-        MESH_DEBUG_PRINTLN("%s MyDispatcher::checkRecv(), score delay is: %d millis", getLogDateTime(), _delay);
-        if (_delay > MAX_RX_DELAY_MILLIS) {
-          _delay = MAX_RX_DELAY_MILLIS;
-        }
-        _mgr->queueInbound(pkt, futureMillis(_delay)); // add to delayed inbound queue
+      MESH_DEBUG_PRINTLN("%s MyDispatcher::checkRecv(), score delay is: %d millis", getLogDateTime(), _delay);
+      if (_delay > MAX_RX_DELAY_MILLIS) {
+        _delay = MAX_RX_DELAY_MILLIS;
       }
-    } else {
-      n_recv_direct++;
-      processRecvPacket(pkt);
+      _mgr->queueInbound(pkt, futureMillis(_delay)); // add to delayed inbound queue
     }
   }
 }
 
-void MyDispatcher::processRecvPacket(aprs::packet* pkt) {
+void MyAprsDispatcher::processRecvPacket(AprsPacket* pkt) {
   mesh::DispatcherAction action = onRecvPacket(pkt);
   if (action == ACTION_RELEASE) {
     _mgr->free(pkt);
@@ -227,7 +174,7 @@ void MyDispatcher::processRecvPacket(aprs::packet* pkt) {
   }
 }
 
-void MyDispatcher::checkSend() {
+void MyAprsDispatcher::checkSend() {
   if (_mgr->getOutboundCount(_ms->getMillis()) == 0) return;
   
   if (!millisHasNowPassed(next_tx_time)) return;
@@ -260,12 +207,12 @@ void MyDispatcher::checkSend() {
       memcpy(&raw[len], &outbound->transport_codes[1], 2); len += 2;
     }
     raw[len++] = outbound->path_len;
-    len += aprs::packet::writePath(&raw[len], outbound->path, outbound->path_len);
+    len += AprsPacket::writePath(&raw[len], outbound->path, outbound->path_len);
 
     if (len + outbound->payload_len > MAX_TRANS_UNIT) {
       MESH_DEBUG_PRINTLN("%s MyDispatcher::checkSend(): FATAL: Invalid packet queued... too long, len=%d", getLogDateTime(), len + outbound->payload_len);
       _mgr->free(outbound);
-      outbound = NULL;
+      outbound = nullptr;
     } else {
       memcpy(&raw[len], outbound->payload, outbound->payload_len); len += outbound->payload_len;
 
@@ -275,10 +222,10 @@ void MyDispatcher::checkSend() {
       if (!success) {
         MESH_DEBUG_PRINTLN("%s MyDispatcher::loop(): ERROR: send start failed!", getLogDateTime());
 
-        logTxFail(outbound, outbound->getRawLength());
+        logTxFail(outbound);
   
         releasePacket(outbound);  // return to pool
-        outbound = NULL;
+        outbound = nullptr;
         return;
       }
       outbound_expiry = futureMillis(max_airtime);
@@ -298,23 +245,23 @@ void MyDispatcher::checkSend() {
   }
 }
 
-aprs::packet* MyDispatcher::obtainNewPacket() {
+AprsPacket* MyAprsDispatcher::obtainNewPacket() {
   auto pkt = _mgr->allocNew();  // TODO: zero out all fields
-  if (pkt == NULL) {
+  if (pkt == nullptr) {
     _err_flags |= ERR_EVENT_FULL;
   } else {
     pkt->payload_len = pkt->path_len = 0;
-    pkt->_snr = 0;
+    pkt->snr = 0;
   }
   return pkt;
 }
 
-void MyDispatcher::releasePacket(aprs::packet* packet) {
+void MyAprsDispatcher::releasePacket(AprsPacket* packet) {
   _mgr->free(packet);
 }
 
-void MyDispatcher::sendPacket(aprs::packet* packet, uint8_t priority, uint32_t delay_millis) {
-  if (!aprs::packet::isValidPathLen(packet->path_len) || packet->payload_len > MAX_PACKET_PAYLOAD) {
+void MyAprsDispatcher::sendPacket(AprsPacket* packet, uint8_t priority, uint32_t delay_millis) {
+  if (!AprsPacket::isValidPathLen(packet->path_len) || packet->payload_len > MAX_PACKET_PAYLOAD) {
     MESH_DEBUG_PRINTLN("%s MyDispatcher::sendPacket(): ERROR: invalid packet... path_len=%d, payload_len=%d", getLogDateTime(), (uint32_t) packet->path_len, (uint32_t) packet->payload_len);
     _mgr->free(packet);
   } else {
@@ -324,12 +271,93 @@ void MyDispatcher::sendPacket(aprs::packet* packet, uint8_t priority, uint32_t d
 
 // Utility function -- handles the case where millis() wraps around back to zero
 //   2's complement arithmetic will handle any unsigned subtraction up to HALF the word size (32-bits in this case)
-bool MyDispatcher::millisHasNowPassed(unsigned long timestamp) const {
+bool MyAprsDispatcher::millisHasNowPassed(unsigned long timestamp) const {
   return (long)(_ms->getMillis() - timestamp) > 0;
 }
 
-unsigned long MyDispatcher::futureMillis(int millis_from_now) const {
+unsigned long MyAprsDispatcher::futureMillis(int millis_from_now) const {
   return _ms->getMillis() + millis_from_now;
+}
+
+const char *MyMesh::getLogDateTime() {
+  static char tmp[32];
+  uint32_t now = getRTCClock()->getCurrentTime();
+  DateTime dt = DateTime(now);
+  sprintf(tmp, "%02d:%02d:%02d - %d/%d/%d U", dt.hour(), dt.minute(), dt.second(), dt.day(), dt.month(),
+          dt.year());
+  return tmp;
+}
+
+void MyMesh::logRxRaw(float snr, float rssi, const uint8_t raw[], int len) {
+#if MESH_PACKET_LOGGING
+  Serial.print(getLogDateTime());
+  Serial.print(" RAW: ");
+  mesh::Utils::printHex(Serial, raw, len);
+  Serial.println();
+#endif
+}
+
+void MyMesh::logRx(mesh::Packet *pkt, int len, float score) {
+#ifdef WITH_BRIDGE
+  if (_prefs.bridge_pkt_src == 1) {
+    bridge.sendPacket(pkt);
+  }
+#endif
+
+  if (_logging) {
+    File f = openAppend(PACKET_LOG_FILE);
+    if (f) {
+      f.print(getLogDateTime());
+      f.printf(": RX, len=%d (type=%d, route=%s, payload_len=%d) SNR=%d RSSI=%d score=%d", len,
+               pkt->getPayloadType(), pkt->isRouteDirect() ? "D" : "F", pkt->payload_len,
+               (int)_radio->getLastSNR(), (int)_radio->getLastRSSI(), (int)(score * 1000));
+
+      if (pkt->getPayloadType() == PAYLOAD_TYPE_PATH || pkt->getPayloadType() == PAYLOAD_TYPE_REQ ||
+          pkt->getPayloadType() == PAYLOAD_TYPE_RESPONSE || pkt->getPayloadType() == PAYLOAD_TYPE_TXT_MSG) {
+        f.printf(" [%02X -> %02X]\n", (uint32_t)pkt->payload[1], (uint32_t)pkt->payload[0]);
+      } else {
+        f.printf("\n");
+      }
+      f.close();
+    }
+  }
+}
+
+void MyMesh::logTx(mesh::Packet *pkt, int len) {
+#ifdef WITH_BRIDGE
+  if (_prefs.bridge_pkt_src == 0) {
+    bridge.sendPacket(pkt);
+  }
+#endif
+
+  if (_logging) {
+    File f = openAppend(PACKET_LOG_FILE);
+    if (f) {
+      f.print(getLogDateTime());
+      f.printf(": TX, len=%d (type=%d, route=%s, payload_len=%d)", len, pkt->getPayloadType(),
+               pkt->isRouteDirect() ? "D" : "F", pkt->payload_len);
+
+      if (pkt->getPayloadType() == PAYLOAD_TYPE_PATH || pkt->getPayloadType() == PAYLOAD_TYPE_REQ ||
+          pkt->getPayloadType() == PAYLOAD_TYPE_RESPONSE || pkt->getPayloadType() == PAYLOAD_TYPE_TXT_MSG) {
+        f.printf(" [%02X -> %02X]\n", (uint32_t)pkt->payload[1], (uint32_t)pkt->payload[0]);
+      } else {
+        f.printf("\n");
+      }
+      f.close();
+    }
+  }
+}
+
+void MyMesh::logTxFail(mesh::Packet *pkt, int len) {
+  if (_logging) {
+    File f = openAppend(PACKET_LOG_FILE);
+    if (f) {
+      f.print(getLogDateTime());
+      f.printf(": TX FAIL!, len=%d (type=%d, route=%s, payload_len=%d)\n", len, pkt->getPayloadType(),
+               pkt->isRouteDirect() ? "D" : "F", pkt->payload_len);
+      f.close();
+    }
+  }
 }
 
 }
