@@ -15,7 +15,8 @@
 	url = https://github.com/iontodirel/libaprs.git
 [submodule "rp2040-lora-aprs/lib/MeshCore"]
 	path = rp2040-lora-aprs/lib/MeshCore
-	url = https://github.com/meshcore-dev/MeshCore.git
+	url = https://github.com/valentintintin/MeshCore.git
+	branch = meshtastic_bridge
 [submodule "rp2040-lora-aprs/lib/nanopb"]
 	path = rp2040-lora-aprs/lib/nanopb
 	url = https://github.com/nanopb/nanopb.git

@@ -1,0 +1,171 @@
+#pragma once
+
+#include "EepromHal.h"
+#include "Telemetry.h"
+#include "config/Log.h"
+#include <stdint.h>
+
+// ============================================================================
+// TelemetryHistory — Ring buffer sur EEPROM M24M01
+//
+// Stocke un historique compact de télémétrie pour analyse post-mortem.
+// Avec ~20 bytes/record et ~127KB disponibles : ~6500 records.
+// À 5min/record : ~22 jours d'historique.
+// ============================================================================
+
+#define TELEMETRY_HISTORY_MAGIC     0x54454C48  // "TELH"
+#define TELEMETRY_HISTORY_VERSION   1
+
+// Adresse EEPROM (après la zone settings — 1KB de marge)
+#define TELEMETRY_HISTORY_ADDR      1024
+
+// Record compact (20 bytes)
+struct __attribute__((packed)) TelemetryRecord {
+  uint32_t timestamp;        // uptime_s
+  int16_t  bat_voltage_mv;
+  int16_t  bat_current_ma;
+  int16_t  sol_voltage_mv;
+  int16_t  sol_current_ma;
+  int16_t  temperature_c10;  // température * 10
+  uint8_t  humidity;         // 0-100
+  uint8_t  victron_soc;      // 0-100
+  int16_t  victron_power_w;
+};
+
+// Header du ring buffer (12 bytes)
+struct __attribute__((packed)) TelemetryHistoryHeader {
+  uint32_t magic;
+  uint16_t version;
+  uint16_t write_index;      // prochain slot d'écriture (0..max_records-1)
+  uint16_t count;            // nombre d'enregistrements valides
+  uint16_t max_records;      // capacité totale
+};
+
+class TelemetryHistory {
+public:
+  TelemetryHistory(EepromHal& eeprom)
+    : _eeprom(&eeprom), _initialized(false), _max_records(0) {}
+
+  bool begin() {
+    if (!_eeprom->isInitialized()) return false;
+
+    // Calculer la capacité disponible
+    uint32_t data_start = TELEMETRY_HISTORY_ADDR + sizeof(TelemetryHistoryHeader);
+    uint32_t available = EEPROM_SIZE_BYTES - data_start;
+    _max_records = available / sizeof(TelemetryRecord);
+    if (_max_records == 0) return false;
+
+    // Lire le header existant
+    TelemetryHistoryHeader hdr;
+    if (!_eeprom->read(TELEMETRY_HISTORY_ADDR, (uint8_t*)&hdr, sizeof(hdr))) {
+      return false;
+    }
+
+    if (hdr.magic == TELEMETRY_HISTORY_MAGIC && hdr.version == TELEMETRY_HISTORY_VERSION
+        && hdr.max_records == _max_records) {
+      // Header valide, reprendre là où on en était
+      _write_index = hdr.write_index % _max_records;
+      _count = hdr.count > _max_records ? _max_records : hdr.count;
+    } else {
+      // Initialiser un nouveau ring buffer
+      _write_index = 0;
+      _count = 0;
+      if (!saveHeader()) return false;
+      LOG_I("EEPROM", "Historique initialisé, %d slots", _max_records);
+    }
+
+    _initialized = true;
+    LOG_I("EEPROM", "Historique: %d/%d records", _count, _max_records);
+    return true;
+  }
+
+  // Enregistrer un snapshot de télémétrie
+  bool record(const Telemetry& t) {
+    if (!_initialized) return false;
+
+    TelemetryRecord rec;
+    rec.timestamp = t.uptime_s;
+    rec.bat_voltage_mv = (int16_t)t.battery.voltage_mv;
+    rec.bat_current_ma = (int16_t)t.battery.current_ma;
+    rec.sol_voltage_mv = (int16_t)t.solar.voltage_mv;
+    rec.sol_current_ma = (int16_t)t.solar.current_ma;
+    rec.temperature_c10 = (int16_t)(t.weather.temperature_c * 10.0f);
+    rec.humidity = (uint8_t)t.weather.humidity;
+    rec.victron_soc = (uint8_t)t.victron_soc;
+    rec.victron_power_w = (int16_t)t.victron_power_w;
+
+    uint32_t addr = recordAddr(_write_index);
+    if (!_eeprom->write(addr, (const uint8_t*)&rec, sizeof(rec))) {
+      LOG_W("EEPROM", "Erreur écriture record %d", _write_index);
+      return false;
+    }
+
+    _write_index = (_write_index + 1) % _max_records;
+    if (_count < _max_records) _count++;
+
+    return saveHeader();
+  }
+
+  // Lire un record par index (0 = plus ancien)
+  bool readRecord(uint16_t index, TelemetryRecord& rec) const {
+    if (!_initialized || index >= _count) return false;
+
+    // Le plus ancien est à (write_index - count) mod max
+    uint16_t actual = (_write_index + _max_records - _count + index) % _max_records;
+    return _eeprom->read(recordAddr(actual), (uint8_t*)&rec, sizeof(rec));
+  }
+
+  // Dump vers Print (serial ou APRS response buffer)
+  void dump(Print& out, uint16_t last_n = 0) const {
+    uint16_t n = (last_n > 0 && last_n < _count) ? last_n : _count;
+    uint16_t start = _count - n;
+
+    out.printf("--- Historique: %d/%d records ---\n", _count, _max_records);
+    out.println(F("uptime,bat_mV,bat_mA,sol_mV,sol_mA,temp,hum,soc,pwr"));
+
+    TelemetryRecord rec;
+    for (uint16_t i = start; i < _count; i++) {
+      if (readRecord(i, rec)) {
+        out.printf("%lu,%d,%d,%d,%d,%.1f,%d,%d,%d\n",
+          rec.timestamp,
+          rec.bat_voltage_mv, rec.bat_current_ma,
+          rec.sol_voltage_mv, rec.sol_current_ma,
+          rec.temperature_c10 / 10.0f, rec.humidity,
+          rec.victron_soc, rec.victron_power_w);
+      }
+    }
+  }
+
+  // Reset
+  bool clear() {
+    _write_index = 0;
+    _count = 0;
+    return saveHeader();
+  }
+
+  uint16_t getCount() const { return _count; }
+  uint16_t getMaxRecords() const { return _max_records; }
+  bool isInitialized() const { return _initialized; }
+
+private:
+  EepromHal* _eeprom;
+  bool _initialized;
+  uint16_t _max_records;
+  uint16_t _write_index;
+  uint16_t _count;
+
+  uint32_t recordAddr(uint16_t index) const {
+    return TELEMETRY_HISTORY_ADDR + sizeof(TelemetryHistoryHeader)
+           + (uint32_t)index * sizeof(TelemetryRecord);
+  }
+
+  bool saveHeader() {
+    TelemetryHistoryHeader hdr;
+    hdr.magic = TELEMETRY_HISTORY_MAGIC;
+    hdr.version = TELEMETRY_HISTORY_VERSION;
+    hdr.write_index = _write_index;
+    hdr.count = _count;
+    hdr.max_records = _max_records;
+    return _eeprom->write(TELEMETRY_HISTORY_ADDR, (const uint8_t*)&hdr, sizeof(hdr));
+  }
+};

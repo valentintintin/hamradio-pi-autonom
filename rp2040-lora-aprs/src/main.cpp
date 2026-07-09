@@ -1,215 +1,218 @@
+// ============================================================================
+// RP-LoRA_Mini_v3_dual — main.cpp
+//
+// Dual SX1262 : MeshCore (868 MHz, SPI1) + APRS (433 MHz, SPI0)
+// FreeRTOS sur RP2040 (Pico W, earlephilhower core)
+// ============================================================================
+
 #include <Arduino.h>
-#include <hardware/rtc.h>
-
-#include <FreeRTOS.h>
-#include <task.h>
-
 #include <LittleFS.h>
-#include <ArduinoLog.h>
-#include <Wire.h>
-#include <DS3231.h>
 
-#include "controllers/RelayController.hpp"
+#include "target.h"
+#include "tasks/tasks.h"
 
-#include "settings.h"
-#include "utils/rp2040.h"
-#include "utils/utils.h"
-#include "config.h"
-#include "SettingsManager.hpp"
-#include "controllers/CommandController.hpp"
-#include "controllers/I2CSlaveController.hpp"
-#include "controllers/LedController.hpp"
-#include "controllers/SensorController.hpp"
-#include "controllers/WatchdogController.hpp"
-#include "hal/I2CMasterHal.hpp"
-#include "../include/hal/Peripherals/SX1262Hal.hpp"
+// MeshCore core
+#include <helpers/SimpleMeshTables.h>
+#include <helpers/ArduinoHelpers.h>
+#include <helpers/IdentityStore.h>
 
-char bufferText[BUFFER_LENGTH];
+// Nos modules
+#include "mesh/MyMesh.h"
+#include "aprs/AprsDispatcher.h"
+#include "aprs/AprsEngine.h"
+#include "bridge/MeshAprsBridge.h"
+#include "hal/Telemetry.h"
+#include "hal/I2CBus.h"
+#include "hal/Ina3221Hal.h"
+#include "hal/MpptChargerHal.h"
+#include "hal/Bme280Hal.h"
+#include "hal/VictronHal.h"
+#include "hal/TelemetryHistory.h"
+#include "config/Log.h"
+#include "config/Settings.h"
+#include "config/SettingsManager.h"
+#include "config/SettingsRegistry.h"
+#include "config/CommandHandler.h"
 
-void serialReceivedTask(void* pvParameters)
-{
-    Log.info(">");
+// ============================================================================
+// Instances globales
+// ============================================================================
 
-    while (true)
-    {
-        Stream* streamReceived = nullptr;
+// Log level global (synchronisé avec settings.system.log_level)
+LogLevel g_log_level = LOG_INFO;
 
-        if (Serial.available())
-        {
-            streamReceived = &Serial;
-            Log.traceln("Serial USB incoming");
-        }
-        else if (Serial1.available())
-        {
-            streamReceived = &Serial1;
-            Log.traceln("Serial UART 0 incoming");
-        }
+// Horloge + RNG
+static ArduinoMillis ms_clock;
+static StdRNG fast_rng;
 
-        if (streamReceived != nullptr)
-        {
-            streamReceived->readBytesUntil('\r', bufferText, BUFFER_LENGTH);
-            while (streamReceived->available())
-            {
-                streamReceived->read();
-            }
+// MeshCore
+static SimpleMeshTables mesh_tables;
+MyMesh the_mesh(board, mesh_radio_driver, ms_clock, fast_rng, rtc_clock, mesh_tables);
 
-            Log.infoln("Serial received: %s", bufferText);
+// APRS
+AprsDispatcher aprs_dispatcher(aprs_radio_driver, ms_clock);
+static AprsConfig aprs_config = {};
+AprsEngine aprs_engine(aprs_dispatcher, aprs_config);
 
-            if (CommandController::getInstance().processCommand(bufferText))
-            {
-                Log.infoln("Command parsing OK: %s", CommandController::getInstance().getResponse());
-            }
-            else
-            {
-                Log.warningln("Command parsing KO: %s", CommandController::getInstance().getResponse());
-            }
+// Bridge
+MeshAprsBridge mesh_aprs_bridge(aprs_engine);
 
-            memset(bufferText, 0, BUFFER_LENGTH);
-            Log.info(">");
-        }
+// Telemetry partagée (lue par beacon, bridge, CLI)
+Telemetry telemetry = {};
 
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }
+// I2C bus + HAL capteurs
+I2CBus i2c_bus(Wire, 4, 5);  // SDA=GP4, SCL=GP5 — I2C0
+Ina3221Hal ina3221(i2c_bus);
+MpptChargerHal mppt(i2c_bus);
+Bme280Hal bme280(i2c_bus);
+VictronHal victron(Serial1);  // VE.Direct sur UART1
+EepromHal eeprom(i2c_bus);
+
+// Historique télémétrie EEPROM
+TelemetryHistory telemetry_history(eeprom);
+
+// Configuration
+Settings settings;
+SettingsManager settings_manager(&eeprom);
+SettingsRegistry settings_registry;
+CommandHandler command_handler(settings, settings_registry, settings_manager, telemetry, &telemetry_history);
+
+// ============================================================================
+// Helpers — copie config APRS depuis settings
+// ============================================================================
+static void applyAprsConfig() {
+  strncpy(aprs_config.callsign, settings.aprs.callsign, sizeof(aprs_config.callsign));
+  strncpy(aprs_config.destination, settings.aprs.destination, sizeof(aprs_config.destination));
+  strncpy(aprs_config.path, settings.aprs.path, sizeof(aprs_config.path));
+  strncpy(aprs_config.pathTelemetry, settings.aprs.path, sizeof(aprs_config.pathTelemetry));
+  aprs_config.symbol = settings.aprs.symbol;
+  aprs_config.symbolTable = settings.aprs.symbolTable;
+  aprs_config.latitude = settings.aprs.latitude;
+  aprs_config.longitude = settings.aprs.longitude;
+  aprs_config.altitude = settings.aprs.altitude;
+  aprs_config.digipeaterEnabled = settings.aprs.digipeaterEnabled;
+  aprs_config.telemetrySequenceNumber = 0;
 }
 
-void setMpptVoltageLimits()
-{
-    const auto& settingsMppt = SettingsManager::getSettings().mppt;
+// ============================================================================
+// Setup
+// ============================================================================
+void setup() {
+  Serial.begin(115200);
+  delay(2000); // attendre USB serial
 
-    if (!I2CMasterHal::takeSemaphore())
-    {
-        Log.warningln("Can not set relay Mppt Charger voltage limit, can not have semaphore");
+  Serial.println(F("========================================"));
+  Serial.println(F("  RP-LoRA Mini v3 — Dual 433/868"));
+  Serial.println(F("  MeshCore + APRS / FreeRTOS"));
+  Serial.println(F("========================================"));
 
-        LedController::getInstance().blink(LedError, LedI2C);
+  // Board init
+  board.begin();
 
-        return;
+  // Filesystem
+  LittleFS.begin();
+
+  // --- Init radio MeshCore (868 MHz, SPI1) ---------------------------------
+  if (!mesh_radio_init()) LOG_E("RADIO", "Init radio 868 FAIL");
+  else                    LOG_I("RADIO", "Init radio 868 OK");
+
+  // --- Init radio APRS (433 MHz, SPI0) ------------------------------------
+  if (!aprs_radio_init()) LOG_E("RADIO", "Init radio 433 FAIL");
+  else                    LOG_I("RADIO", "Init radio 433 OK");
+
+  // --- RNG — seed depuis bruit radio ---------------------------------------
+  fast_rng.begin(radio_get_rng_seed());
+
+  // --- Identity MeshCore — charge ou génère --------------------------------
+  {
+    IdentityStore store(LittleFS, "/identity");
+    store.begin();
+
+    if (!store.load("_main", the_mesh.self_id)) {
+      LOG_W("MESH", "Génération nouvelle identité");
+      the_mesh.self_id = radio_new_identity();
+
+      // Éviter les hash réservés (0x00, 0xFF)
+      int tries = 0;
+      while (tries < 10 &&
+             (the_mesh.self_id.pub_key[0] == 0x00 || the_mesh.self_id.pub_key[0] == 0xFF)) {
+        the_mesh.self_id = radio_new_identity();
+        tries++;
+      }
+
+      store.save("_main", the_mesh.self_id);
     }
 
-    if (!MpptChargerHal::getInstance().setVoltageLimits(settingsMppt.powerOffVoltage, settingsMppt.powerOnVoltage))
-    {
-        Log.warningln("Can not set relay Mppt Charger voltage limit");
+    LOG_I("MESH", "ID: %02X%02X%02X%02X...",
+      the_mesh.self_id.pub_key[0], the_mesh.self_id.pub_key[1],
+      the_mesh.self_id.pub_key[2], the_mesh.self_id.pub_key[3]);
+  }
 
-        LedController::getInstance().blink(LedError, LedMpptCharger);
-    }
+  // --- Init I2C bus + capteurs ----------------------------------------------
+  i2c_bus.begin();
+  LOG_I("I2C", "Bus initialisé");
 
-    I2CMasterHal::releaseSemaphore();
+  if (ina3221.begin()) LOG_I("I2C", "INA3221 OK");
+  else                 LOG_W("I2C", "INA3221 non détecté");
+
+  if (mppt.begin())    LOG_I("I2C", "MPPT charger OK");
+  else                 LOG_W("I2C", "MPPT non détecté");
+
+  if (bme280.begin())  LOG_I("I2C", "BME280 OK");
+  else                 LOG_W("I2C", "BME280 non détecté");
+
+  if (eeprom.begin()) {
+    LOG_I("I2C", "EEPROM M24M01 OK");
+    if (telemetry_history.begin())
+      LOG_I("I2C", "Historique EEPROM: %d slots", telemetry_history.getMaxRecords());
+  } else {
+    LOG_W("I2C", "EEPROM non détectée");
+  }
+
+  if (victron.begin()) LOG_I("VICTRON", "VE.Direct OK");
+  else                 LOG_W("VICTRON", "VE.Direct non détecté");
+
+  // --- Charger la configuration --------------------------------------------
+  settings = settings_manager.load();
+  settings_registry.init(settings);
+  g_log_level = (LogLevel)settings.system.log_level;
+  LOG_I("CONFIG", "%d paramètres, log=%s", settings_registry.count(), logLevelName(g_log_level));
+
+  // --- Appliquer la config APRS --------------------------------------------
+  applyAprsConfig();
+
+  // --- Init MeshCore -------------------------------------------------------
+  the_mesh.begin(&LittleFS);
+
+  // --- Init APRS -----------------------------------------------------------
+  aprs_dispatcher.begin();
+  aprs_dispatcher.setRxCallback(&aprs_engine);
+
+  // --- Bridge --------------------------------------------------------------
+  the_mesh.setBridge(&mesh_aprs_bridge);
+
+  // --- Advert initial ------------------------------------------------------
+  the_mesh.sendSelfAdvertisement(16000);
+
+  // --- Créer les tasks FreeRTOS --------------------------------------------
+  LOG_I("RTOS", "Création des tasks...");
+
+  xTaskCreate(taskMeshLoop,   "mesh",    TASK_STACK_MESH,    nullptr, TASK_PRIO_MESH_LOOP, nullptr);
+  xTaskCreate(taskAprsLoop,   "aprs",    TASK_STACK_APRS,    nullptr, TASK_PRIO_APRS_LOOP, nullptr);
+  xTaskCreate(taskAprsBeacon, "beacon",  TASK_STACK_BEACON,  nullptr, TASK_PRIO_BEACON,    nullptr);
+  xTaskCreate(taskAprsBridge, "bridge",  TASK_STACK_BRIDGE,  nullptr, TASK_PRIO_BRIDGE,    nullptr);
+  xTaskCreate(taskEnergy,     "energy",  TASK_STACK_ENERGY,  nullptr, TASK_PRIO_ENERGY,    nullptr);
+  xTaskCreate(taskWeather,    "weather", TASK_STACK_WEATHER, nullptr, TASK_PRIO_WEATHER,   nullptr);
+  xTaskCreate(taskCli,        "cli",     TASK_STACK_CLI,     nullptr, TASK_PRIO_CLI,       nullptr);
+
+  LOG_I("RTOS", "Scheduler démarré");
+
+  board.onBootComplete();
 }
 
-void setLora()
-{
-    const auto settingsLora = SettingsManager::getSettings().lora;
-
-    const SettingsLoRaModem lora = settingsLora.modems[settingsLora.mode];
-
-    if (lora.enabled)
-    {
-        SX1262Hal::getInstance().begin(
-            settingsLora.txEnabled,
-            lora.frequency,
-            lora.bandwidth,
-            lora.spreadingFactor,
-            lora.codingRate,
-            lora.syncWord,
-            settingsLora.outputPower,
-            lora.preambleLength
-        );
-    }
-}
-
-void setup()
-{
-    pinMode(LED_BUILTIN, OUTPUT);
-    randomSeed(analogRead(A1));
-
-    Serial.begin(115200);
-    Serial.setTimeout(5000);
-
-    // Serial1.begin(115200);
-    // Serial1.setTimeout(5000);
-
-    Serial2.begin(115200);
-    Serial2.setTimeout(5000);
-
-    Log.begin(LOG_LEVEL_VERBOSE, &Serial);
-    Log.addHandler(&Serial2);
-
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(2500);
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(2500);
-
-    const auto resetReason = rp2040.getResetReason();
-    Log.infoln("Reboot reason: %d", resetReason);
-
-    if (resetReason == RP2040::WDT_RESET)
-    {
-        digitalWrite(LED_BUILTIN, HIGH);
-        delay(1000);
-        digitalWrite(LED_BUILTIN, LOW);
-        delay(1000);
-    }
-
-    Log.infoln("Starting");
-
-    LedController::getInstance().begin();
-
-    rtc_init();
-
-    Wire.setSDA(0);
-    Wire.setSCL(1);
-    Wire.begin();
-
-    Wire1.setSDA(2);
-    Wire1.setSCL(3);
-
-    // Initialisation SPI pour LoRa (SPI1)
-    SPI1.setRX(LORA_MISO);
-    SPI1.setTX(LORA_MOSI);
-    SPI1.setSCK(LORA_SCK);
-
-    SettingsManager::getInstance().begin();
-
-    if (SettingsManager::getSettings().useSlowClock)
-    {
-        setSlowClock();
-    }
-
-    const auto now = RTClib::now();
-
-    if (now.year() >= 2026 && now.year() <= 2060)
-    {
-        const auto epoch = now.unixtime();
-        setTimeToInternalRtc(epoch);
-        getDateTimeStringFromEpoch(epoch, bufferText, BUFFER_LENGTH);
-        Log.infoln("Set internal RTC to date %s", bufferText);
-    }
-    else
-    {
-        setTimeToInternalRtc(0);
-        Log.warningln("Wrong rtc time !");
-
-        LedController::getInstance().blink(LedError, LedClock);
-    }
-
-    RelayController::getInstance().begin();
-    SensorController::getInstance().begin();
-    WatchdogController::getInstance().begin();
-    I2CSlaveController::getInstance().begin();
-    CommandController::getInstance().begin();
-
-    setMpptVoltageLimits();
-    SensorController::getInstance().queryTelemetries();
-
-    if (xTaskCreate(serialReceivedTask, "SerialReceived", configMINIMAL_STACK_SIZE, nullptr, tskIDLE_PRIORITY, nullptr) != pdPASS)
-    {
-        Log.errorln("Serial task KO");
-
-        LedController::getInstance().blink(LedError, LedFreeRtos);
-    }
-
-    setLora();
-}
-
-void loop()
-{
+// ============================================================================
+// Loop — vide avec FreeRTOS, tout est dans les tasks
+// ============================================================================
+void loop() {
+  vTaskDelay(pdMS_TO_TICKS(1000));
 }
