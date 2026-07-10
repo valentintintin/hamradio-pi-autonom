@@ -127,6 +127,6 @@ void radio_set_params(float freq, float bw, uint8_t sf, uint8_t cr) {
   mesh_radio_hw.setCodingRate(cr);
 }
 
-void radio_set_tx_power(uint8_t power_dbm) {
+void radio_set_tx_power(int8_t power_dbm) {
   mesh_radio_hw.setOutputPower(power_dbm);
 }

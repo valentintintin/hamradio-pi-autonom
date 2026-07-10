@@ -10,7 +10,8 @@
 MyMesh::MyMesh(mesh::MainBoard& board, mesh::Radio& radio, mesh::MillisecondClock& ms,
                mesh::RNG& rng, mesh::RTCClock& rtc, mesh::MeshTables& tables)
   : mesh::Mesh(radio, ms, rng, rtc, *new StaticPoolPacketManager(32), tables),
-    _cli(board, rtc, &_prefs, this),
+    _key_store(), _region_map(_key_store),
+    _cli(board, rtc, sensors, _region_map, _acl, &_prefs, this),
     _fs(nullptr), _bridge(nullptr), _logging(false),
     _next_local_advert(0), _next_flood_advert(0),
     _set_radio_at(0), _revert_radio_at(0)
@@ -110,14 +111,14 @@ void MyMesh::onAdvertRecv(mesh::Packet* packet, const mesh::Identity& id,
   mesh::Mesh::onAdvertRecv(packet, id, timestamp, app_data, app_data_len);
 
   // Tracker les voisins directs (zero-hop)
-  if (packet->path_len == 0) {
+  if (packet->getPathHashCount() == 0) {
     AdvertDataParser parser(app_data, app_data_len);
     if (parser.isValid() && parser.getType() == ADV_TYPE_REPEATER) {
       putNeighbour(id, timestamp, packet->getSNR());
     }
   }
 
-  LOG_D(TAG, "Advert reçu %02X%02X... hops=%d", id.pub_key[0], id.pub_key[1], packet->path_len);
+  LOG_D(TAG, "Advert reçu %02X%02X... hops=%d", id.pub_key[0], id.pub_key[1], packet->getPathHashCount());
 
   if (_bridge) {
     _bridge->onMeshAdvertReceived(id, app_data, app_data_len);
@@ -158,18 +159,18 @@ void MyMesh::putNeighbour(const mesh::Identity& id, uint32_t timestamp, float sn
 // ============================================================================
 bool MyMesh::allowPacketForward(const mesh::Packet* packet) {
   if (_prefs.disable_fwd) return false;
-  if (packet->isRouteFlood() && packet->path_len >= _prefs.flood_max) return false;
+  if (packet->isRouteFlood() && packet->getPathHashCount() >= _prefs.flood_max) return false;
   return true;
 }
 
 uint32_t MyMesh::getRetransmitDelay(const mesh::Packet* packet) {
-  uint32_t t = _radio->getEstAirtimeFor(packet->path_len + packet->payload_len + 2) * _prefs.tx_delay_factor;
-  return getRNG()->nextInt(0, 6) * t;
+  uint32_t t = _radio->getEstAirtimeFor(packet->getPathByteLen() + packet->payload_len + 2) * _prefs.tx_delay_factor;
+  return getRNG()->nextInt(0, 5 * t + 1);
 }
 
 uint32_t MyMesh::getDirectRetransmitDelay(const mesh::Packet* packet) {
-  uint32_t t = _radio->getEstAirtimeFor(packet->path_len + packet->payload_len + 2) * _prefs.direct_tx_delay_factor;
-  return getRNG()->nextInt(0, 6) * t;
+  uint32_t t = _radio->getEstAirtimeFor(packet->getPathByteLen() + packet->payload_len + 2) * _prefs.direct_tx_delay_factor;
+  return getRNG()->nextInt(0, 5 * t + 1);
 }
 
 // ============================================================================
@@ -187,11 +188,15 @@ void MyMesh::savePrefs() {
   _cli.savePrefs(_fs);
 }
 
-void MyMesh::sendSelfAdvertisement(int delay_millis) {
+void MyMesh::sendSelfAdvertisement(int delay_millis, bool flood) {
   mesh::Packet* pkt = createSelfAdvert();
   if (pkt) {
-    sendFlood(pkt, delay_millis);
-    LOG_I(TAG, "Advert envoyé (délai %dms)", delay_millis);
+    if (flood) {
+      sendFlood(pkt, delay_millis);
+    } else {
+      sendZeroHop(pkt, delay_millis);
+    }
+    LOG_I(TAG, "Advert envoyé (%s, délai %dms)", flood ? "flood" : "local", delay_millis);
   } else {
     LOG_E(TAG, "Impossible de créer l'advert");
   }
@@ -233,7 +238,7 @@ void MyMesh::dumpLogFile() {
   }
 }
 
-void MyMesh::setTxPower(uint8_t power_dbm) {
+void MyMesh::setTxPower(int8_t power_dbm) {
   radio_set_tx_power(power_dbm);
 }
 
@@ -267,7 +272,7 @@ void MyMesh::formatNeighborsReply(char* reply) {
     char hex[10];
     mesh::Utils::toHex(hex, _neighbours[i].id.pub_key, 4);
     uint32_t secs_ago = getRTCClock()->getCurrentTime() - _neighbours[i].heard_timestamp;
-    sprintf(dp, "%s:%d:%d", hex, secs_ago, _neighbours[i].snr);
+    sprintf(dp, "%s:%lu:%d", hex, (unsigned long)secs_ago, _neighbours[i].snr);
     while (*dp) dp++;
   }
 #endif
@@ -283,4 +288,20 @@ void MyMesh::removeNeighbor(const uint8_t* pubkey, int key_len) {
     }
   }
 #endif
+}
+
+// ============================================================================
+// Stats — formatage JSON pour CommonCLI
+// ============================================================================
+void MyMesh::formatStatsReply(char* reply) {
+  StatsFormatHelper::formatCoreStats(reply, board, *_ms, _err_flags, _mgr);
+}
+
+void MyMesh::formatRadioStatsReply(char* reply) {
+  StatsFormatHelper::formatRadioStats(reply, _radio, radio_driver, getTotalAirTime(), getReceiveAirTime());
+}
+
+void MyMesh::formatPacketStatsReply(char* reply) {
+  StatsFormatHelper::formatPacketStats(reply, radio_driver, getNumSentFlood(), getNumSentDirect(),
+                                       getNumRecvFlood(), getNumRecvDirect());
 }

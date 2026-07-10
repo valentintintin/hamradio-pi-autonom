@@ -15,6 +15,11 @@
 #include <helpers/ArduinoHelpers.h>
 #include <helpers/StaticPoolPacketManager.h>
 #include <helpers/SimpleMeshTables.h>
+#include <helpers/StatsFormatHelper.h>
+#include <helpers/ClientACL.h>
+#include <helpers/RegionMap.h>
+#include <helpers/TransportKeyStore.h>
+#include <helpers/TxtDataHelpers.h>
 #include <target.h>
 
 // Forward
@@ -59,15 +64,18 @@ public:
   const char* getBuildDate() override { return FIRMWARE_BUILD_DATE; }
   const char* getRole() override { return FIRMWARE_ROLE; }
   bool formatFileSystem() override;
-  void sendSelfAdvertisement(int delay_millis) override;
+  void sendSelfAdvertisement(int delay_millis, bool flood) override;
   void updateAdvertTimer() override;
   void updateFloodAdvertTimer() override;
   void setLoggingOn(bool enable) override { _logging = enable; }
   void eraseLogFile() override;
   void dumpLogFile() override;
-  void setTxPower(uint8_t power_dbm) override;
+  void setTxPower(int8_t power_dbm) override;
   void formatNeighborsReply(char* reply) override;
   void removeNeighbor(const uint8_t* pubkey, int key_len) override;
+  void formatStatsReply(char* reply) override;
+  void formatRadioStatsReply(char* reply) override;
+  void formatPacketStatsReply(char* reply) override;
   mesh::LocalIdentity& getSelfId() override { return self_id; }
   void saveIdentity(const mesh::LocalIdentity& new_id) override;
   void clearStats() override;
@@ -90,8 +98,11 @@ protected:
 
 private:
   FILESYSTEM* _fs;
-  CommonCLI _cli;
+  TransportKeyStore _key_store;
   NodePrefs _prefs;
+  ClientACL _acl;
+  RegionMap _region_map;
+  CommonCLI _cli;
   MeshAprsBridge* _bridge;
   bool _logging;
 

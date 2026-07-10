@@ -192,7 +192,7 @@ void setup() {
   the_mesh.setBridge(&mesh_aprs_bridge);
 
   // --- Advert initial ------------------------------------------------------
-  the_mesh.sendSelfAdvertisement(16000);
+  the_mesh.sendSelfAdvertisement(16000, true);
 
   // --- Créer les tasks FreeRTOS --------------------------------------------
   LOG_I("RTOS", "Création des tasks...");
@@ -206,8 +206,6 @@ void setup() {
   xTaskCreate(taskCli,        "cli",     TASK_STACK_CLI,     nullptr, TASK_PRIO_CLI,       nullptr);
 
   LOG_I("RTOS", "Scheduler démarré");
-
-  board.onBootComplete();
 }
 
 // ============================================================================
