@@ -14,7 +14,7 @@
 #include "hal/Bme280Hal.h"
 #include "hal/VictronHal.h"
 
-extern Telemetry telemetry;
+extern TelemetryData telemetry;
 extern Settings settings;
 extern I2CBus i2c_bus;
 extern Ina3221Hal ina3221;

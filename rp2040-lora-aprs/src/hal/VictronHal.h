@@ -17,7 +17,7 @@ public:
     return _initialized;
   }
 
-  bool query(Telemetry& telemetry) {
+  bool query(TelemetryData& telemetry) {
     if (!_initialized) return false;
 
     // Tension batterie (mV → mV, la lib retourne directement en mV)

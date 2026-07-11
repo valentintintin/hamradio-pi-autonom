@@ -26,7 +26,7 @@ struct WeatherData {
   int   uv_index;
 };
 
-struct Telemetry {
+struct TelemetryData {
   // INA3221 — 3 canaux
   EnergyData battery;
   EnergyData solar;

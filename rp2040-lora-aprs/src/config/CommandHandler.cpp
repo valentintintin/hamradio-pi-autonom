@@ -1,7 +1,6 @@
 #include "CommandHandler.h"
 #include "Log.h"
 #include <string.h>
-#include <rp2040.h>
 
 extern LogLevel g_log_level;
 

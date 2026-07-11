@@ -27,7 +27,7 @@
 class CommandHandler {
 public:
   CommandHandler(Settings& settings, SettingsRegistry& registry,
-                 SettingsManager& manager, Telemetry& telemetry,
+                 SettingsManager& manager, TelemetryData& telemetry,
                  TelemetryHistory* history = nullptr)
     : _settings(&settings), _registry(&registry),
       _manager(&manager), _telemetry(&telemetry), _history(history) {}
@@ -43,7 +43,7 @@ private:
   Settings* _settings;
   SettingsRegistry* _registry;
   SettingsManager* _manager;
-  Telemetry* _telemetry;
+  TelemetryData* _telemetry;
   TelemetryHistory* _history;
 
   void cmdGet(const char* key, Print& out);

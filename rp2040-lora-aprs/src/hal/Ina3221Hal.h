@@ -18,26 +18,26 @@ public:
 
   bool begin() {
     if (!_bus->lock()) return false;
-    _initialized = _ina.begin(&_bus->wire());
+    _initialized = _ina.begin(_addr, &_bus->wire());
     _bus->unlock();
     return _initialized;
   }
 
-  bool query(Telemetry& telemetry) {
+  bool query(TelemetryData& telemetry) {
     if (!_initialized) return false;
     if (!_bus->lock()) return false;
 
     // Canal 0 : batterie
-    telemetry.battery.voltage_mv = _ina.getBusVoltage_V(0) * 1000.0f;
-    telemetry.battery.current_ma = _ina.getCurrent_A(0) * 1000.0f;
+    telemetry.battery.voltage_mv = _ina.getBusVoltage(0) * 1000.0f;
+    telemetry.battery.current_ma = _ina.getCurrentAmps(0) * 1000.0f;
 
     // Canal 1 : board
-    telemetry.board.voltage_mv = _ina.getBusVoltage_V(1) * 1000.0f;
-    telemetry.board.current_ma = _ina.getCurrent_A(1) * 1000.0f;
+    telemetry.board.voltage_mv = _ina.getBusVoltage(1) * 1000.0f;
+    telemetry.board.current_ma = _ina.getCurrentAmps(1) * 1000.0f;
 
     // Canal 2 : solaire
-    telemetry.solar.voltage_mv = _ina.getBusVoltage_V(2) * 1000.0f;
-    telemetry.solar.current_ma = _ina.getCurrent_A(2) * 1000.0f;
+    telemetry.solar.voltage_mv = _ina.getBusVoltage(2) * 1000.0f;
+    telemetry.solar.current_ma = _ina.getCurrentAmps(2) * 1000.0f;
 
     _bus->unlock();
     return true;

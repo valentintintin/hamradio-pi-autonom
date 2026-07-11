@@ -20,7 +20,7 @@ public:
     return _initialized;
   }
 
-  bool query(Telemetry& telemetry) {
+  bool query(TelemetryData& telemetry) {
     if (!_initialized) return false;
     if (!_bus->lock()) return false;
 

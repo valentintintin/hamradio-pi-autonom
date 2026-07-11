@@ -58,7 +58,7 @@ AprsEngine aprs_engine(aprs_dispatcher, aprs_config);
 MeshAprsBridge mesh_aprs_bridge(aprs_engine);
 
 // Telemetry partagée (lue par beacon, bridge, CLI)
-Telemetry telemetry = {};
+TelemetryData telemetry = {};
 
 // I2C bus + HAL capteurs
 I2CBus i2c_bus(Wire, 4, 5);  // SDA=GP4, SCL=GP5 — I2C0

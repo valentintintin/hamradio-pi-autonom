@@ -1,6 +1,7 @@
 #include "MyMesh.h"
 #include "../bridge/MeshAprsBridge.h"
 #include "config/Log.h"
+#include <LittleFS.h>
 
 #define TAG "MESH"
 

@@ -80,7 +80,7 @@ public:
   }
 
   // Enregistrer un snapshot de télémétrie
-  bool record(const Telemetry& t) {
+  bool record(const TelemetryData& t) {
     if (!_initialized) return false;
 
     TelemetryRecord rec;

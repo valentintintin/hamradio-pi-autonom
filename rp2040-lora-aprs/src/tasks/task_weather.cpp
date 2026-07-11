@@ -17,7 +17,7 @@
 #include <RadioLib.h>
 
 extern AprsDispatcher aprs_dispatcher;
-extern Telemetry telemetry;
+extern TelemetryData telemetry;
 
 #define TAG "WEATHER"
 

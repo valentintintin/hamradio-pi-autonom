@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <cstring>
 
 // ============================================================================
 // Settings — struct de configuration persistante
