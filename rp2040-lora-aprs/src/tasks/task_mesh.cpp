@@ -1,6 +1,6 @@
 #include "tasks.h"
 #include "config/Log.h"
-#include "../mesh/MyMesh.h"
+#include "../mesh/MeshcoreRepeater.h"
 
 // ============================================================================
 // Task MeshCore — appelle le dispatcher/mesh loop en continu

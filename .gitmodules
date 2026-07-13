@@ -1,6 +1,7 @@
 [submodule "rp2040-lora-aprs/lib/Aprs"]
 	path = rp2040-lora-aprs/lib/Aprs
 	url = https://github.com/valentintintin/SimpleLibAprs
+	branch = claude
 [submodule "rp2040-lora-aprs/lib/Timer"]
 	path = rp2040-lora-aprs/lib/Timer
 	url = https://github.com/valentintintin/SimpleLibTimer

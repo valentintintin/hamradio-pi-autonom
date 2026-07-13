@@ -1,11 +1,11 @@
 #pragma once
 
 // ============================================================================
-// AprsEngine — Encodage/décodage APRS + digipeat
+// AprsEngine — Encodage/décodage APRS + digipeat, sur SimpleLibAprs
 //
-// Porté depuis Communication.cpp (rp2040-lora-aprs-old).
 // Découplé du System monolithique : utilise AprsDispatcher pour l'envoi
-// et des callbacks pour les événements.
+// et des callbacks (AprsEventCallback) pour les événements (télémetrie,
+// météo, messages entrants).
 // ============================================================================
 
 #include "AprsDispatcher.h"
@@ -21,19 +21,27 @@
 // Buffer pour frames APRS texte
 #define APRS_TEXT_BUFFER_SIZE 256
 
+// Suppression des doublons digipeat — APRS Digipeater Algorithm §4.2a (~30s)
+#define APRS_DEDUP_SLOTS       16
+#define APRS_DEDUP_WINDOW_MS   30000
+
+// Anti-flood pour les réponses aux requêtes générales ("?APRS?" non dirigées)
+#define APRS_GENERAL_QUERY_MIN_INTERVAL_MS 300000  // 5 min
+
 // ============================================================================
 // Config APRS (remplace l'ancien SettingsAprs)
 // ============================================================================
 struct AprsConfig {
   char callsign[10];
   char destination[10];       // "APRS" par defaut
-  char path[32];              // "WIDE1-1" par defaut
-  char pathTelemetry[32];     // path spécifique telemetrie
+  char path[32];               // "WIDE1-1" par defaut
+  char pathTelemetry[32];      // path spécifique telemetrie
+  char comment[40];            // commentaire par défaut (position, réponse aux query)
   char symbol;
   char symbolTable;
   double latitude;
   double longitude;
-  uint16_t altitude;          // metres
+  uint16_t altitude;           // metres
   bool digipeaterEnabled;
   uint16_t telemetrySequenceNumber;
 };
@@ -43,17 +51,22 @@ struct AprsConfig {
 // ============================================================================
 class AprsEventCallback {
 public:
-  // Paquet APRS reçu et décodé
-  virtual void onAprsFrameReceived(const AprsPacketLite& pkt, float rssi, float snr) {}
+  virtual ~AprsEventCallback() = default;
 
-  // Message APRS adressé à nous
+  // Paquet APRS reçu et décodé (tous types confondus)
+  virtual void onAprsFrameReceived(const aprs::PacketLite& pkt, float rssi, float snr) {}
+
+  // Message APRS adressé à nous (hors ACK/REJ)
   virtual void onAprsMessageReceived(const char* from, const char* message) {}
 
-  // Fournir les données télémétriques
-  virtual void fillTelemetryData(AprsPacket& pkt) {}
+  // Fournir les données télémétriques courantes
+  virtual void fillTelemetryData(aprs::Telemetry& telemetry) {}
 
-  // Fournir les données météo
-  virtual void fillWeatherData(AprsPacket& pkt) {}
+  // Fournir les données météo courantes
+  virtual void fillWeatherData(aprs::Weather& weather) {}
+
+  // Fournir le texte de statut courant (reflète l'état de la station)
+  virtual void fillStatusText(char* buf, size_t len) { if (len) buf[0] = '\0'; }
 };
 
 // ============================================================================
@@ -67,12 +80,22 @@ public:
 
   // --- Envoi ---------------------------------------------------------------
   bool sendPosition(const char* comment);
-  bool sendStatus(const char* comment);
+  bool sendWeather();
+  bool sendStatus(const char* text);
+  // Demande le texte de statut courant à l'event callback (fillStatusText) et
+  // ne transmet que s'il a changé depuis le dernier envoi, ou si
+  // `max_interval_ms` s'est écoulé (filet de sécurité "toujours entendu").
+  bool sendStatusIfChanged(uint32_t max_interval_ms);
   bool sendTelemetry();
   bool sendTelemetryParams();
-  bool sendMessage(const char* destination, const char* message, const char* ackToConfirm = nullptr);
+  // Message sortant ; ackToAsk (optionnel) demande un accusé de réception au destinataire
+  bool sendMessage(const char* destination, const char* message, const char* ackToAsk = nullptr);
+  // Accusé de réception standalone pour un message reçu (ackId = "{nn" reçu)
+  bool sendAck(const char* destination, const char* ackId);
   bool sendItem(const char* name, char symbol, char symbolTable, const char* comment,
                 double latitude, double longitude, uint16_t altitude, bool alive = true);
+  // Envoi manuel d'un contenu APRS brut (debug/test), sous notre callsign/path configuré
+  bool sendRaw(const char* content);
 
   // --- Réception (callback AprsDispatcher) ---------------------------------
   void onAprsPacketReceived(const uint8_t* data, uint8_t len, float rssi, float snr) override;
@@ -83,15 +106,30 @@ private:
   AprsEventCallback* _event_cb;
 
   // Buffers de travail
-  AprsPacket _tx_pkt;
-  AprsPacketLite _rx_pkt;
   char _text_buf[APRS_TEXT_BUFFER_SIZE];
   uint8_t _raw_buf[APRS_MAX_PACKET_SIZE];
+  aprs::PacketLite _rx_pkt;
 
-  // Encode et enqueue le paquet via le dispatcher
-  bool encodeAndSend(uint8_t priority, uint32_t delay_ms = 0);
+  // Suppression des doublons digipeat (§4.2a)
+  struct DedupEntry {
+    uint32_t hash;
+    uint32_t timeMs;
+  };
+  DedupEntry _dedup[APRS_DEDUP_SLOTS];
+  uint32_t frameHash(const aprs::PacketLite& p) const;
+  bool isDuplicate(uint32_t hash, uint32_t now) const;
+  void remember(uint32_t hash, uint32_t now);
 
-  // Prépare les champs communs du paquet TX
-  void prepareTxCommon();
-  void prepareTxCommonTelemetry();
+  // Anti-flood requêtes générales
+  unsigned long _last_general_query_reply_ms = 0;
+
+  // Suivi du dernier statut envoyé (pour sendStatusIfChanged)
+  char _last_status_text[64] = {};
+  unsigned long _last_status_sent_ms = 0;
+
+  // Encode un frame déjà écrit dans _text_buf (taille `size`) et l'enqueue
+  bool encodeAndSend(size_t size, uint8_t priority, uint32_t delay_ms = 0);
+
+  void handleQuery(const aprs::PacketLite& pkt);
+  void handleDigipeat(aprs::PacketLite& pkt);
 };

@@ -22,6 +22,7 @@ void SettingsRegistry::init(Settings& s) {
   add("aprs.digipeat",       ST_BOOL,   &s.aprs.digipeaterEnabled);
   add("aprs.interval.position",  ST_UINT32, &s.aprs.intervalPosition_ms,  60000.0f, 86400000.0f);
   add("aprs.interval.telemetry", ST_UINT32, &s.aprs.intervalTelemetry_ms, 60000.0f, 86400000.0f);
+  add("aprs.interval.weather",   ST_UINT32, &s.aprs.intervalWeather_ms,   60000.0f, 86400000.0f);
   add("aprs.interval.status",    ST_UINT32, &s.aprs.intervalStatus_ms,    60000.0f, 86400000.0f);
   add("aprs.comment",        ST_STRING, s.aprs.comment,         sizeof(s.aprs.comment));
 
@@ -49,6 +50,12 @@ void SettingsRegistry::init(Settings& s) {
   add("system.watchdog",       ST_BOOL,   &s.system.watchdog_enabled);
   add("system.log_interval",   ST_UINT32, &s.system.telemetry_log_interval_ms, 10000.0f, 3600000.0f);
   add("system.log_level",      ST_UINT8,  &s.system.log_level, 0.0f, 5.0f);
+
+  // --- Relais (bistables, pilotés via TCA9555 I2C — cf. hal/RelayHal.h) ----
+  add("relay.1.state", ST_BOOL, &s.relay[0].state);
+  add("relay.2.state", ST_BOOL, &s.relay[1].state);
+  add("relay.3.state", ST_BOOL, &s.relay[2].state);
+  add("relay.4.state", ST_BOOL, &s.relay[3].state);
 }
 
 // ============================================================================
@@ -183,7 +190,7 @@ bool SettingsRegistry::set(const char* key, const char* value, Print* out) {
       break;
     }
     case ST_BOOL:
-      *(bool*)e->ptr = (strcmp(value, "true") == 0 || strcmp(value, "1") == 0);
+      *(bool*)e->ptr = (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 || strcmp(value, "on") == 0);
       break;
   }
   return true;

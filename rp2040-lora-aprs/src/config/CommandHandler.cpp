@@ -1,6 +1,11 @@
 #include "CommandHandler.h"
 #include "Log.h"
+#include "Version.h"
+#include <target.h>
+#include <RTClib.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 extern LogLevel g_log_level;
 
@@ -34,8 +39,9 @@ private:
 // Execute — dispatch sur la commande
 // ============================================================================
 bool CommandHandler::execute(const char* input, Print& out) {
-  // Copie locale pour tokeniser
-  char buf[128];
+  // Copie locale pour tokeniser (assez grand pour "send aprs <contenu>",
+  // le contenu APRS pouvant aller jusqu'à ~200 caractères)
+  char buf[220];
   strncpy(buf, input, sizeof(buf) - 1);
   buf[sizeof(buf) - 1] = '\0';
 
@@ -64,6 +70,11 @@ bool CommandHandler::execute(const char* input, Print& out) {
     return true;
   }
 
+  if (strcmp(cmd, "clock") == 0) {
+    cmdSetClockDate(cmd, out);
+    return true;
+  }
+
   if (strcmp(cmd, "list") == 0) {
     cmdList(out);
     return true;
@@ -76,6 +87,36 @@ bool CommandHandler::execute(const char* input, Print& out) {
 
   if (strcmp(cmd, "status") == 0) {
     cmdStatus(out);
+    return true;
+  }
+
+  if (strcmp(cmd, "version") == 0) {
+    cmdVersion(out);
+    return true;
+  }
+
+  if (strcmp(cmd, "uptime") == 0) {
+    out.printf("Uptime: %lu s\n", _telemetry->uptime_s);
+    return true;
+  }
+
+  if (strcmp(cmd, "freemem") == 0) {
+    out.printf("Free heap: %u bytes\n", (unsigned)rp2040.getFreeHeap());
+    return true;
+  }
+
+  if (strcmp(cmd, "beacon") == 0) {
+    out.println(_aprs->sendPosition(_settings->aprs.comment) ? F("Position envoyée") : F("Échec envoi position"));
+    return true;
+  }
+
+  if (strcmp(cmd, "wx") == 0) {
+    out.println(_aprs->sendWeather() ? F("Météo envoyée") : F("Échec envoi météo"));
+    return true;
+  }
+
+  if (strncmp(cmd, "send aprs ", 10) == 0) {
+    cmdSendAprs(cmd + 10, out);
     return true;
   }
 
@@ -93,13 +134,23 @@ bool CommandHandler::execute(const char* input, Print& out) {
     return true;
   }
 
+  if (strcmp(cmd, "dfu") == 0) {
+    out.println(F("Redémarrage en mode bootloader USB (UF2)..."));
+    out.flush();
+    delay(100);
+    rp2040.rebootToBootloader();
+    return true;
+  }
+
   if (strcmp(cmd, "defaults") == 0) {
     cmdDefaults(out);
     return true;
   }
 
   if (strcmp(cmd, "help") == 0) {
-    out.println(F("Commandes: get <key>, set <key> <value>, list, save, status, history [n], defaults, reboot, help"));
+    out.println(F("Commandes: get <key>, set <key> <value>, clock JJ/MM/AA HH:MM:SS,"));
+    out.println(F("  list, save, status, version, uptime, freemem, beacon, wx,"));
+    out.println(F("  send aprs <texte>, history [n], defaults, reboot, dfu, help"));
     return true;
   }
 
@@ -134,6 +185,19 @@ void CommandHandler::cmdSet(const char* key, const char* value, Print& out) {
       g_log_level = (LogLevel)_settings->system.log_level;
       out.printf("Log level: %s\n", logLevelName(g_log_level));
     }
+
+    // Relais : appliquer immédiatement l'impulsion I2C (la clé venant d'être
+    // écrite dans _settings)
+    int relayNum = 0;
+    char relayField[16] = {0};
+    if (sscanf(key, "relay.%d.%15s", &relayNum, relayField) == 2 &&
+        strcmp(relayField, "state") == 0 &&
+        relayNum >= 1 && relayNum <= RELAY_COUNT) {
+      uint8_t idx = relayNum - 1;
+      if (!_relay->setState(idx, _settings->relay[idx].state)) {
+        out.printf("Attention: expandeur relais (TCA9555) non détecté, pas d'action matérielle\n");
+      }
+    }
   } else {
     // Si set retourne false mais que la clé existe, c'est une erreur de validation
     // (le message a déjà été affiché par validate())
@@ -141,6 +205,24 @@ void CommandHandler::cmdSet(const char* key, const char* value, Print& out) {
       out.printf("Clé inconnue: %s\n", key);
     }
   }
+}
+
+// ============================================================================
+// Règle l'horloge RTC depuis "JJ/MM/AA HH:MM:SS"
+// ============================================================================
+void CommandHandler::cmdSetClockDate(const char* value, Print& out) {
+  int day, month, year, hour, minute, second;
+  if (sscanf(value, "%d/%d/%d %d:%d:%d", &day, &month, &year, &hour, &minute, &second) != 6) {
+    out.println(F("Usage: clock JJ/MM/AA HH:MM:SS"));
+    return;
+  }
+  if (year < 100) year += 2000;
+
+  DateTime dt(year, month, day, hour, minute, second);
+  rtc_clock.setCurrentTime(dt.unixtime());
+
+  out.printf("Horloge réglée: %02d/%02d/%04d %02d:%02d:%02d UTC\n",
+    day, month, year, hour, minute, second);
 }
 
 void CommandHandler::cmdList(Print& out) {
@@ -176,6 +258,12 @@ void CommandHandler::cmdStatus(Print& out) {
   out.printf("  Uptime:    %lu s\n", _telemetry->uptime_s);
 }
 
+void CommandHandler::cmdVersion(Print& out) {
+  out.printf("%s build %s\n", FIRMWARE_VERSION, FIRMWARE_BUILD_DATE);
+  out.println(F("Board: F4ISE RP-LoRA Mini v3 dual (RP2040)"));
+  out.printf("Uptime: %lu s  Free heap: %u\n", _telemetry->uptime_s, (unsigned)rp2040.getFreeHeap());
+}
+
 void CommandHandler::cmdDefaults(Print& out) {
   *_settings = getDefaultSettings();
   _registry->init(*_settings);  // re-pointer les entrées
@@ -201,4 +289,12 @@ void CommandHandler::cmdHistory(const char* args, Print& out) {
     n = atoi(args);
   }
   _history->dump(out, n);
+}
+
+void CommandHandler::cmdSendAprs(const char* content, Print& out) {
+  if (_aprs->sendRaw(content)) {
+    out.println(F("Paquet APRS envoyé"));
+  } else {
+    out.println(F("Échec envoi (contenu vide ou trop long)"));
+  }
 }

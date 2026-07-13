@@ -1,20 +1,28 @@
 #include "tasks.h"
 #include "config/Log.h"
+#include "config/Settings.h"
 #include "../aprs/AprsEngine.h"
 
 // ============================================================================
-// Task Beacon APRS — envoie position/status/telemetry périodiquement
+// Task Beacon APRS — envoie position/météo/telemetry/statut périodiquement
+//
+// Intervalles lus depuis `settings.aprs.interval.*` (modifiables à chaud via
+// le CLI "set aprs.interval.xxx <ms>") :
+//   - position  : 2x/jour
+//   - telemetry : toutes les heures
+//   - météo     : toutes les 15 min
+//   - statut    : dès que l'état de la station change (sendStatusIfChanged),
+//                 avec un envoi forcé au bout de intervalStatus_ms au cas où
+//                 rien n'a changé (filet de sécurité "toujours entendu")
 // ============================================================================
 
 extern AprsEngine aprs_engine;
+extern Settings settings;
 
 #define TAG "BEACON"
 
-// Intervalles (en ms)
-#define BEACON_POSITION_INTERVAL     (60 * 60 * 1000)   // 1h
-#define BEACON_STATUS_INTERVAL       (24 * 60 * 60 * 1000) // 24h
-#define BEACON_TELEMETRY_INTERVAL    (15 * 60 * 1000)    // 15 min
-#define BEACON_BOOT_DELAY            (90 * 1000)          // 90s après boot
+#define BEACON_BOOT_DELAY   (90 * 1000)   // 90s après boot, éviter les TX storms
+#define BEACON_CHECK_PERIOD (10 * 1000)   // fréquence de vérification des échéances
 
 void taskAprsBeacon(void* params) {
   (void)params;
@@ -24,36 +32,43 @@ void taskAprsBeacon(void* params) {
   LOG_D(TAG, "Task démarrée");
 
   // Première salve
-  aprs_engine.sendPosition(APRS_COMMENT);
+  aprs_engine.sendPosition(settings.aprs.comment);
   vTaskDelay(pdMS_TO_TICKS(5000));
   aprs_engine.sendTelemetryParams();
+  vTaskDelay(pdMS_TO_TICKS(3000));
+  aprs_engine.sendWeather();
 
   unsigned long last_position = millis();
-  unsigned long last_status = millis();
   unsigned long last_telemetry = millis();
+  unsigned long last_weather = millis();
 
   for (;;) {
     unsigned long now = millis();
 
-    if (now - last_position >= BEACON_POSITION_INTERVAL) {
+    if (now - last_position >= settings.aprs.intervalPosition_ms) {
       LOG_T(TAG, "TX position");
-      aprs_engine.sendPosition(APRS_COMMENT);
+      aprs_engine.sendPosition(settings.aprs.comment);
       last_position = now;
     }
 
-    if (now - last_telemetry >= BEACON_TELEMETRY_INTERVAL) {
+    if (now - last_telemetry >= settings.aprs.intervalTelemetry_ms) {
       LOG_T(TAG, "TX telemetry");
       aprs_engine.sendTelemetry();
       last_telemetry = now;
     }
 
-    if (now - last_status >= BEACON_STATUS_INTERVAL) {
-      LOG_T(TAG, "TX status");
-      aprs_engine.sendStatus(APRS_COMMENT);
-      last_status = now;
+    if (now - last_weather >= settings.aprs.intervalWeather_ms) {
+      LOG_T(TAG, "TX météo");
+      aprs_engine.sendWeather();
+      last_weather = now;
     }
 
-    // Check toutes les 10s — pas besoin de plus
-    vTaskDelay(pdMS_TO_TICKS(10000));
+    // Statut : envoyé dès que l'état change, sinon au plus tard toutes les
+    // intervalStatus_ms (voir AprsEngine::sendStatusIfChanged)
+    if (aprs_engine.sendStatusIfChanged(settings.aprs.intervalStatus_ms)) {
+      LOG_T(TAG, "TX statut");
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(BEACON_CHECK_PERIOD));
   }
 }

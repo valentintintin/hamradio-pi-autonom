@@ -25,9 +25,10 @@ struct AprsSettings {
   float longitude;
   int16_t altitude;         // mètres
   bool digipeaterEnabled;
-  uint32_t intervalPosition_ms;   // beacon position
-  uint32_t intervalTelemetry_ms;  // beacon telemetry
-  uint32_t intervalStatus_ms;     // beacon status
+  uint32_t intervalPosition_ms;   // beacon position (2x/jour)
+  uint32_t intervalTelemetry_ms;  // beacon telemetry (toutes les heures)
+  uint32_t intervalWeather_ms;    // beacon météo (toutes les 15 min)
+  uint32_t intervalStatus_ms;     // filet de sécurité statut (envoi forcé même si état inchangé)
   char comment[32];               // commentaire APRS
 };
 
@@ -62,6 +63,16 @@ struct SystemSettings {
   uint8_t log_level;                   // LogLevel (0=none .. 5=trace)
 };
 
+// Relais bistable piloté via l'expandeur I2C TCA9555 (carte Interface F1ZIC,
+// cf. hal/RelayHal.h). Le mapping broche est fixé par le câblage matériel
+// (P00-P07 du TCA9555) ; seul l'état logique est persisté ici — le relais
+// bistable garde sa position mécanique sans alimentation, même après reboot.
+#define RELAY_COUNT       4
+
+struct RelayChannel {
+  bool state;
+};
+
 struct Settings {
   uint32_t magic;
   uint16_t version;
@@ -71,6 +82,7 @@ struct Settings {
   WeatherSettings weather;
   EnergySettings energy;
   SystemSettings system;
+  RelayChannel relay[RELAY_COUNT];
 };
 
 // ============================================================================
@@ -93,9 +105,10 @@ inline Settings getDefaultSettings() {
   s.aprs.longitude = 0.0f;
   s.aprs.altitude = 0;
   s.aprs.digipeaterEnabled = true;
-  s.aprs.intervalPosition_ms = 3600000;    // 1h
-  s.aprs.intervalTelemetry_ms = 900000;    // 15min
-  s.aprs.intervalStatus_ms = 86400000;     // 24h
+  s.aprs.intervalPosition_ms = 43200000;   // 12h (2x/jour)
+  s.aprs.intervalTelemetry_ms = 3600000;   // 1h
+  s.aprs.intervalWeather_ms = 900000;      // 15min
+  s.aprs.intervalStatus_ms = 21600000;     // 6h (filet de sécurité, sinon envoi si l'état change)
   strncpy(s.aprs.comment, "LoRa Dual Digi", sizeof(s.aprs.comment));
 
   // Radio
@@ -122,6 +135,11 @@ inline Settings getDefaultSettings() {
   s.system.watchdog_enabled = false;
   s.system.telemetry_log_interval_ms = 300000; // 5min
   s.system.log_level = 3;                      // INFO par défaut
+
+  // Relais — tous désactivés par défaut
+  for (int i = 0; i < RELAY_COUNT; i++) {
+    s.relay[i].state = false;
+  }
 
   return s;
 }

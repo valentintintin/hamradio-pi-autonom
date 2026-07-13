@@ -17,10 +17,10 @@
 #include <helpers/IdentityStore.h>
 
 // Nos modules
-#include "mesh/MyMesh.h"
+#include "mesh/MeshcoreRepeater.h"
 #include "aprs/AprsDispatcher.h"
 #include "aprs/AprsEngine.h"
-#include "bridge/MeshAprsBridge.h"
+#include "aprs/AprsEventHandler.h"
 #include "hal/Telemetry.h"
 #include "hal/I2CBus.h"
 #include "hal/Ina3221Hal.h"
@@ -28,6 +28,7 @@
 #include "hal/Bme280Hal.h"
 #include "hal/VictronHal.h"
 #include "hal/TelemetryHistory.h"
+#include "hal/RelayHal.h"
 #include "config/Log.h"
 #include "config/Settings.h"
 #include "config/SettingsManager.h"
@@ -54,9 +55,6 @@ AprsDispatcher aprs_dispatcher(aprs_radio_driver, ms_clock);
 static AprsConfig aprs_config = {};
 AprsEngine aprs_engine(aprs_dispatcher, aprs_config);
 
-// Bridge
-MeshAprsBridge mesh_aprs_bridge(aprs_engine);
-
 // Telemetry partagée (lue par beacon, bridge, CLI)
 TelemetryData telemetry = {};
 
@@ -71,11 +69,18 @@ EepromHal eeprom(i2c_bus);
 // Historique télémétrie EEPROM
 TelemetryHistory telemetry_history(eeprom);
 
+// Relais bistables (carte Interface F1ZIC, expandeur TCA9555 @0x20 sur I2C0)
+RelayHal relay_hal(i2c_bus);
+
 // Configuration
 Settings settings;
 SettingsManager settings_manager(&eeprom);
 SettingsRegistry settings_registry;
-CommandHandler command_handler(settings, settings_registry, settings_manager, telemetry, &telemetry_history);
+CommandHandler command_handler(settings, settings_registry, settings_manager, telemetry,
+                               aprs_engine, relay_hal, &telemetry_history);
+
+// Relie AprsEngine à la télémétrie et au CLI (query météo, telemetry, CLI par message)
+AprsEventHandler aprs_event_handler(aprs_engine, command_handler, telemetry, settings);
 
 // ============================================================================
 // Helpers — copie config APRS depuis settings
@@ -84,7 +89,8 @@ static void applyAprsConfig() {
   strncpy(aprs_config.callsign, settings.aprs.callsign, sizeof(aprs_config.callsign));
   strncpy(aprs_config.destination, settings.aprs.destination, sizeof(aprs_config.destination));
   strncpy(aprs_config.path, settings.aprs.path, sizeof(aprs_config.path));
-  strncpy(aprs_config.pathTelemetry, settings.aprs.path, sizeof(aprs_config.pathTelemetry));
+  strncpy(aprs_config.pathTelemetry, settings.aprs.pathTelemetry, sizeof(aprs_config.pathTelemetry));
+  strncpy(aprs_config.comment, settings.aprs.comment, sizeof(aprs_config.comment));
   aprs_config.symbol = settings.aprs.symbol;
   aprs_config.symbolTable = settings.aprs.symbolTable;
   aprs_config.latitude = settings.aprs.latitude;
@@ -100,11 +106,6 @@ static void applyAprsConfig() {
 void setup() {
   Serial.begin(115200);
   delay(2000); // attendre USB serial
-
-  Serial.println(F("========================================"));
-  Serial.println(F("  RP-LoRA Mini v3 — Dual 433/868"));
-  Serial.println(F("  MeshCore + APRS / FreeRTOS"));
-  Serial.println(F("========================================"));
 
   // Board init
   board.begin();
@@ -130,22 +131,16 @@ void setup() {
 
     if (!store.load("_main", the_mesh.self_id)) {
       LOG_W("MESH", "Génération nouvelle identité");
-      the_mesh.self_id = radio_new_identity();
-
-      // Éviter les hash réservés (0x00, 0xFF)
-      int tries = 0;
-      while (tries < 10 &&
-             (the_mesh.self_id.pub_key[0] == 0x00 || the_mesh.self_id.pub_key[0] == 0xFF)) {
-        the_mesh.self_id = radio_new_identity();
-        tries++;
+      the_mesh.self_id = radio_new_identity();   // create new random identity
+      int count = 0;
+      while (count < 10 && (the_mesh.self_id.pub_key[0] == 0x00 || the_mesh.self_id.pub_key[0] == 0xFF)) {  // reserved id hashes
+        the_mesh.self_id = radio_new_identity(); count++;
       }
-
       store.save("_main", the_mesh.self_id);
     }
 
-    LOG_I("MESH", "ID: %02X%02X%02X%02X...",
-      the_mesh.self_id.pub_key[0], the_mesh.self_id.pub_key[1],
-      the_mesh.self_id.pub_key[2], the_mesh.self_id.pub_key[3]);
+    Serial.print("Repeater ID: ");
+    mesh::Utils::printHex(Serial, the_mesh.self_id.pub_key, PUB_KEY_SIZE); Serial.println();
   }
 
   // --- Init I2C bus + capteurs ----------------------------------------------
@@ -181,18 +176,19 @@ void setup() {
   // --- Appliquer la config APRS --------------------------------------------
   applyAprsConfig();
 
+  // --- Relais bistables (broches configurées via CLI, cf settings.relay) --
+  relay_hal.begin(settings.relay, RELAY_COUNT);
+
   // --- Init MeshCore -------------------------------------------------------
   the_mesh.begin(&LittleFS);
 
   // --- Init APRS -----------------------------------------------------------
   aprs_dispatcher.begin();
   aprs_dispatcher.setRxCallback(&aprs_engine);
-
-  // --- Bridge --------------------------------------------------------------
-  the_mesh.setBridge(&mesh_aprs_bridge);
+  aprs_engine.setEventCallback(&aprs_event_handler);
 
   // --- Advert initial ------------------------------------------------------
-  the_mesh.sendSelfAdvertisement(16000, true);
+  the_mesh.sendSelfAdvertisement(16000, false);
 
   // --- Créer les tasks FreeRTOS --------------------------------------------
   LOG_I("RTOS", "Création des tasks...");
@@ -200,12 +196,13 @@ void setup() {
   xTaskCreate(taskMeshLoop,   "mesh",    TASK_STACK_MESH,    nullptr, TASK_PRIO_MESH_LOOP, nullptr);
   xTaskCreate(taskAprsLoop,   "aprs",    TASK_STACK_APRS,    nullptr, TASK_PRIO_APRS_LOOP, nullptr);
   xTaskCreate(taskAprsBeacon, "beacon",  TASK_STACK_BEACON,  nullptr, TASK_PRIO_BEACON,    nullptr);
-  xTaskCreate(taskAprsBridge, "bridge",  TASK_STACK_BRIDGE,  nullptr, TASK_PRIO_BRIDGE,    nullptr);
   xTaskCreate(taskEnergy,     "energy",  TASK_STACK_ENERGY,  nullptr, TASK_PRIO_ENERGY,    nullptr);
   xTaskCreate(taskWeather,    "weather", TASK_STACK_WEATHER, nullptr, TASK_PRIO_WEATHER,   nullptr);
   xTaskCreate(taskCli,        "cli",     TASK_STACK_CLI,     nullptr, TASK_PRIO_CLI,       nullptr);
 
   LOG_I("RTOS", "Scheduler démarré");
+
+  board.onBootComplete();
 }
 
 // ============================================================================
