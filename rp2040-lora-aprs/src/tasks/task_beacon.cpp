@@ -2,6 +2,7 @@
 #include "config/Log.h"
 #include "config/Settings.h"
 #include "../aprs/AprsEngine.h"
+#include "TaskHeartbeat.h"
 #include <Timer.h>
 
 // ============================================================================
@@ -44,6 +45,8 @@ void taskAprsBeacon(void* params) {
   Timer weather_timer(settings.aprs.intervalWeather_ms);
 
   for (;;) {
+    heartbeat(HB_BEACON);
+
     // Resynchroniser l'intervalle si modifié à chaud ("set aprs.interval.xxx <ms>")
     position_timer.setInterval(settings.aprs.intervalPosition_ms, false);
     telemetry_timer.setInterval(settings.aprs.intervalTelemetry_ms, false);

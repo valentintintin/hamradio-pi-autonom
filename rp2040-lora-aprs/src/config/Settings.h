@@ -61,12 +61,22 @@ struct SystemSettings {
   bool watchdog_enabled;
   uint32_t telemetry_log_interval_ms;  // intervalle log EEPROM
   uint8_t log_level;                   // LogLevel (0=none .. 5=trace)
-  // Réservé pour un futur mode basse consommation. Pas encore d'action câblée
-  // dessus : baisser clk_sys au runtime casserait le tick FreeRTOS sur ce
-  // port (configCPU_CLOCK_HZ = F_CPU fixé à la compilation, jamais recalculé),
-  // et board.sleep() figerait aussi les autres tâches (APRS/météo/énergie)
-  // qui doivent continuer de tourner. Nécessite un vrai travail de
-  // coordination inter-tâches avant d'être branché à une action réelle.
+  // Réservé pour un futur mode basse consommation — toujours pas d'action
+  // câblée dessus. Ce qui existe déjà "gratuitement" sur ce core : la tâche
+  // idle FreeRTOS appelle __wfe() par défaut (cf.
+  // framework-arduinopico/cores/rp2040/freertos/variantHooks.cpp), donc le
+  // CPU dort déjà entre deux tâches sans rien à faire ici.
+  // Ce qui resterait à faire (baisser clk_sys) reste risqué sur ce port :
+  // configCPU_CLOCK_HZ (utilisé pour calculer le rechargement du SysTick de
+  // FreeRTOS) est figé à la compilation (= F_CPU) et n'est jamais recalculé
+  // au runtime — et comme ce core démarre déjà l'ordonnanceur AVANT setup(),
+  // il n'existe pas de fenêtre "avant le RTOS" pour changer l'horloge sans
+  // risquer de désynchroniser le tick. Le faire correctement demande de
+  // reprogrammer SysTick->LOAD à la main en cohérence avec la nouvelle
+  // fréquence (et de reparenter clk_peri sur clk_usb pour ne pas dériver les
+  // horloges SPI/I2C) — invérifiable sans banc de test matériel, donc pas
+  // fait : le risque d'un bug de timing silencieux sur un site difficile
+  // d'accès dépasse le gain.
   bool low_power_enabled;
 };
 

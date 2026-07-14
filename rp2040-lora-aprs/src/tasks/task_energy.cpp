@@ -13,6 +13,7 @@
 #include "hal/MpptChargerHal.h"
 #include "hal/Bme280Hal.h"
 #include "hal/VictronHal.h"
+#include "TaskHeartbeat.h"
 #include <Timer.h>
 
 extern TelemetryData telemetry;
@@ -36,6 +37,8 @@ void taskEnergy(void* params) {
   Timer history_timer(settings.system.telemetry_log_interval_ms);
 
   for (;;) {
+    heartbeat(HB_ENERGY);
+
     if (ina3221.isInitialized() && !ina3221.query(telemetry)) {
       LOG_W(TAG, "Erreur lecture INA3221");
     }

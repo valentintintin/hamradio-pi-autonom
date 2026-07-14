@@ -2,6 +2,7 @@
 #include "target.h"
 #include "config/Log.h"
 #include "../mesh/MeshcoreRepeater.h"
+#include "TaskHeartbeat.h"
 
 // ============================================================================
 // Task MeshCore — appelle le dispatcher/mesh loop en continu
@@ -16,6 +17,8 @@ void taskMeshLoop(void* params) {
   LOG_D(TAG, "Task démarrée");
 
   for (;;) {
+    heartbeat(HB_MESH);
+
     the_mesh.loop();
 
     // Horloge de secours (millis()) + capteurs MeshCore (GPS, etc.) : comme

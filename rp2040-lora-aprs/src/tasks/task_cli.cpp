@@ -11,6 +11,7 @@
 #include "config/Log.h"
 #include "mesh/MeshcoreRepeater.h"
 #include "config/CommandHandler.h"
+#include "TaskHeartbeat.h"
 #include <string.h>
 
 extern MyMesh the_mesh;
@@ -28,6 +29,8 @@ void taskCli(void* params) {
   size_t line_len = 0;
 
   for (;;) {
+    heartbeat(HB_CLI);
+
     while (Serial.available()) {
       char c = (char)Serial.read();
       if (c == '\r') {

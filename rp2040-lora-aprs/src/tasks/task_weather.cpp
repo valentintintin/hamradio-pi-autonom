@@ -15,6 +15,7 @@
 #include "aprs/AprsDispatcher.h"
 #include "aprs/AprsRadioMode.h"
 #include "hal/Telemetry.h"
+#include "TaskHeartbeat.h"
 #include <FineOffsetWH65B.h>
 #include <RadioLib.h>
 
@@ -96,6 +97,8 @@ void taskWeather(void* params) {
   LOG_D(TAG, "Task démarrée");
 
   for (;;) {
+    heartbeat(HB_WEATHER);
+
     if (settings.weather.wh65b_enabled) {
       LOG_T(TAG, "Début cycle FSK");
 
