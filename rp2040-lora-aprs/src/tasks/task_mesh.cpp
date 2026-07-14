@@ -1,4 +1,5 @@
 #include "tasks.h"
+#include "target.h"
 #include "config/Log.h"
 #include "../mesh/MeshcoreRepeater.h"
 
@@ -16,6 +17,12 @@ void taskMeshLoop(void* params) {
 
   for (;;) {
     the_mesh.loop();
+
+    // Horloge de secours (millis()) + capteurs MeshCore (GPS, etc.) : comme
+    // dans le loop() de référence des exemples MeshCore, à appeler à chaque
+    // itération.
+    rtc_clock.tick();
+    sensors.loop();
 
     // Yield bref — le dispatcher a besoin de tourner souvent
     // pour ne pas rater de paquets RX

@@ -61,6 +61,13 @@ struct SystemSettings {
   bool watchdog_enabled;
   uint32_t telemetry_log_interval_ms;  // intervalle log EEPROM
   uint8_t log_level;                   // LogLevel (0=none .. 5=trace)
+  // Réservé pour un futur mode basse consommation. Pas encore d'action câblée
+  // dessus : baisser clk_sys au runtime casserait le tick FreeRTOS sur ce
+  // port (configCPU_CLOCK_HZ = F_CPU fixé à la compilation, jamais recalculé),
+  // et board.sleep() figerait aussi les autres tâches (APRS/météo/énergie)
+  // qui doivent continuer de tourner. Nécessite un vrai travail de
+  // coordination inter-tâches avant d'être branché à une action réelle.
+  bool low_power_enabled;
 };
 
 // Relais bistable piloté via l'expandeur I2C TCA9555 (carte Interface F1ZIC,
@@ -135,6 +142,7 @@ inline Settings getDefaultSettings() {
   s.system.watchdog_enabled = false;
   s.system.telemetry_log_interval_ms = 300000; // 5min
   s.system.log_level = 3;                      // INFO par défaut
+  s.system.low_power_enabled = false;          // pas d'action câblée pour l'instant, cf. commentaire du champ
 
   // Relais — tous désactivés par défaut
   for (int i = 0; i < RELAY_COUNT; i++) {

@@ -2,6 +2,7 @@
 #include "config/Log.h"
 #include "config/Settings.h"
 #include "../aprs/AprsEngine.h"
+#include <Timer.h>
 
 // ============================================================================
 // Task Beacon APRS — envoie position/météo/telemetry/statut périodiquement
@@ -38,29 +39,32 @@ void taskAprsBeacon(void* params) {
   vTaskDelay(pdMS_TO_TICKS(3000));
   aprs_engine.sendWeather();
 
-  unsigned long last_position = millis();
-  unsigned long last_telemetry = millis();
-  unsigned long last_weather = millis();
+  Timer position_timer(settings.aprs.intervalPosition_ms);
+  Timer telemetry_timer(settings.aprs.intervalTelemetry_ms);
+  Timer weather_timer(settings.aprs.intervalWeather_ms);
 
   for (;;) {
-    unsigned long now = millis();
+    // Resynchroniser l'intervalle si modifié à chaud ("set aprs.interval.xxx <ms>")
+    position_timer.setInterval(settings.aprs.intervalPosition_ms, false);
+    telemetry_timer.setInterval(settings.aprs.intervalTelemetry_ms, false);
+    weather_timer.setInterval(settings.aprs.intervalWeather_ms, false);
 
-    if (now - last_position >= settings.aprs.intervalPosition_ms) {
+    if (position_timer.hasExpired()) {
       LOG_T(TAG, "TX position");
       aprs_engine.sendPosition(settings.aprs.comment);
-      last_position = now;
+      position_timer.restart();
     }
 
-    if (now - last_telemetry >= settings.aprs.intervalTelemetry_ms) {
+    if (telemetry_timer.hasExpired()) {
       LOG_T(TAG, "TX telemetry");
       aprs_engine.sendTelemetry();
-      last_telemetry = now;
+      telemetry_timer.restart();
     }
 
-    if (now - last_weather >= settings.aprs.intervalWeather_ms) {
+    if (weather_timer.hasExpired()) {
       LOG_T(TAG, "TX météo");
       aprs_engine.sendWeather();
-      last_weather = now;
+      weather_timer.restart();
     }
 
     // Statut : envoyé dès que l'état change, sinon au plus tard toutes les

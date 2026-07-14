@@ -17,15 +17,21 @@ public:
     : _bus(&bus), _addr(addr), _initialized(false) {}
 
   bool begin() {
-    if (!_bus->lock()) return false;
+    if (!_bus->lock()) {
+      return false;
+    }
     _initialized = _ina.begin(_addr, &_bus->wire());
     _bus->unlock();
     return _initialized;
   }
 
   bool query(TelemetryData& telemetry) {
-    if (!_initialized) return false;
-    if (!_bus->lock()) return false;
+    if (!_initialized) {
+      return false;
+    }
+    if (!_bus->lock()) {
+      return false;
+    }
 
     // Canal 0 : batterie
     telemetry.battery.voltage_mv = _ina.getBusVoltage(0) * 1000.0f;

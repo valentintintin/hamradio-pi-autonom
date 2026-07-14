@@ -7,6 +7,8 @@
 #include "hal/RelayHal.h"
 #include "aprs/AprsEngine.h"
 #include <Arduino.h>
+#include <FreeRTOS.h>
+#include <semphr.h>
 
 // ============================================================================
 // CommandHandler — parse et exécute les commandes get/set/list/save/reboot
@@ -20,7 +22,7 @@
 // Commandes supportées :
 //   get <key>           → affiche la valeur
 //   set <key> <value>   → modifie la valeur (en RAM)
-//   set clockdate JJ/MM/AA HH:MM:SS → règle l'horloge RTC
+//   clockdate JJ/MM/AA HH:MM:SS → règle l'horloge RTC
 //   save                → persiste sur LittleFS + EEPROM
 //   list                → affiche toutes les clés
 //   status              → affiche la telemetry courante
@@ -30,7 +32,7 @@
 //   send aprs <texte>    → envoi manuel d'un paquet APRS brut
 //   history [n]         → affiche l'historique télémétrie EEPROM
 //   reboot              → redémarre le RP2040
-//   reset dfu           → redémarre en mode bootloader USB (reflash UF2)
+//   dfu                 → redémarre en mode bootloader USB (reflash UF2)
 //   defaults            → recharge les valeurs par défaut
 // ============================================================================
 
@@ -42,14 +44,19 @@ public:
                  TelemetryHistory* history = nullptr)
     : _settings(&settings), _registry(&registry),
       _manager(&manager), _telemetry(&telemetry),
-      _aprs(&aprsEngine), _relay(&relay), _history(history) {}
+      _aprs(&aprsEngine), _relay(&relay), _history(history),
+      _mutex(aprsEngine.getMutex()) {}
 
-  // Exécute une commande, écrit la réponse dans out
-  // Retourne true si la commande a été reconnue
-  bool execute(const char* input, Print& out);
+  // Exécute une commande, écrit la réponse dans out.
+  // Retourne true si la commande a été reconnue.
+  // isLocal : true pour la liaison série (locale, de confiance) ; certaines
+  // commandes (ex: "help") ne produisent une réponse que si isLocal, pour ne
+  // pas gaspiller l'airtime sur une liaison radio distante (APRS/mesh).
+  bool execute(const char* input, Print& out, bool isLocal = true);
 
-  // Version qui écrit dans un buffer (pour réponse APRS/mesh)
-  bool execute(const char* input, char* outBuf, size_t outLen);
+  // Version qui écrit dans un buffer (pour réponse APRS/mesh) ; isLocal=false
+  // par défaut car ce chemin est toujours utilisé pour une liaison radio.
+  bool execute(const char* input, char* outBuf, size_t outLen, bool isLocal = false);
 
 private:
   Settings* _settings;
@@ -59,6 +66,15 @@ private:
   AprsEngine* _aprs;
   RelayHal* _relay;
   TelemetryHistory* _history;
+
+  // Settings/SettingsRegistry/relais sont partagés entre les tâches série,
+  // APRS et mesh (MeshcoreRepeater retombe désormais aussi sur execute()) :
+  // sans ce verrou, deux commandes concurrentes (ex: "save" en série pendant
+  // qu'un "set" arrive par mesh) pourraient entrelacer leurs écritures dans
+  // Settings ou pendant la sérialisation LittleFS/EEPROM.
+  // Partagé (pas un mutex séparé) avec AprsEngine::getMutex() — voir le
+  // commentaire de cette méthode pour la raison (éviter un interblocage AB-BA).
+  SemaphoreHandle_t _mutex;
 
   void cmdGet(const char* key, Print& out);
   void cmdSet(const char* key, const char* value, Print& out);

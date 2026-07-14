@@ -15,7 +15,9 @@ extern LogLevel g_log_level;
 class StringPrint : public Print {
 public:
   StringPrint(char* buf, size_t len) : _buf(buf), _len(len), _pos(0) {
-    if (_len > 0) _buf[0] = '\0';
+    if (_len > 0) {
+      _buf[0] = '\0';
+    }
   }
   size_t write(uint8_t c) override {
     if (_pos < _len - 1) { _buf[_pos++] = c; _buf[_pos] = '\0'; return 1; }
@@ -36,9 +38,32 @@ private:
 };
 
 // ============================================================================
+// Verrou — execute() est appelé depuis les tâches série, APRS et mesh ; cette
+// garde RAII couvre tous les points de sortie (nombreux "return" ci-dessous)
+// sans avoir à dupliquer un unlock à chacun. Récursif (partagé avec
+// AprsEngine, cf. AprsEngine::getMutex()) car un message APRS reçu tient déjà
+// ce verrou (dans AprsEngine::onAprsPacketReceived) quand il appelle
+// execute() via AprsEventHandler, et execute() lui-même peut rappeler
+// AprsEngine (commandes "beacon"/"wx"/"send aprs").
+// ============================================================================
+namespace {
+struct SettingsLockGuard {
+  SemaphoreHandle_t sem;
+  explicit SettingsLockGuard(SemaphoreHandle_t s) : sem(s) {
+    xSemaphoreTakeRecursive(sem, portMAX_DELAY);
+  }
+  ~SettingsLockGuard() {
+    xSemaphoreGiveRecursive(sem);
+  }
+};
+}  // namespace
+
+// ============================================================================
 // Execute — dispatch sur la commande
 // ============================================================================
-bool CommandHandler::execute(const char* input, Print& out) {
+bool CommandHandler::execute(const char* input, Print& out, bool isLocal) {
+  SettingsLockGuard lock(_mutex);
+
   // Copie locale pour tokeniser (assez grand pour "send aprs <contenu>",
   // le contenu APRS pouvant aller jusqu'à ~200 caractères)
   char buf[220];
@@ -47,7 +72,9 @@ bool CommandHandler::execute(const char* input, Print& out) {
 
   // Trim leading spaces
   char* cmd = buf;
-  while (*cmd == ' ') cmd++;
+  while (*cmd == ' ') {
+    cmd++;
+  }
 
   if (strncmp(cmd, "get ", 4) == 0) {
     cmdGet(cmd + 4, out);
@@ -57,12 +84,16 @@ bool CommandHandler::execute(const char* input, Print& out) {
   if (strncmp(cmd, "set ", 4) == 0) {
     // Trouver la clé et la valeur
     char* key = cmd + 4;
-    while (*key == ' ') key++;
+    while (*key == ' ') {
+      key++;
+    }
     char* value = strchr(key, ' ');
     if (value) {
       *value = '\0';
       value++;
-      while (*value == ' ') value++;
+      while (*value == ' ') {
+        value++;
+      }
       cmdSet(key, value, out);
     } else {
       out.println(F("Usage: set <key> <value>"));
@@ -70,8 +101,10 @@ bool CommandHandler::execute(const char* input, Print& out) {
     return true;
   }
 
-  if (strcmp(cmd, "clock") == 0) {
-    cmdSetClockDate(cmd, out);
+  // "clockdate" (pas "clock"/"time") : évite toute collision avec les
+  // commandes CLI MeshCore du même nom (lecture "clock", réglage "time ").
+  if (strncmp(cmd, "clockdate ", 10) == 0) {
+    cmdSetClockDate(cmd + 10, out);
     return true;
   }
 
@@ -148,18 +181,22 @@ bool CommandHandler::execute(const char* input, Print& out) {
   }
 
   if (strcmp(cmd, "help") == 0) {
-    out.println(F("Commandes: get <key>, set <key> <value>, clock JJ/MM/AA HH:MM:SS,"));
-    out.println(F("  list, save, status, version, uptime, freemem, beacon, wx,"));
-    out.println(F("  send aprs <texte>, history [n], defaults, reboot, dfu, help"));
+    // Pas de texte d'aide sur une liaison radio distante (APRS/mesh) : ça ne
+    // ferait que gaspiller l'airtime pour un client qui explore la commande.
+    if (isLocal) {
+      out.println(F("Commandes: get <key>, set <key> <value>, clockdate JJ/MM/AA HH:MM:SS,"));
+      out.println(F("  list, save, status, version, uptime, freemem, beacon, wx,"));
+      out.println(F("  send aprs <texte>, history [n], defaults, reboot, dfu, help"));
+    }
     return true;
   }
 
   return false;
 }
 
-bool CommandHandler::execute(const char* input, char* outBuf, size_t outLen) {
+bool CommandHandler::execute(const char* input, char* outBuf, size_t outLen, bool isLocal) {
   StringPrint sp(outBuf, outLen);
-  return execute(input, sp);
+  return execute(input, sp, isLocal);
 }
 
 // ============================================================================
@@ -216,7 +253,9 @@ void CommandHandler::cmdSetClockDate(const char* value, Print& out) {
     out.println(F("Usage: clock JJ/MM/AA HH:MM:SS"));
     return;
   }
-  if (year < 100) year += 2000;
+  if (year < 100) {
+    year += 2000;
+  }
 
   DateTime dt(year, month, day, hour, minute, second);
   rtc_clock.setCurrentTime(dt.unixtime());

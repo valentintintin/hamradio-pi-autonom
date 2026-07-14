@@ -15,7 +15,9 @@ public:
     : _bus(&bus), _addr(addr), _initialized(false) {}
 
   bool begin() {
-    if (!_bus->lock()) return false;
+    if (!_bus->lock()) {
+      return false;
+    }
     _initialized = _bme.begin(_addr, &_bus->wire());
     if (_initialized) {
       _bme.setSampling(
@@ -32,8 +34,12 @@ public:
   }
 
   bool query(WeatherData& data) {
-    if (!_initialized) return false;
-    if (!_bus->lock()) return false;
+    if (!_initialized) {
+      return false;
+    }
+    if (!_bus->lock()) {
+      return false;
+    }
 
     _bme.takeForcedMeasurement();
     data.temperature_c = _bme.readTemperature();

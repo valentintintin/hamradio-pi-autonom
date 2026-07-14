@@ -50,6 +50,7 @@ void SettingsRegistry::init(Settings& s) {
   add("system.watchdog",       ST_BOOL,   &s.system.watchdog_enabled);
   add("system.log_interval",   ST_UINT32, &s.system.telemetry_log_interval_ms, 10000.0f, 3600000.0f);
   add("system.log_level",      ST_UINT8,  &s.system.log_level, 0.0f, 5.0f);
+  add("system.low_power",      ST_BOOL,   &s.system.low_power_enabled);
 
   // --- Relais (bistables, pilotés via TCA9555 I2C — cf. hal/RelayHal.h) ----
   add("relay.1.state", ST_BOOL, &s.relay[0].state);
@@ -62,7 +63,9 @@ void SettingsRegistry::init(Settings& s) {
 // Ajouter une entrée (sans bornes)
 // ============================================================================
 void SettingsRegistry::add(const char* key, SettingType type, void* ptr, uint8_t maxLen) {
-  if (_count >= 64) return;
+  if (_count >= 64) {
+    return;
+  }
   _entries[_count++] = { key, type, ptr, maxLen, 0, 0, false };
 }
 
@@ -70,7 +73,9 @@ void SettingsRegistry::add(const char* key, SettingType type, void* ptr, uint8_t
 // Ajouter une entrée (avec bornes min/max)
 // ============================================================================
 void SettingsRegistry::add(const char* key, SettingType type, void* ptr, float min, float max) {
-  if (_count >= 64) return;
+  if (_count >= 64) {
+    return;
+  }
   _entries[_count++] = { key, type, ptr, 0, min, max, true };
 }
 
@@ -78,7 +83,9 @@ void SettingsRegistry::add(const char* key, SettingType type, void* ptr, float m
 // Validation des bornes
 // ============================================================================
 bool SettingsRegistry::validate(const SettingEntry* e, float value, Print* out) const {
-  if (!e->hasRange) return true;
+  if (!e->hasRange) {
+    return true;
+  }
   if (value < e->min || value > e->max) {
     if (out) {
       out->printf("Hors limites: %.4g (attendu [%.4g, %.4g])\n", value, e->min, e->max);
@@ -105,7 +112,9 @@ const SettingEntry* SettingsRegistry::find(const char* key) const {
 // ============================================================================
 bool SettingsRegistry::get(const char* key, char* out, size_t outLen) const {
   const SettingEntry* e = find(key);
-  if (!e) return false;
+  if (!e) {
+    return false;
+  }
 
   switch (e->type) {
     case ST_STRING:
@@ -146,7 +155,9 @@ bool SettingsRegistry::set(const char* key, const char* value) {
 
 bool SettingsRegistry::set(const char* key, const char* value, Print* out) {
   const SettingEntry* e = find(key);
-  if (!e) return false;
+  if (!e) {
+    return false;
+  }
 
   switch (e->type) {
     case ST_STRING:
@@ -155,37 +166,49 @@ bool SettingsRegistry::set(const char* key, const char* value, Print* out) {
       break;
     case ST_FLOAT: {
       float fv = atof(value);
-      if (!validate(e, fv, out)) return false;
+      if (!validate(e, fv, out)) {
+        return false;
+      }
       *(float*)e->ptr = fv;
       break;
     }
     case ST_INT8: {
       int iv = atoi(value);
-      if (!validate(e, (float)iv, out)) return false;
+      if (!validate(e, (float)iv, out)) {
+        return false;
+      }
       *(int8_t*)e->ptr = (int8_t)iv;
       break;
     }
     case ST_INT16: {
       int iv = atoi(value);
-      if (!validate(e, (float)iv, out)) return false;
+      if (!validate(e, (float)iv, out)) {
+        return false;
+      }
       *(int16_t*)e->ptr = (int16_t)iv;
       break;
     }
     case ST_UINT8: {
       int iv = atoi(value);
-      if (!validate(e, (float)iv, out)) return false;
+      if (!validate(e, (float)iv, out)) {
+        return false;
+      }
       *(uint8_t*)e->ptr = (uint8_t)iv;
       break;
     }
     case ST_UINT16: {
       int iv = atoi(value);
-      if (!validate(e, (float)iv, out)) return false;
+      if (!validate(e, (float)iv, out)) {
+        return false;
+      }
       *(uint16_t*)e->ptr = (uint16_t)iv;
       break;
     }
     case ST_UINT32: {
       uint32_t uv = (uint32_t)strtoul(value, nullptr, 10);
-      if (!validate(e, (float)uv, out)) return false;
+      if (!validate(e, (float)uv, out)) {
+        return false;
+      }
       *(uint32_t*)e->ptr = uv;
       break;
     }

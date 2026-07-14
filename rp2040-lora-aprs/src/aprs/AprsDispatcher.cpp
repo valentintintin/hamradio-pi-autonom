@@ -4,30 +4,18 @@
 
 #define TAG "APRS-DSP"
 
-// ============================================================================
-// Logique de scheduling portée de MeshCore Dispatcher (MIT license)
-// Source: MeshCore/src/Dispatcher.cpp
-// ============================================================================
-
-#define MIN_TX_BUDGET_RESERVE_MS   100
-#define MIN_TX_BUDGET_AIRTIME_DIV  2
-
 AprsDispatcher::AprsDispatcher(mesh::Radio& radio, mesh::MillisecondClock& ms)
   : _radio(&radio), _ms(&ms), _rx_callback(nullptr),
     _outbound_active(false), _outbound_len(0),
-    _tx_budget_ms(0), _last_budget_update(0),
-    _duty_cycle_window_ms(3600000),
     _cad_busy_start(0), _next_tx_time(0),
     _paused(false),
     _total_air_time(0), _n_sent(0), _n_recv(0)
 {
   memset(_tx_pool, 0, sizeof(_tx_pool));
+  _pool_mutex = xSemaphoreCreateMutex();
 }
 
 void AprsDispatcher::begin() {
-  _duty_cycle = 1.0f / (1.0f + getAirtimeBudgetFactor());
-  _tx_budget_ms = (unsigned long)(_duty_cycle_window_ms * _duty_cycle);
-  _last_budget_update = _ms->getMillis();
   _next_tx_time = _ms->getMillis();
   _n_sent = _n_recv = 0;
 
@@ -67,7 +55,9 @@ void AprsDispatcher::resume() {
 // Loop principal — appelé depuis la task FreeRTOS
 // ============================================================================
 void AprsDispatcher::loop() {
-  if (_paused) return;
+  if (_paused) {
+    return;
+  }
 
   _radio->loop();
 
@@ -77,20 +67,9 @@ void AprsDispatcher::loop() {
       long t = _ms->getMillis() - _outbound_start;
       _total_air_time += t;
 
-      updateTxBudget();
-      if ((unsigned long)t > _tx_budget_ms) {
-        _tx_budget_ms = 0;
-      } else {
-        _tx_budget_ms -= t;
-      }
-
-      // Calculer prochain créneau TX si budget faible
-      if (_tx_budget_ms < MIN_TX_BUDGET_RESERVE_MS) {
-        unsigned long needed = MIN_TX_BUDGET_RESERVE_MS - _tx_budget_ms;
-        _next_tx_time = futureMillis((unsigned long)(needed / _duty_cycle));
-      } else {
-        _next_tx_time = _ms->getMillis();
-      }
+      // Pas de budget duty cycle à recharger (bande amateur, cf. AprsDispatcher.h) :
+      // le prochain envoi n'est retardé que par le CAD, il peut donc démarrer tout de suite.
+      _next_tx_time = _ms->getMillis();
 
       _radio->onSendFinished();
       _outbound_active = false;
@@ -121,29 +100,23 @@ void AprsDispatcher::checkRecv() {
     float rssi = _radio->getLastRSSI();
     float snr = _radio->getLastSNR();
     uint32_t airtime = _radio->getEstAirtimeFor(len);
-    _total_air_time += airtime; // comptabiliser le RX aussi
+    _total_air_time += airtime; // comptabiliser le RX aussi (stat informative)
 
     _rx_callback->onAprsPacketReceived(raw, len, rssi, snr);
   }
 }
 
 // ============================================================================
-// Émission — logique CAD + duty cycle (portée de MeshCore)
+// Émission — logique CAD (portée de MeshCore, sans plafond duty cycle)
 // ============================================================================
 void AprsDispatcher::checkSend() {
-  if (getOutboundCount(_ms->getMillis()) == 0) return;
-
-  updateTxBudget();
-
-  // Vérifier le budget duty cycle
-  uint32_t est_airtime = _radio->getEstAirtimeFor(APRS_MAX_PACKET_SIZE);
-  if (_tx_budget_ms < est_airtime / MIN_TX_BUDGET_AIRTIME_DIV) {
-    unsigned long needed = est_airtime / MIN_TX_BUDGET_AIRTIME_DIV - _tx_budget_ms;
-    _next_tx_time = futureMillis((unsigned long)(needed / _duty_cycle));
+  if (getOutboundCount(_ms->getMillis()) == 0) {
     return;
   }
 
-  if (!millisHasNowPassed(_next_tx_time)) return;
+  if (!millisHasNowPassed(_next_tx_time)) {
+    return;
+  }
 
   // CAD — Channel Activity Detection
   if (_radio->isReceiving()) {
@@ -161,7 +134,9 @@ void AprsDispatcher::checkSend() {
 
   // Récupérer le prochain paquet prêt
   AprsQueuedPacket* pkt = getNextOutbound(_ms->getMillis());
-  if (!pkt) return;
+  if (!pkt) {
+    return;
+  }
 
   // Copier et libérer le slot
   memcpy(_outbound_data, pkt->data, pkt->len);
@@ -184,32 +159,27 @@ void AprsDispatcher::checkSend() {
 }
 
 // ============================================================================
-// Duty cycle — refill progressif (identique MeshCore)
-// ============================================================================
-void AprsDispatcher::updateTxBudget() {
-  unsigned long now = _ms->getMillis();
-  unsigned long elapsed = now - _last_budget_update;
-
-  unsigned long max_budget = (unsigned long)(_duty_cycle_window_ms * _duty_cycle);
-  unsigned long refill = (unsigned long)(elapsed * _duty_cycle);
-
-  if (refill > 0) {
-    _tx_budget_ms += refill;
-    if (_tx_budget_ms > max_budget) {
-      _tx_budget_ms = max_budget;
-    }
-    _last_budget_update = now;
-  }
-}
-
-// ============================================================================
 // API publique — enqueue un paquet
+//
+// Peut être appelé depuis plusieurs tâches productrices en même temps
+// (beacon, CLI, mesh, et le traitement RX du dispatcher lui-même) : le verrou
+// couvre tout le cycle allocSlot()+écriture pour qu'un seul producteur à la
+// fois puisse choisir puis remplir un slot libre (sinon deux producteurs
+// pourraient sélectionner le même slot avant que l'un des deux ne le marque
+// "used", et l'un écraserait le paquet de l'autre).
 // ============================================================================
 bool AprsDispatcher::send(const uint8_t* data, uint8_t len, uint8_t priority, uint32_t delay_ms) {
-  if (len == 0 || len > APRS_MAX_PACKET_SIZE) return false;
+  if (len == 0 || len > APRS_MAX_PACKET_SIZE) {
+    return false;
+  }
+
+  if (xSemaphoreTake(_pool_mutex, portMAX_DELAY) != pdTRUE) {
+    return false;
+  }
 
   AprsQueuedPacket* slot = allocSlot();
   if (!slot) {
+    xSemaphoreGive(_pool_mutex);
     LOG_W(TAG, "Queue TX pleine, paquet perdu (%d bytes)", len);
     return false;
   }
@@ -220,6 +190,7 @@ bool AprsDispatcher::send(const uint8_t* data, uint8_t len, uint8_t priority, ui
   slot->send_after = futureMillis(delay_ms);
   slot->used = true;
 
+  xSemaphoreGive(_pool_mutex);
   return true;
 }
 
@@ -228,7 +199,9 @@ bool AprsDispatcher::send(const uint8_t* data, uint8_t len, uint8_t priority, ui
 // ============================================================================
 AprsQueuedPacket* AprsDispatcher::allocSlot() {
   for (int i = 0; i < APRS_TX_QUEUE_SIZE; i++) {
-    if (!_tx_pool[i].used) return &_tx_pool[i];
+    if (!_tx_pool[i].used) {
+      return &_tx_pool[i];
+    }
   }
   return nullptr;
 }
@@ -237,8 +210,12 @@ AprsQueuedPacket* AprsDispatcher::getNextOutbound(unsigned long now) {
   AprsQueuedPacket* best = nullptr;
 
   for (int i = 0; i < APRS_TX_QUEUE_SIZE; i++) {
-    if (!_tx_pool[i].used) continue;
-    if (!millisHasNowPassed(_tx_pool[i].send_after)) continue;
+    if (!_tx_pool[i].used) {
+      continue;
+    }
+    if (!millisHasNowPassed(_tx_pool[i].send_after)) {
+      continue;
+    }
 
     if (!best || _tx_pool[i].priority < best->priority) {
       best = &_tx_pool[i];
@@ -255,14 +232,6 @@ int AprsDispatcher::getOutboundCount(unsigned long now) const {
     }
   }
   return count;
-}
-
-// ============================================================================
-// Retransmit delay — formule MeshCore: rand(0, 5*t+1)
-// ============================================================================
-uint32_t AprsDispatcher::getRetransmitDelay(uint32_t airtime_ms) {
-  float t = airtime_ms * 0.5f;
-  return random(0, (int)(5 * t + 1));
 }
 
 // ============================================================================

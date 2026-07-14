@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <helpers/ArduinoHelpers.h>
+#include "InternalRp2040RTCClock.h"
 
 // ============================================================================
 // Board
@@ -23,7 +24,7 @@ CustomSX1262Wrapper aprs_radio_driver(aprs_radio_hw, board);
 // ============================================================================
 // RTC + Sensors
 // ============================================================================
-static VolatileRTCClock fallback_clock;
+static InternalRp2040RTCClock fallback_clock;
 AutoDiscoverRTCClock rtc_clock(fallback_clock);
 SensorManager sensors;
 

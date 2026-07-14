@@ -52,12 +52,24 @@ inline const char* logLevelPrefix(LogLevel lvl) {
 
 // Helper pour parser un niveau depuis un string (pour CLI "set system.log_level debug")
 inline LogLevel parseLogLevel(const char* s) {
-  if (strcmp(s, "error") == 0 || strcmp(s, "1") == 0) return LOG_ERROR;
-  if (strcmp(s, "warn")  == 0 || strcmp(s, "2") == 0) return LOG_WARN;
-  if (strcmp(s, "info")  == 0 || strcmp(s, "3") == 0) return LOG_INFO;
-  if (strcmp(s, "debug") == 0 || strcmp(s, "4") == 0) return LOG_DEBUG;
-  if (strcmp(s, "trace") == 0 || strcmp(s, "5") == 0) return LOG_TRACE;
-  if (strcmp(s, "none")  == 0 || strcmp(s, "0") == 0) return LOG_NONE;
+  if (strcmp(s, "error") == 0 || strcmp(s, "1") == 0) {
+    return LOG_ERROR;
+  }
+  if (strcmp(s, "warn") == 0 || strcmp(s, "2") == 0) {
+    return LOG_WARN;
+  }
+  if (strcmp(s, "info") == 0 || strcmp(s, "3") == 0) {
+    return LOG_INFO;
+  }
+  if (strcmp(s, "debug") == 0 || strcmp(s, "4") == 0) {
+    return LOG_DEBUG;
+  }
+  if (strcmp(s, "trace") == 0 || strcmp(s, "5") == 0) {
+    return LOG_TRACE;
+  }
+  if (strcmp(s, "none") == 0 || strcmp(s, "0") == 0) {
+    return LOG_NONE;
+  }
   return LOG_INFO; // défaut
 }
 

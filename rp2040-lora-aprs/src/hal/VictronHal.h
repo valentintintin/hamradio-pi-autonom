@@ -18,11 +18,15 @@ public:
   }
 
   bool query(TelemetryData& telemetry) {
-    if (!_initialized) return false;
+    if (!_initialized) {
+      return false;
+    }
 
     // Tension batterie (mV → mV, la lib retourne directement en mV)
     int32_t v = _ved.read(VE_VOLTAGE);
-    if (v > 0) telemetry.victron_voltage_mv = (float)v;
+    if (v > 0) {
+      telemetry.victron_voltage_mv = (float)v;
+    }
 
     // Courant (mA)
     int32_t i = _ved.read(VE_CURRENT);
@@ -34,7 +38,9 @@ public:
 
     // State of charge (0.1% → %)
     int32_t soc = _ved.read(VE_SOC);
-    if (soc >= 0) telemetry.victron_soc = soc / 10.0f;
+    if (soc >= 0) {
+      telemetry.victron_soc = soc / 10.0f;
+    }
 
     return true;
   }

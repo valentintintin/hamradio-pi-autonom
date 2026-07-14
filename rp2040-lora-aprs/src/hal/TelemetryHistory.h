@@ -47,13 +47,17 @@ public:
     : _eeprom(&eeprom), _initialized(false), _max_records(0) {}
 
   bool begin() {
-    if (!_eeprom->isInitialized()) return false;
+    if (!_eeprom->isInitialized()) {
+      return false;
+    }
 
     // Calculer la capacité disponible
     uint32_t data_start = TELEMETRY_HISTORY_ADDR + sizeof(TelemetryHistoryHeader);
     uint32_t available = EEPROM_SIZE_BYTES - data_start;
     _max_records = available / sizeof(TelemetryRecord);
-    if (_max_records == 0) return false;
+    if (_max_records == 0) {
+      return false;
+    }
 
     // Lire le header existant
     TelemetryHistoryHeader hdr;
@@ -70,7 +74,9 @@ public:
       // Initialiser un nouveau ring buffer
       _write_index = 0;
       _count = 0;
-      if (!saveHeader()) return false;
+      if (!saveHeader()) {
+        return false;
+      }
       LOG_I("EEPROM", "Historique initialisé, %d slots", _max_records);
     }
 
@@ -81,7 +87,9 @@ public:
 
   // Enregistrer un snapshot de télémétrie
   bool record(const TelemetryData& t) {
-    if (!_initialized) return false;
+    if (!_initialized) {
+      return false;
+    }
 
     TelemetryRecord rec;
     rec.timestamp = t.uptime_s;
@@ -101,14 +109,18 @@ public:
     }
 
     _write_index = (_write_index + 1) % _max_records;
-    if (_count < _max_records) _count++;
+    if (_count < _max_records) {
+      _count++;
+    }
 
     return saveHeader();
   }
 
   // Lire un record par index (0 = plus ancien)
   bool readRecord(uint16_t index, TelemetryRecord& rec) const {
-    if (!_initialized || index >= _count) return false;
+    if (!_initialized || index >= _count) {
+      return false;
+    }
 
     // Le plus ancien est à (write_index - count) mod max
     uint16_t actual = (_write_index + _max_records - _count + index) % _max_records;

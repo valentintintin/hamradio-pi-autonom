@@ -1,8 +1,10 @@
 // ============================================================================
 // Task CLI — commandes série
 //
-// Dispatch : commandes "mesh ..." vers MeshCore CommonCLI,
-//            le reste vers notre CommandHandler (get/set/list/save/...)
+// Dispatch : commandes "mesh ..." vers MeshCore (MeshcoreRepeater retombe
+//            elle-même sur notre CommandHandler si elle ne reconnaît pas la
+//            commande — cf MeshcoreRepeater::handleCommand),
+//            le reste directement vers notre CommandHandler (get/set/list/...)
 // ============================================================================
 
 #include "tasks.h"
@@ -15,44 +17,51 @@ extern MyMesh the_mesh;
 extern CommandHandler command_handler;
 
 #define TAG "CLI"
+#define CLI_LINE_MAX 160
 
 void taskCli(void* params) {
   (void)params;
   LOG_I(TAG, "Prêt. Tapez 'help'.");
 
-  static char cmd_buf[160];
-  static char reply_buf[160];
+  static char line[CLI_LINE_MAX];
+  static char reply_buf[CLI_LINE_MAX];
+  size_t line_len = 0;
 
   for (;;) {
-    if (Serial.available()) {
-      String cmd = Serial.readStringUntil('\n');
-      cmd.trim();
-
-      if (cmd.length() > 0) {
-        if (cmd.startsWith("mesh ")) {
-          // Dispatch vers MeshCore CommonCLI ; si elle ne reconnaît pas la
-          // commande, on retente sur notre CommandHandler (commandes custom :
-          // relay, version, aprs, clockdate... accessibles aussi via "mesh ")
-          strncpy(cmd_buf, cmd.c_str() + 5, sizeof(cmd_buf) - 1);
-          cmd_buf[sizeof(cmd_buf) - 1] = '\0';
-          reply_buf[0] = '\0';
-
-          the_mesh.handleCommand(0, cmd_buf, reply_buf);
-
-          if (strcmp(reply_buf, "Unknown command") == 0) {
-            if (!command_handler.execute(cmd_buf, Serial)) {
-              Serial.printf("Commande inconnue: %s (tapez 'help')\n", cmd_buf);
-            }
-          } else if (reply_buf[0]) {
-            Serial.printf("  -> %s\n", reply_buf);
-          }
-          LOG_D(TAG, "MeshCore: %s", cmd_buf);
-        }
-        else if (!command_handler.execute(cmd.c_str(), Serial)) {
-          Serial.printf("Commande inconnue: %s (tapez 'help')\n", cmd.c_str());
-        }
+    while (Serial.available()) {
+      char c = (char)Serial.read();
+      if (c == '\r') {
+        continue; // ignoré, on ne coupe la ligne que sur '\n'
       }
+      if (c == '\n') {
+        line[line_len] = '\0';
+
+        // Trim des espaces de tête
+        char* cmd = line;
+        while (*cmd == ' ') {
+          cmd++;
+        }
+
+        if (*cmd != '\0') {
+          if (strncmp(cmd, "mesh ", 5) == 0) {
+            reply_buf[0] = '\0';
+            the_mesh.handleCommand(0, cmd + 5, reply_buf);
+            if (reply_buf[0]) {
+              Serial.printf("  -> %s\n", reply_buf);
+            }
+            LOG_D(TAG, "MeshCore: %s", cmd + 5);
+          } else if (!command_handler.execute(cmd, Serial)) {
+            Serial.printf("Commande inconnue: %s (tapez 'help')\n", cmd);
+          }
+        }
+
+        line_len = 0;
+      } else if (line_len < sizeof(line) - 1) {
+        line[line_len++] = c;
+      }
+      // au-delà de CLI_LINE_MAX, les caractères en trop sont silencieusement
+      // ignorés jusqu'au prochain '\n' (évite un buffer overflow)
     }
-    vTaskDelay(pdMS_TO_TICKS(100));
+    vTaskDelay(pdMS_TO_TICKS(20));
   }
 }

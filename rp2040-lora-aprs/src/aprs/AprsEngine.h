@@ -9,8 +9,11 @@
 // ============================================================================
 
 #include "AprsDispatcher.h"
+#include "config/Settings.h"
 #include <Aprs.h>
 #include <stdint.h>
+#include <FreeRTOS.h>
+#include <semphr.h>
 
 // Header LoRa-APRS standard (3 bytes)
 #define LORA_APRS_HEADER_0  '<'
@@ -27,24 +30,6 @@
 
 // Anti-flood pour les réponses aux requêtes générales ("?APRS?" non dirigées)
 #define APRS_GENERAL_QUERY_MIN_INTERVAL_MS 300000  // 5 min
-
-// ============================================================================
-// Config APRS (remplace l'ancien SettingsAprs)
-// ============================================================================
-struct AprsConfig {
-  char callsign[10];
-  char destination[10];       // "APRS" par defaut
-  char path[32];               // "WIDE1-1" par defaut
-  char pathTelemetry[32];      // path spécifique telemetrie
-  char comment[40];            // commentaire par défaut (position, réponse aux query)
-  char symbol;
-  char symbolTable;
-  double latitude;
-  double longitude;
-  uint16_t altitude;           // metres
-  bool digipeaterEnabled;
-  uint16_t telemetrySequenceNumber;
-};
 
 // ============================================================================
 // Callback pour events APRS
@@ -74,9 +59,23 @@ public:
 // ============================================================================
 class AprsEngine : public AprsRxCallback {
 public:
-  AprsEngine(AprsDispatcher& dispatcher, AprsConfig& config);
+  // `settings` doit pointer vers settings.aprs (config live, cf. main.cpp) —
+  // pas de copie locale : un "set aprs.xxx" au CLI prend effet immédiatement,
+  // sans étape de resynchronisation à part.
+  AprsEngine(AprsDispatcher& dispatcher, AprsSettings& settings);
 
   void setEventCallback(AprsEventCallback* cb) { _event_cb = cb; }
+
+  // Exposé pour que CommandHandler partage ce même verrou récursif au lieu
+  // d'en créer un second : CommandHandler::execute() peut appeler
+  // AprsEngine::sendXxx() ("beacon"/"wx"/"send aprs"), et un message APRS
+  // reçu appelle AprsEngine::onAprsPacketReceived() -> ... ->
+  // CommandHandler::execute() (via AprsEventHandler). Deux verrous distincts
+  // acquis dans un ordre différent selon le sens d'entrée créeraient un
+  // risque d'interblocage AB-BA ; un seul verrou récursif partagé l'élimine
+  // structurellement (une même tâche peut toujours ré-entrer, une tâche
+  // différente attend simplement que la première ait fini).
+  SemaphoreHandle_t getMutex() const { return _mutex; }
 
   // --- Envoi ---------------------------------------------------------------
   bool sendPosition(const char* comment);
@@ -102,18 +101,33 @@ public:
 
 private:
   AprsDispatcher* _dispatcher;
-  AprsConfig* _config;
+  AprsSettings* _settings;
   AprsEventCallback* _event_cb;
+
+  // Sérialise tous les points d'entrée publics : sendXxx() peuvent être
+  // appelés concomitamment depuis plusieurs tâches FreeRTOS (beacon, CLI,
+  // mesh via MeshcoreRepeater, et onAprsPacketReceived depuis la tâche du
+  // dispatcher APRS) alors qu'ils partagent _text_buf/_raw_buf/_rx_pkt.
+  // Récursif car onAprsPacketReceived (déjà verrouillé) peut lui-même
+  // appeler sendPosition/sendWeather/sendMessage via handleQuery().
+  SemaphoreHandle_t _mutex;
 
   // Buffers de travail
   char _text_buf[APRS_TEXT_BUFFER_SIZE];
   uint8_t _raw_buf[APRS_MAX_PACKET_SIZE];
   aprs::PacketLite _rx_pkt;
 
-  // Suppression des doublons digipeat (§4.2a)
+  // Compteur de séquence télémétrie — pas persisté (repart de 0 au reboot)
+  uint16_t _telemetry_seq = 0;
+
+  // Suppression des doublons digipeat (§4.2a). `valid` distingue un slot
+  // jamais utilisé d'une entrée réelle : sans ça, un paquet dont le hash vaut
+  // exactement 0 serait pris pour un doublon pendant les 30 premières
+  // secondes après boot (tous les slots démarrent à {hash:0, timeMs:0}).
   struct DedupEntry {
     uint32_t hash;
     uint32_t timeMs;
+    bool valid;
   };
   DedupEntry _dedup[APRS_DEDUP_SLOTS];
   uint32_t frameHash(const aprs::PacketLite& p) const;

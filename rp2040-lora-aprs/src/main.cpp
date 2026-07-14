@@ -46,14 +46,18 @@ LogLevel g_log_level = LOG_INFO;
 static ArduinoMillis ms_clock;
 static StdRNG fast_rng;
 
+// Configuration — déclarée tôt : plusieurs modules (AprsEngine...) référencent
+// directement ses sous-structures plutôt que d'en garder une copie locale.
+Settings settings;
+
 // MeshCore
 static SimpleMeshTables mesh_tables;
-MyMesh the_mesh(board, mesh_radio_driver, ms_clock, fast_rng, rtc_clock, mesh_tables);
+MeshcoreRepeater the_mesh(board, mesh_radio_driver, ms_clock, fast_rng, rtc_clock, mesh_tables);
 
-// APRS
+// APRS — AprsEngine référence directement settings.aprs (pas de copie locale),
+// donc un "set aprs.xxx" au CLI prend effet immédiatement, sans étape de sync.
 AprsDispatcher aprs_dispatcher(aprs_radio_driver, ms_clock);
-static AprsConfig aprs_config = {};
-AprsEngine aprs_engine(aprs_dispatcher, aprs_config);
+AprsEngine aprs_engine(aprs_dispatcher, settings.aprs);
 
 // Telemetry partagée (lue par beacon, bridge, CLI)
 TelemetryData telemetry = {};
@@ -72,8 +76,7 @@ TelemetryHistory telemetry_history(eeprom);
 // Relais bistables (carte Interface F1ZIC, expandeur TCA9555 @0x20 sur I2C0)
 RelayHal relay_hal(i2c_bus);
 
-// Configuration
-Settings settings;
+// Configuration (settings elle-même déclarée plus haut, cf. commentaire)
 SettingsManager settings_manager(&eeprom);
 SettingsRegistry settings_registry;
 CommandHandler command_handler(settings, settings_registry, settings_manager, telemetry,
@@ -81,24 +84,6 @@ CommandHandler command_handler(settings, settings_registry, settings_manager, te
 
 // Relie AprsEngine à la télémétrie et au CLI (query météo, telemetry, CLI par message)
 AprsEventHandler aprs_event_handler(aprs_engine, command_handler, telemetry, settings);
-
-// ============================================================================
-// Helpers — copie config APRS depuis settings
-// ============================================================================
-static void applyAprsConfig() {
-  strncpy(aprs_config.callsign, settings.aprs.callsign, sizeof(aprs_config.callsign));
-  strncpy(aprs_config.destination, settings.aprs.destination, sizeof(aprs_config.destination));
-  strncpy(aprs_config.path, settings.aprs.path, sizeof(aprs_config.path));
-  strncpy(aprs_config.pathTelemetry, settings.aprs.pathTelemetry, sizeof(aprs_config.pathTelemetry));
-  strncpy(aprs_config.comment, settings.aprs.comment, sizeof(aprs_config.comment));
-  aprs_config.symbol = settings.aprs.symbol;
-  aprs_config.symbolTable = settings.aprs.symbolTable;
-  aprs_config.latitude = settings.aprs.latitude;
-  aprs_config.longitude = settings.aprs.longitude;
-  aprs_config.altitude = settings.aprs.altitude;
-  aprs_config.digipeaterEnabled = settings.aprs.digipeaterEnabled;
-  aprs_config.telemetrySequenceNumber = 0;
-}
 
 // ============================================================================
 // Setup
@@ -114,12 +99,18 @@ void setup() {
   LittleFS.begin();
 
   // --- Init radio MeshCore (868 MHz, SPI1) ---------------------------------
-  if (!mesh_radio_init()) LOG_E("RADIO", "Init radio 868 FAIL");
-  else                    LOG_I("RADIO", "Init radio 868 OK");
+  if (!mesh_radio_init()) {
+    LOG_E("RADIO", "Init radio 868 FAIL");
+  } else {
+    LOG_I("RADIO", "Init radio 868 OK");
+  }
 
   // --- Init radio APRS (433 MHz, SPI0) ------------------------------------
-  if (!aprs_radio_init()) LOG_E("RADIO", "Init radio 433 FAIL");
-  else                    LOG_I("RADIO", "Init radio 433 OK");
+  if (!aprs_radio_init()) {
+    LOG_E("RADIO", "Init radio 433 FAIL");
+  } else {
+    LOG_I("RADIO", "Init radio 433 OK");
+  }
 
   // --- RNG — seed depuis bruit radio ---------------------------------------
   fast_rng.begin(radio_get_rng_seed());
@@ -134,38 +125,53 @@ void setup() {
       the_mesh.self_id = radio_new_identity();   // create new random identity
       int count = 0;
       while (count < 10 && (the_mesh.self_id.pub_key[0] == 0x00 || the_mesh.self_id.pub_key[0] == 0xFF)) {  // reserved id hashes
-        the_mesh.self_id = radio_new_identity(); count++;
+        the_mesh.self_id = radio_new_identity();
+        count++;
       }
       store.save("_main", the_mesh.self_id);
     }
 
     Serial.print("Repeater ID: ");
-    mesh::Utils::printHex(Serial, the_mesh.self_id.pub_key, PUB_KEY_SIZE); Serial.println();
+    mesh::Utils::printHex(Serial, the_mesh.self_id.pub_key, PUB_KEY_SIZE);
+    Serial.println();
   }
 
   // --- Init I2C bus + capteurs ----------------------------------------------
   i2c_bus.begin();
   LOG_I("I2C", "Bus initialisé");
 
-  if (ina3221.begin()) LOG_I("I2C", "INA3221 OK");
-  else                 LOG_W("I2C", "INA3221 non détecté");
+  if (ina3221.begin()) {
+    LOG_I("I2C", "INA3221 OK");
+  } else {
+    LOG_W("I2C", "INA3221 non détecté");
+  }
 
-  if (mppt.begin())    LOG_I("I2C", "MPPT charger OK");
-  else                 LOG_W("I2C", "MPPT non détecté");
+  if (mppt.begin()) {
+    LOG_I("I2C", "MPPT charger OK");
+  } else {
+    LOG_W("I2C", "MPPT non détecté");
+  }
 
-  if (bme280.begin())  LOG_I("I2C", "BME280 OK");
-  else                 LOG_W("I2C", "BME280 non détecté");
+  if (bme280.begin()) {
+    LOG_I("I2C", "BME280 OK");
+  } else {
+    LOG_W("I2C", "BME280 non détecté");
+  }
 
   if (eeprom.begin()) {
     LOG_I("I2C", "EEPROM M24M01 OK");
-    if (telemetry_history.begin())
+    if (telemetry_history.begin()) {
       LOG_I("I2C", "Historique EEPROM: %d slots", telemetry_history.getMaxRecords());
+    }
   } else {
     LOG_W("I2C", "EEPROM non détectée");
   }
 
-  if (victron.begin()) LOG_I("VICTRON", "VE.Direct OK");
-  else                 LOG_W("VICTRON", "VE.Direct non détecté");
+  if (victron.begin()) {
+    LOG_I("VICTRON", "VE.Direct OK");
+  } else {
+    LOG_W("VICTRON", "VE.Direct non détecté");
+  }
 
   // --- Charger la configuration --------------------------------------------
   settings = settings_manager.load();
@@ -173,13 +179,11 @@ void setup() {
   g_log_level = (LogLevel)settings.system.log_level;
   LOG_I("CONFIG", "%d paramètres, log=%s", settings_registry.count(), logLevelName(g_log_level));
 
-  // --- Appliquer la config APRS --------------------------------------------
-  applyAprsConfig();
-
   // --- Relais bistables (broches configurées via CLI, cf settings.relay) --
   relay_hal.begin(settings.relay, RELAY_COUNT);
 
   // --- Init MeshCore -------------------------------------------------------
+  sensors.begin();
   the_mesh.begin(&LittleFS);
 
   // --- Init APRS -----------------------------------------------------------
@@ -199,6 +203,7 @@ void setup() {
   xTaskCreate(taskEnergy,     "energy",  TASK_STACK_ENERGY,  nullptr, TASK_PRIO_ENERGY,    nullptr);
   xTaskCreate(taskWeather,    "weather", TASK_STACK_WEATHER, nullptr, TASK_PRIO_WEATHER,   nullptr);
   xTaskCreate(taskCli,        "cli",     TASK_STACK_CLI,     nullptr, TASK_PRIO_CLI,       nullptr);
+  xTaskCreate(taskWatchdog,   "wdt",     TASK_STACK_WATCHDOG, nullptr, TASK_PRIO_WATCHDOG, nullptr);
 
   LOG_I("RTOS", "Scheduler démarré");
 
