@@ -1,7 +1,7 @@
 #include "tasks.h"
-#include "config/Log.h"
+#include "core/Log.h"
 #include "../aprs/AprsDispatcher.h"
-#include "TaskHeartbeat.h"
+#include "task_heartbeat.h"
 
 // ============================================================================
 // Task APRS — appelle le dispatcher APRS en continu

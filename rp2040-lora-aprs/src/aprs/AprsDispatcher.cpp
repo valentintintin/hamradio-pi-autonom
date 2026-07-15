@@ -1,5 +1,6 @@
 #include "AprsDispatcher.h"
-#include "config/Log.h"
+#include "core/Log.h"
+#include "core/LockGuard.h"
 #include <string.h>
 
 #define TAG "APRS-DSP"
@@ -173,13 +174,10 @@ bool AprsDispatcher::send(const uint8_t* data, uint8_t len, uint8_t priority, ui
     return false;
   }
 
-  if (xSemaphoreTake(_pool_mutex, portMAX_DELAY) != pdTRUE) {
-    return false;
-  }
+  LockGuard lock(_pool_mutex);
 
   AprsQueuedPacket* slot = allocSlot();
   if (!slot) {
-    xSemaphoreGive(_pool_mutex);
     LOG_W(TAG, "Queue TX pleine, paquet perdu (%d bytes)", len);
     return false;
   }
@@ -190,7 +188,6 @@ bool AprsDispatcher::send(const uint8_t* data, uint8_t len, uint8_t priority, ui
   slot->send_after = futureMillis(delay_ms);
   slot->used = true;
 
-  xSemaphoreGive(_pool_mutex);
   return true;
 }
 

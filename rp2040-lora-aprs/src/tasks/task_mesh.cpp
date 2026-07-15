@@ -1,8 +1,8 @@
 #include "tasks.h"
 #include "target.h"
-#include "config/Log.h"
+#include "core/Log.h"
 #include "../mesh/MeshcoreRepeater.h"
-#include "TaskHeartbeat.h"
+#include "task_heartbeat.h"
 
 // ============================================================================
 // Task MeshCore — appelle le dispatcher/mesh loop en continu

@@ -8,10 +8,10 @@
 // ============================================================================
 
 #include "tasks.h"
-#include "config/Log.h"
+#include "core/Log.h"
 #include "mesh/MeshcoreRepeater.h"
-#include "config/CommandHandler.h"
-#include "TaskHeartbeat.h"
+#include "cli/CommandHandler.h"
+#include "task_heartbeat.h"
 #include <string.h>
 
 extern MyMesh the_mesh;

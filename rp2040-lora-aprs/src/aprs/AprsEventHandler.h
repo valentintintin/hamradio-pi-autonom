@@ -17,7 +17,7 @@
 
 #include "AprsEngine.h"
 #include "hal/Telemetry.h"
-#include "config/CommandHandler.h"
+#include "cli/CommandHandler.h"
 #include "config/Settings.h"
 
 class AprsEventHandler : public AprsEventCallback {

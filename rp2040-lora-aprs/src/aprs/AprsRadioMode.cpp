@@ -1,6 +1,6 @@
 #include "AprsRadioMode.h"
 #include "target.h"
-#include "config/Log.h"
+#include "core/Log.h"
 #include <RadioLib.h>
 
 #define TAG "APRS-RADIO"

@@ -2,7 +2,7 @@
 
 #include "EepromHal.h"
 #include "Telemetry.h"
-#include "config/Log.h"
+#include "core/Log.h"
 #include <stdint.h>
 
 // ============================================================================

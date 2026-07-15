@@ -1,8 +1,8 @@
 #include "tasks.h"
-#include "config/Log.h"
+#include "core/Log.h"
 #include "config/Settings.h"
 #include "../aprs/AprsEngine.h"
-#include "TaskHeartbeat.h"
+#include "task_heartbeat.h"
 #include <Timer.h>
 
 // ============================================================================

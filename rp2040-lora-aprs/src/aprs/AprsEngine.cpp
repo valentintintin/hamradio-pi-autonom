@@ -1,28 +1,10 @@
 #include "AprsEngine.h"
-#include "config/Log.h"
+#include "core/Log.h"
+#include "core/LockGuard.h"
 #include <string.h>
 #include <stdio.h>
 
 #define TAG "APRS-ENG"
-
-// ============================================================================
-// Verrou récursif — sendXxx()/onAprsPacketReceived() sont appelés depuis
-// plusieurs tâches FreeRTOS (beacon, CLI, mesh, dispatcher APRS) et partagent
-// _text_buf/_raw_buf/_rx_pkt. Récursif car onAprsPacketReceived (déjà
-// verrouillé) peut lui-même appeler sendPosition/sendWeather/sendMessage via
-// handleQuery()/le traitement des messages.
-// ============================================================================
-namespace {
-struct EngineLockGuard {
-  SemaphoreHandle_t sem;
-  explicit EngineLockGuard(SemaphoreHandle_t s) : sem(s) {
-    xSemaphoreTakeRecursive(sem, portMAX_DELAY);
-  }
-  ~EngineLockGuard() {
-    xSemaphoreGiveRecursive(sem);
-  }
-};
-}  // namespace
 
 // ============================================================================
 // Construction
@@ -31,7 +13,6 @@ struct EngineLockGuard {
 AprsEngine::AprsEngine(AprsDispatcher& dispatcher, AprsSettings& settings)
   : _dispatcher(&dispatcher), _settings(&settings), _event_cb(nullptr)
 {
-  memset(_dedup, 0, sizeof(_dedup));
   _mutex = xSemaphoreCreateRecursiveMutex();
 }
 
@@ -62,7 +43,7 @@ bool AprsEngine::encodeAndSend(size_t size, uint8_t priority, uint32_t delay_ms)
 // Position (compressée, sans météo)
 // ============================================================================
 bool AprsEngine::sendPosition(const char* comment) {
-  EngineLockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
 
   aprs::Position position;
   position.symbol = _settings->symbol;
@@ -88,7 +69,7 @@ bool AprsEngine::sendPosition(const char* comment) {
 // l'encodeur dès qu'un Weather est fourni, APRS101 ch.12)
 // ============================================================================
 bool AprsEngine::sendWeather() {
-  EngineLockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
 
   aprs::Position position;
   position.latitude = _settings->latitude;
@@ -115,7 +96,7 @@ bool AprsEngine::sendWeather() {
 // Status
 // ============================================================================
 bool AprsEngine::sendStatus(const char* text) {
-  EngineLockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
 
   size_t written = 0;
   aprs::Result r = aprs::encodeStatus(_settings->callsign, _settings->destination, _settings->path,
@@ -128,7 +109,7 @@ bool AprsEngine::sendStatus(const char* text) {
 }
 
 bool AprsEngine::sendStatusIfChanged(uint32_t max_interval_ms) {
-  EngineLockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
 
   if (!_event_cb) {
     return false;
@@ -160,7 +141,7 @@ bool AprsEngine::sendStatusIfChanged(uint32_t max_interval_ms) {
 // Telemetry
 // ============================================================================
 bool AprsEngine::sendTelemetry() {
-  EngineLockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
 
   aprs::Telemetry telemetry;
   telemetry.sequenceNumber = ++_telemetry_seq;
@@ -181,7 +162,7 @@ bool AprsEngine::sendTelemetry() {
 }
 
 bool AprsEngine::sendTelemetryParams() {
-  EngineLockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
 
   aprs::Telemetry telemetry;
   if (_event_cb) {
@@ -218,7 +199,7 @@ bool AprsEngine::sendTelemetryParams() {
 // Message sortant (avec demande d'accusé de réception optionnelle)
 // ============================================================================
 bool AprsEngine::sendMessage(const char* destination, const char* message, const char* ackToAsk) {
-  EngineLockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
 
   aprs::Message msg;
   strncpy(msg.destination, destination, sizeof(msg.destination) - 1);
@@ -241,7 +222,7 @@ bool AprsEngine::sendMessage(const char* destination, const char* message, const
 // Accusé de réception standalone (répond à une demande "{nn" reçue)
 // ============================================================================
 bool AprsEngine::sendAck(const char* destination, const char* ackId) {
-  EngineLockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
 
   aprs::Message msg;
   strncpy(msg.destination, destination, sizeof(msg.destination) - 1);
@@ -263,7 +244,7 @@ bool AprsEngine::sendAck(const char* destination, const char* ackId) {
 bool AprsEngine::sendItem(const char* name, char symbol, char symbolTable,
                           const char* comment, double latitude, double longitude,
                           uint16_t altitude, bool alive) {
-  EngineLockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
 
   aprs::ObjectItem item;
   strncpy(item.name, name, sizeof(item.name) - 1);
@@ -292,7 +273,7 @@ bool AprsEngine::sendItem(const char* name, char symbol, char symbolTable,
 // Envoi manuel d'un contenu brut (debug/test) sous notre callsign/path
 // ============================================================================
 bool AprsEngine::sendRaw(const char* content) {
-  EngineLockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
 
   if (!content || !content[0]) {
     return false;
@@ -311,58 +292,6 @@ bool AprsEngine::sendRaw(const char* content) {
 // ============================================================================
 // Digipeat — APRS Digipeater Algorithm (WB2OSZ, APRS Foundation, 2024-2025)
 // ============================================================================
-uint32_t AprsEngine::frameHash(const aprs::PacketLite& p) const {
-  // Callsign destination sans SSID, pour ne pas distinguer deux copies de la
-  // même trame reçues avec des adresses AX.25 destination légèrement différentes.
-  char destNoSsid[aprs::kCallsignLength + 1];
-  size_t i = 0;
-  for (; p.destination[i] && p.destination[i] != '-' && i < sizeof(destNoSsid) - 1; i++) {
-    destNoSsid[i] = p.destination[i];
-  }
-  destNoSsid[i] = '\0';
-
-  uint32_t h = 5381;
-  for (const char* s = p.source; *s; s++) {
-    h = (h * 33) ^ (uint8_t)*s;
-  }
-  for (const char* s = destNoSsid; *s; s++) {
-    h = (h * 33) ^ (uint8_t)*s;
-  }
-  for (const char* s = p.content; *s; s++) {
-    h = (h * 33) ^ (uint8_t)*s;
-  }
-  return h;
-}
-
-bool AprsEngine::isDuplicate(uint32_t hash, uint32_t now) const {
-  for (uint8_t i = 0; i < APRS_DEDUP_SLOTS; i++) {
-    if (_dedup[i].valid && _dedup[i].hash == hash && (now - _dedup[i].timeMs) < APRS_DEDUP_WINDOW_MS) {
-      return true;
-    }
-  }
-  return false;
-}
-
-void AprsEngine::remember(uint32_t hash, uint32_t now) {
-  // Un slot jamais utilisé (valid=false) est toujours le meilleur candidat à
-  // remplacer, avant même de regarder les timestamps des slots déjà occupés.
-  uint8_t oldest = 0;
-  bool oldest_valid = _dedup[0].valid;
-  for (uint8_t i = 1; i < APRS_DEDUP_SLOTS; i++) {
-    if (!_dedup[i].valid) {
-      oldest = i;
-      oldest_valid = false;
-      break;
-    }
-    if (oldest_valid && _dedup[i].timeMs < _dedup[oldest].timeMs) {
-      oldest = i;
-    }
-  }
-  _dedup[oldest].hash = hash;
-  _dedup[oldest].timeMs = now;
-  _dedup[oldest].valid = true;
-}
-
 void AprsEngine::handleDigipeat(aprs::PacketLite& pkt) {
   if (!_settings->digipeaterEnabled) {
     return;
@@ -381,8 +310,8 @@ void AprsEngine::handleDigipeat(aprs::PacketLite& pkt) {
 
   // §4.2a : suppression des doublons entendus dans les ~30 dernières secondes
   uint32_t now = millis();
-  uint32_t hash = frameHash(pkt);
-  if (isDuplicate(hash, now)) {
+  uint32_t hash = _dedup.hash(pkt);
+  if (_dedup.isDuplicate(hash, now)) {
     return;
   }
 
@@ -394,7 +323,7 @@ void AprsEngine::handleDigipeat(aprs::PacketLite& pkt) {
     return;
   }
 
-  remember(hash, now);
+  _dedup.remember(hash, now);
 
   // Petit délai aléatoire pour limiter les collisions entre digipeaters qui
   // reçoivent tous la même trame en même temps.
@@ -451,7 +380,7 @@ void AprsEngine::handleQuery(const aprs::PacketLite& pkt) {
 // Réception APRS — callback depuis AprsDispatcher
 // ============================================================================
 void AprsEngine::onAprsPacketReceived(const uint8_t* data, uint8_t len, float rssi, float snr) {
-  EngineLockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
 
   // Vérifier le header LoRa-APRS
   if (len < LORA_APRS_HEADER_SIZE + 1) {

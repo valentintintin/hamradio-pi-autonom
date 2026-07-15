@@ -1,8 +1,9 @@
 #include "tasks.h"
-#include "config/Log.h"
+#include "core/Log.h"
 #include "config/Settings.h"
-#include "TaskHeartbeat.h"
+#include "task_heartbeat.h"
 #include <hardware/structs/watchdog.h>
+#include <Timer.h>
 
 // ============================================================================
 // Task Watchdog — arme et nourrit le watchdog matériel du RP2040, mais
@@ -104,14 +105,14 @@ void taskWatchdog(void* params) {
   rp2040.wdt_begin(WATCHDOG_TIMEOUT_MS);
   LOG_I(TAG, "Watchdog matériel armé (%d ms)", WATCHDOG_TIMEOUT_MS);
 
-  unsigned long start = millis();
+  Timer healthy_uptime_timer(WATCHDOG_HEALTHY_UPTIME_MS);
   bool healthy_uptime_reached = false;
 
   for (;;) {
     if (allTasksAlive()) {
       rp2040.wdt_reset();
 
-      if (!healthy_uptime_reached && (millis() - start) > WATCHDOG_HEALTHY_UPTIME_MS) {
+      if (!healthy_uptime_reached && healthy_uptime_timer.hasExpired()) {
         healthy_uptime_reached = true;
         watchdog_hw->scratch[WDT_SCRATCH_REBOOT_COUNT] = 0;
         LOG_D(TAG, "Uptime sain atteint, compteur de reboots watchdog remis à zéro");

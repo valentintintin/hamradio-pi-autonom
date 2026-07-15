@@ -1,6 +1,8 @@
 #include "CommandHandler.h"
-#include "Log.h"
-#include "Version.h"
+#include "core/Log.h"
+#include "core/Version.h"
+#include "core/LockGuard.h"
+#include "core/StringPrint.h"
 #include <target.h>
 #include <RTClib.h>
 #include <string.h>
@@ -10,59 +12,16 @@
 extern LogLevel g_log_level;
 
 // ============================================================================
-// Helper — StringPrint pour écrire dans un buffer
-// ============================================================================
-class StringPrint : public Print {
-public:
-  StringPrint(char* buf, size_t len) : _buf(buf), _len(len), _pos(0) {
-    if (_len > 0) {
-      _buf[0] = '\0';
-    }
-  }
-  size_t write(uint8_t c) override {
-    if (_pos < _len - 1) { _buf[_pos++] = c; _buf[_pos] = '\0'; return 1; }
-    return 0;
-  }
-  size_t write(const uint8_t* buf, size_t size) override {
-    size_t written = 0;
-    for (size_t i = 0; i < size && _pos < _len - 1; i++) {
-      _buf[_pos++] = buf[i]; written++;
-    }
-    _buf[_pos] = '\0';
-    return written;
-  }
-private:
-  char* _buf;
-  size_t _len;
-  size_t _pos;
-};
-
-// ============================================================================
-// Verrou — execute() est appelé depuis les tâches série, APRS et mesh ; cette
-// garde RAII couvre tous les points de sortie (nombreux "return" ci-dessous)
-// sans avoir à dupliquer un unlock à chacun. Récursif (partagé avec
-// AprsEngine, cf. AprsEngine::getMutex()) car un message APRS reçu tient déjà
-// ce verrou (dans AprsEngine::onAprsPacketReceived) quand il appelle
-// execute() via AprsEventHandler, et execute() lui-même peut rappeler
-// AprsEngine (commandes "beacon"/"wx"/"send aprs").
-// ============================================================================
-namespace {
-struct SettingsLockGuard {
-  SemaphoreHandle_t sem;
-  explicit SettingsLockGuard(SemaphoreHandle_t s) : sem(s) {
-    xSemaphoreTakeRecursive(sem, portMAX_DELAY);
-  }
-  ~SettingsLockGuard() {
-    xSemaphoreGiveRecursive(sem);
-  }
-};
-}  // namespace
-
-// ============================================================================
 // Execute — dispatch sur la commande
+//
+// Le verrou couvre tous les points de sortie (nombreux "return" ci-dessous).
+// Récursif (partagé avec AprsEngine, cf. AprsEngine::getMutex()) car un
+// message APRS reçu tient déjà ce verrou (dans AprsEngine::onAprsPacketReceived)
+// quand il appelle execute() via AprsEventHandler, et execute() lui-même peut
+// rappeler AprsEngine (commandes "beacon"/"wx"/"send aprs").
 // ============================================================================
 bool CommandHandler::execute(const char* input, Print& out, bool isLocal) {
-  SettingsLockGuard lock(_mutex);
+  RecursiveLockGuard lock(_mutex);
 
   // Copie locale pour tokeniser (assez grand pour "send aprs <contenu>",
   // le contenu APRS pouvant aller jusqu'à ~200 caractères)

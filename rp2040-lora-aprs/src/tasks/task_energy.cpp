@@ -4,7 +4,7 @@
 // ============================================================================
 
 #include "tasks.h"
-#include "config/Log.h"
+#include "core/Log.h"
 #include "config/Settings.h"
 #include "hal/Telemetry.h"
 #include "hal/TelemetryHistory.h"
@@ -13,7 +13,7 @@
 #include "hal/MpptChargerHal.h"
 #include "hal/Bme280Hal.h"
 #include "hal/VictronHal.h"
-#include "TaskHeartbeat.h"
+#include "task_heartbeat.h"
 #include <Timer.h>
 
 extern TelemetryData telemetry;

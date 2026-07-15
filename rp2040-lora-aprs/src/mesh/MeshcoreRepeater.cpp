@@ -1,5 +1,5 @@
 #include "MeshcoreRepeater.h"
-#include "config/CommandHandler.h"
+#include "cli/CommandHandler.h"
 #include <string.h>
 
 extern CommandHandler command_handler;

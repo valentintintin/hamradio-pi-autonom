@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Settings.h"
-#include "Log.h"
+#include "core/Log.h"
 #include "hal/EepromHal.h"
 #include <LittleFS.h>
 

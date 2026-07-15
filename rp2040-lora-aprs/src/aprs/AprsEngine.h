@@ -9,6 +9,8 @@
 // ============================================================================
 
 #include "AprsDispatcher.h"
+#include "AprsEventCallback.h"
+#include "AprsDedup.h"
 #include "config/Settings.h"
 #include <Aprs.h>
 #include <stdint.h>
@@ -24,35 +26,8 @@
 // Buffer pour frames APRS texte
 #define APRS_TEXT_BUFFER_SIZE 256
 
-// Suppression des doublons digipeat — APRS Digipeater Algorithm §4.2a (~30s)
-#define APRS_DEDUP_SLOTS       16
-#define APRS_DEDUP_WINDOW_MS   30000
-
 // Anti-flood pour les réponses aux requêtes générales ("?APRS?" non dirigées)
 #define APRS_GENERAL_QUERY_MIN_INTERVAL_MS 300000  // 5 min
-
-// ============================================================================
-// Callback pour events APRS
-// ============================================================================
-class AprsEventCallback {
-public:
-  virtual ~AprsEventCallback() = default;
-
-  // Paquet APRS reçu et décodé (tous types confondus)
-  virtual void onAprsFrameReceived(const aprs::PacketLite& pkt, float rssi, float snr) {}
-
-  // Message APRS adressé à nous (hors ACK/REJ)
-  virtual void onAprsMessageReceived(const char* from, const char* message) {}
-
-  // Fournir les données télémétriques courantes
-  virtual void fillTelemetryData(aprs::Telemetry& telemetry) {}
-
-  // Fournir les données météo courantes
-  virtual void fillWeatherData(aprs::Weather& weather) {}
-
-  // Fournir le texte de statut courant (reflète l'état de la station)
-  virtual void fillStatusText(char* buf, size_t len) { if (len) buf[0] = '\0'; }
-};
 
 // ============================================================================
 // AprsEngine
@@ -120,19 +95,8 @@ private:
   // Compteur de séquence télémétrie — pas persisté (repart de 0 au reboot)
   uint16_t _telemetry_seq = 0;
 
-  // Suppression des doublons digipeat (§4.2a). `valid` distingue un slot
-  // jamais utilisé d'une entrée réelle : sans ça, un paquet dont le hash vaut
-  // exactement 0 serait pris pour un doublon pendant les 30 premières
-  // secondes après boot (tous les slots démarrent à {hash:0, timeMs:0}).
-  struct DedupEntry {
-    uint32_t hash;
-    uint32_t timeMs;
-    bool valid;
-  };
-  DedupEntry _dedup[APRS_DEDUP_SLOTS];
-  uint32_t frameHash(const aprs::PacketLite& p) const;
-  bool isDuplicate(uint32_t hash, uint32_t now) const;
-  void remember(uint32_t hash, uint32_t now);
+  // Suppression des doublons digipeat (§4.2a)
+  AprsDedup _dedup;
 
   // Anti-flood requêtes générales
   unsigned long _last_general_query_reply_ms = 0;

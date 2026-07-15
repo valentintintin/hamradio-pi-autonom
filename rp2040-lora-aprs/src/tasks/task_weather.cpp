@@ -10,12 +10,12 @@
 
 #include "tasks.h"
 #include "target.h"
-#include "config/Log.h"
+#include "core/Log.h"
 #include "config/Settings.h"
 #include "aprs/AprsDispatcher.h"
 #include "aprs/AprsRadioMode.h"
 #include "hal/Telemetry.h"
-#include "TaskHeartbeat.h"
+#include "task_heartbeat.h"
 #include <FineOffsetWH65B.h>
 #include <RadioLib.h>
 

@@ -29,11 +29,11 @@
 #include "hal/VictronHal.h"
 #include "hal/TelemetryHistory.h"
 #include "hal/RelayHal.h"
-#include "config/Log.h"
+#include "core/Log.h"
 #include "config/Settings.h"
 #include "config/SettingsManager.h"
 #include "config/SettingsRegistry.h"
-#include "config/CommandHandler.h"
+#include "cli/CommandHandler.h"
 
 // ============================================================================
 // Instances globales

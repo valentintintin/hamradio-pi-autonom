@@ -1,7 +1,7 @@
 #pragma once
 
-#include "SettingsRegistry.h"
-#include "SettingsManager.h"
+#include "config/SettingsRegistry.h"
+#include "config/SettingsManager.h"
 #include "hal/Telemetry.h"
 #include "hal/TelemetryHistory.h"
 #include "hal/RelayHal.h"
