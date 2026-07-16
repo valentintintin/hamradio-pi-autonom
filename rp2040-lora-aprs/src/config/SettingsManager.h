@@ -2,7 +2,7 @@
 
 #include "Settings.h"
 #include "core/Log.h"
-#include "hal/EepromHal.h"
+#include "hal/M24M01Hal.h"
 #include <LittleFS.h>
 
 // ============================================================================
@@ -17,7 +17,7 @@
 
 class SettingsManager {
 public:
-  SettingsManager(EepromHal* eeprom = nullptr)
+  SettingsManager(M24M01Hal* eeprom = nullptr)
     : _eeprom(eeprom) {}
 
   // Charger la config (LittleFS > EEPROM > défauts)
@@ -53,10 +53,10 @@ public:
     return ok;
   }
 
-  void setEeprom(EepromHal* eeprom) { _eeprom = eeprom; }
+  void setEeprom(M24M01Hal* eeprom) { _eeprom = eeprom; }
 
 private:
-  EepromHal* _eeprom;
+  M24M01Hal* _eeprom;
 
   bool isValid(const Settings& s) {
     return s.magic == SETTINGS_MAGIC && s.version == SETTINGS_VERSION;

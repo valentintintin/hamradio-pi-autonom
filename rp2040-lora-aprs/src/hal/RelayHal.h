@@ -1,7 +1,7 @@
 #pragma once
 
 #include "config/Settings.h"
-#include "hal/I2CBus.h"
+#include "hal/Tca9555Hal.h"
 #include <stdint.h>
 
 // ============================================================================
@@ -17,15 +17,21 @@
 //   P00/P01 = relais 1 set/reset      P04/P05 = relais 3 set/reset
 //   P02/P03 = relais 2 set/reset      P06/P07 = relais 4 set/reset
 // Port 0 entièrement dédié aux relais : repos = tous les bits bas (aucune
-// ligne maintenue haute), donc pas de read-modify-write nécessaire.
+// ligne maintenue haute), donc pas de read-modify-write nécessaire pour
+// l'initialisation du port (cf. begin()).
+//
+// L'expandeur est créé et possédé par l'appelant (cf. main.cpp) — comme
+// I2CBus, c'est une ressource partagée sur le bus I2C0, pas une propriété du
+// RelayHal.
 // ============================================================================
 
 #define TCA9555_RELAY_ADDR 0x20
+#define TCA9555_RELAY_PORT 0
 
 class RelayHal {
 public:
-  RelayHal(I2CBus& bus, uint8_t addr = TCA9555_RELAY_ADDR)
-    : _bus(&bus), _addr(addr), _initialized(false) {}
+  explicit RelayHal(Tca9555Hal& expander)
+    : _expander(&expander), _initialized(false) {}
 
   // `channels` doit pointer vers settings.relay (persisté), `count` = RELAY_COUNT
   bool begin(RelayChannel* channels, uint8_t count);
@@ -36,12 +42,8 @@ public:
   bool isInitialized() const { return _initialized; }
 
 private:
-  I2CBus* _bus;
-  uint8_t _addr;
+  Tca9555Hal* _expander;
   bool _initialized;
   RelayChannel* _channels = nullptr;
   uint8_t _count = 0;
-
-  bool writeRegister(uint8_t reg, uint8_t value);
-  void pulseBit(uint8_t bit);
 };

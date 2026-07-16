@@ -28,6 +28,7 @@
 #include "hal/Bme280Hal.h"
 #include "hal/VictronHal.h"
 #include "hal/TelemetryHistory.h"
+#include "hal/Tca9555Hal.h"
 #include "hal/RelayHal.h"
 #include "core/Log.h"
 #include "config/Settings.h"
@@ -68,13 +69,14 @@ Ina3221Hal ina3221(i2c_bus);
 MpptChargerHal mppt(i2c_bus);
 Bme280Hal bme280(i2c_bus);
 VictronHal victron(Serial1);  // VE.Direct sur UART1
-EepromHal eeprom(i2c_bus);
+M24M01Hal eeprom(i2c_bus);
 
 // Historique télémétrie EEPROM
 TelemetryHistory telemetry_history(eeprom);
 
 // Relais bistables (carte Interface F1ZIC, expandeur TCA9555 @0x20 sur I2C0)
-RelayHal relay_hal(i2c_bus);
+Tca9555Hal relay_expander(i2c_bus, TCA9555_RELAY_ADDR);
+RelayHal relay_hal(relay_expander);
 
 // Configuration (settings elle-même déclarée plus haut, cf. commentaire)
 SettingsManager settings_manager(&eeprom);

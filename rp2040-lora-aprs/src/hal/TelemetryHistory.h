@@ -1,6 +1,6 @@
 #pragma once
 
-#include "EepromHal.h"
+#include "M24M01Hal.h"
 #include "Telemetry.h"
 #include "core/Log.h"
 #include <stdint.h>
@@ -43,7 +43,7 @@ struct __attribute__((packed)) TelemetryHistoryHeader {
 
 class TelemetryHistory {
 public:
-  TelemetryHistory(EepromHal& eeprom)
+  TelemetryHistory(M24M01Hal& eeprom)
     : _eeprom(&eeprom), _initialized(false), _max_records(0), _write_index(0), _count(0)
   {
   }
@@ -55,7 +55,7 @@ public:
 
     // Calculer la capacité disponible
     uint32_t data_start = TELEMETRY_HISTORY_ADDR + sizeof(TelemetryHistoryHeader);
-    uint32_t available = EEPROM_SIZE_BYTES - data_start;
+    uint32_t available = M24M01_SIZE_BYTES - data_start;
     _max_records = available / sizeof(TelemetryRecord);
     if (_max_records == 0) {
       return false;
@@ -163,7 +163,7 @@ public:
   bool isInitialized() const { return _initialized; }
 
 private:
-  EepromHal* _eeprom;
+  M24M01Hal* _eeprom;
   bool _initialized;
   uint16_t _max_records;
   uint16_t _write_index;
