@@ -5,6 +5,8 @@
 #include "core/Log.h"
 #include <stdint.h>
 
+#include "target.h"
+
 // ============================================================================
 // TelemetryHistory — Ring buffer sur EEPROM M24M01
 //
@@ -21,15 +23,13 @@
 
 // Record compact (20 bytes)
 struct __attribute__((packed)) TelemetryRecord {
-  uint32_t timestamp;        // uptime_s
-  int16_t  bat_voltage_mv;
-  int16_t  bat_current_ma;
-  int16_t  sol_voltage_mv;
-  int16_t  sol_current_ma;
-  int16_t  temperature_c10;  // température * 10
-  uint8_t  humidity;         // 0-100
-  uint8_t  victron_soc;      // 0-100
-  int16_t  victron_power_w;
+  uint32_t timestamp;
+  EnergyData battery;
+  EnergyData solar;
+  int16_t  temperature_inside_c10;  // température * 10
+  uint8_t  humidity_inside;         // 0-100
+  int16_t  temperature_outside_c10;  // température * 10
+  uint32_t uptime_s;
 };
 
 // Header du ring buffer (12 bytes)
@@ -44,7 +44,9 @@ struct __attribute__((packed)) TelemetryHistoryHeader {
 class TelemetryHistory {
 public:
   TelemetryHistory(EepromHal& eeprom)
-    : _eeprom(&eeprom), _initialized(false), _max_records(0) {}
+    : _eeprom(&eeprom), _initialized(false), _max_records(0), _write_index(0), _count(0)
+  {
+  }
 
   bool begin() {
     if (!_eeprom->isInitialized()) {
@@ -92,15 +94,15 @@ public:
     }
 
     TelemetryRecord rec;
-    rec.timestamp = t.uptime_s;
-    rec.bat_voltage_mv = (int16_t)t.battery.voltage_mv;
-    rec.bat_current_ma = (int16_t)t.battery.current_ma;
-    rec.sol_voltage_mv = (int16_t)t.solar.voltage_mv;
-    rec.sol_current_ma = (int16_t)t.solar.current_ma;
-    rec.temperature_c10 = (int16_t)(t.weather.temperature_c * 10.0f);
-    rec.humidity = (uint8_t)t.weather.humidity;
-    rec.victron_soc = (uint8_t)t.victron_soc;
-    rec.victron_power_w = (int16_t)t.victron_power_w;
+    rec.timestamp = rtc_clock.getCurrentTime();
+    rec.battery.voltage_mv = (int16_t)t.battery_mppt.voltage_mv;
+    rec.battery.current_ma = (int16_t)t.battery_mppt.current_ma;
+    rec.solar.voltage_mv = (int16_t)t.solar_mppt.voltage_mv;
+    rec.solar.current_ma = (int16_t)t.solar_mppt.current_ma;
+    rec.temperature_inside_c10 = (int16_t)(t.weather_inside.base.temperature_c * 10.0f);
+    rec.humidity_inside = (uint8_t)t.weather_inside.base.humidity;
+    rec.temperature_outside_c10 = (int16_t)(t.weather_outside.base.temperature_c * 10.0f);
+    rec.uptime_s = millis();
 
     uint32_t addr = recordAddr(_write_index);
     if (!_eeprom->write(addr, (const uint8_t*)&rec, sizeof(rec))) {
@@ -133,17 +135,18 @@ public:
     uint16_t start = _count - n;
 
     out.printf("--- Historique: %d/%d records ---\n", _count, _max_records);
-    out.println(F("uptime,bat_mV,bat_mA,sol_mV,sol_mA,temp,hum,soc,pwr"));
+    out.println(F("date,bat_mV,bat_mA,sol_mV,sol_mA,temp_in,hum_in,temp_out,uptime"));
 
-    TelemetryRecord rec;
+    TelemetryRecord rec{};
     for (uint16_t i = start; i < _count; i++) {
       if (readRecord(i, rec)) {
-        out.printf("%lu,%d,%d,%d,%d,%.1f,%d,%d,%d\n",
+        out.printf("%lu,%d,%d,%d,%d,%.1f,%d,%.1f,%d\n",
           rec.timestamp,
-          rec.bat_voltage_mv, rec.bat_current_ma,
-          rec.sol_voltage_mv, rec.sol_current_ma,
-          rec.temperature_c10 / 10.0f, rec.humidity,
-          rec.victron_soc, rec.victron_power_w);
+          rec.battery.voltage_mv, rec.battery.voltage_mv,
+          rec.solar.voltage_mv, rec.solar.current_ma,
+          rec.temperature_inside_c10 / 10.0f, rec.humidity_inside,
+          rec.temperature_outside_c10 / 10.0f,
+          rec.uptime_s);
       }
     }
   }

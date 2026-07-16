@@ -18,13 +18,13 @@
 
 typedef void (*AprsRadioRxCallback)();
 
-namespace AprsRadioMode {
+namespace LoRa433RadioMode {
 
 // Configure le SX1262 APRS en réception FSK (WH65B). `onRxDone` est appelé
 // (depuis un contexte interruption RadioLib) quand une trame est reçue.
 bool switchToFsk(AprsRadioRxCallback onRxDone);
 
 // Restaure la configuration LoRa-APRS normale.
-bool switchBackToLora();
+bool switchToLora();
 
 }  // namespace AprsRadioMode

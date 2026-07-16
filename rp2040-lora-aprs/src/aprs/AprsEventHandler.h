@@ -35,6 +35,4 @@ private:
   CommandHandler* _cmd;
   TelemetryData* _telemetry;
   Settings* _settings;
-
-  static bool isPrivilegedCommand(const char* cmd);
 };

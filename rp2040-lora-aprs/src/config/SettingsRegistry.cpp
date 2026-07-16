@@ -32,7 +32,6 @@ void SettingsRegistry::init(Settings& s) {
   add("radio.aprs.sf",       ST_UINT8,  &s.radio.aprs_sf,       5.0f, 12.0f);
   add("radio.aprs.cr",       ST_UINT8,  &s.radio.aprs_cr,       5.0f, 8.0f);
   add("radio.aprs.power",    ST_INT8,   &s.radio.aprs_tx_power, -9.0f, 22.0f);
-  add("radio.mesh.freq",     ST_FLOAT,  &s.radio.mesh_freq,     863.0f, 870.0f);
 
   // --- Weather -------------------------------------------------------------
   add("weather.wh65b.enabled",  ST_BOOL,   &s.weather.wh65b_enabled);
@@ -43,7 +42,6 @@ void SettingsRegistry::init(Settings& s) {
   add("energy.poll_interval",     ST_UINT32, &s.energy.poll_interval_ms,     5000.0f, 600000.0f);
   add("energy.mppt_wdt.interval", ST_UINT32, &s.energy.mppt_wdt_interval_ms, 10000.0f, 300000.0f);
   add("energy.mppt_wdt.enabled",  ST_BOOL,   &s.energy.mppt_wdt_enabled);
-  add("energy.victron.enabled",   ST_BOOL,   &s.energy.victron_enabled);
 
   // --- System --------------------------------------------------------------
   add("system.password",       ST_STRING, s.system.admin_password, sizeof(s.system.admin_password));

@@ -1,4 +1,4 @@
-#include "AprsRadioMode.h"
+#include "LoRa433RadioMode.h"
 #include "target.h"
 #include "core/Log.h"
 #include <RadioLib.h>
@@ -12,7 +12,7 @@
 #define WH65B_SYNC_WORD_0 0xAA
 #define WH65B_SYNC_WORD_1 0x2D
 
-namespace AprsRadioMode {
+namespace LoRa433RadioMode {
 
 bool switchToFsk(AprsRadioRxCallback onRxDone) {
   int16_t state = aprs_radio_hw.beginFSK(
@@ -56,7 +56,7 @@ bool switchToFsk(AprsRadioRxCallback onRxDone) {
   return true;
 }
 
-bool switchBackToLora() {
+bool switchToLora() {
   aprs_radio_hw.clearPacketReceivedAction();
 
   int16_t state = aprs_radio_hw.begin(

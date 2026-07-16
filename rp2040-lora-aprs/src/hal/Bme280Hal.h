@@ -33,7 +33,7 @@ public:
     return _initialized;
   }
 
-  bool query(WeatherData& data) {
+  bool query(WeatherDataBme& data) {
     if (!_initialized) {
       return false;
     }
@@ -42,8 +42,8 @@ public:
     }
 
     _bme.takeForcedMeasurement();
-    data.temperature_c = _bme.readTemperature();
-    data.humidity = _bme.readHumidity();
+    data.base.temperature_c = _bme.readTemperature();
+    data.base.humidity = _bme.readHumidity();
     data.pressure_hpa = _bme.readPressure() / 100.0f;
 
     _bus->unlock();

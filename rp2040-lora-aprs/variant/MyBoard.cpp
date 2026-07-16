@@ -1,7 +1,7 @@
-#include "F4iseBoard.h"
+#include "MyBoard.h"
 #include <Wire.h>
 
-void F4iseBoard::begin() {
+void MyBoard::begin() {
   startup_reason = BD_STARTUP_NORMAL;
 
   // I2C pour RTC et capteurs (pins par défaut Pico W : SDA=4, SCL=5)

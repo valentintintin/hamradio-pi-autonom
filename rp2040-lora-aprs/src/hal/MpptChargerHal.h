@@ -34,34 +34,21 @@ public:
     uint16_t uval;
 
     if (_mppt.getIndexedValue(VAL_VB, &val)) {
-      telemetry.battery.voltage_mv = val;
+      telemetry.battery_mppt.voltage_mv = val;
     }
     if (_mppt.getIndexedValue(VAL_IB, &val)) {
-      telemetry.battery.current_ma = val;
+      telemetry.battery_mppt.current_ma = val;
     }
     if (_mppt.getIndexedValue(VAL_VS, &val)) {
-      telemetry.solar.voltage_mv = val;
+      telemetry.solar_mppt.voltage_mv = val;
     }
     if (_mppt.getIndexedValue(VAL_IS, &val)) {
-      telemetry.solar.current_ma = val;
-    }
-    if (_mppt.getIndexedValue(VAL_IC, &val)) {
-      telemetry.mppt_charge_ma = val;
-    }
-    if (_mppt.getIndexedValue(VAL_INT_TEMP, &val)) {
-      telemetry.mppt_int_temp_c = val / 10.0f;
-    }
-
-    if (_mppt.getStatusValue(SYS_STATUS, &uval)) {
-      telemetry.mppt_status = uval;
+      telemetry.solar_mppt.current_ma = val;
     }
 
     bool alert = false;
-    bool night = false;
+    // TODO alert
     _mppt.isAlert(&alert);
-    _mppt.isNight(&night);
-    telemetry.mppt_alert = alert;
-    telemetry.mppt_night = night;
 
     _bus->unlock();
     return true;

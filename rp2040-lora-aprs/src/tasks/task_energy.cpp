@@ -59,11 +59,11 @@ void taskEnergy(void* params) {
       }
     }
 
-    if (bme280.isInitialized() && !bme280.query(telemetry.weather)) {
+    if (bme280.isInitialized() && !bme280.query(telemetry.weather_inside)) {
       LOG_W(TAG, "Erreur lecture BME280");
     }
 
-    if (settings.energy.victron_enabled && victron.isInitialized() && !victron.query(telemetry)) {
+    if (victron.isInitialized() && !victron.query(telemetry)) {
       LOG_W(TAG, "Erreur lecture Victron");
     }
 
@@ -79,9 +79,10 @@ void taskEnergy(void* params) {
         telemetry_history.getCount(), telemetry_history.getMaxRecords());
     }
 
+    // TODO voir si je garde les valeurs mppt ou ina ?
     LOG_T(TAG, "Bat:%.0fmV/%.0fmA Sol:%.0fmV/%.0fmA",
-      telemetry.battery.voltage_mv, telemetry.battery.current_ma,
-      telemetry.solar.voltage_mv, telemetry.solar.current_ma);
+      telemetry.battery_mppt.voltage_mv, telemetry.battery_mppt.current_ma,
+      telemetry.solar_mppt.voltage_mv, telemetry.solar_mppt.current_ma);
 
     vTaskDelay(pdMS_TO_TICKS(settings.energy.poll_interval_ms));
   }

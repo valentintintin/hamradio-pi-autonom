@@ -13,6 +13,6 @@ public:
                    mesh::RNG& rng, mesh::RTCClock& rtc, mesh::MeshTables& tables);
   void handleCommand(uint32_t sender_timestamp, char* command, char* reply) override;
 
-  const char* getFirmwareVer() override { return "v1.16.0 Bridge Meshtastic"; }
-  const char* getBuildDate() override { return "14 Jun 2026"; }
+  const char* getFirmwareVer() override { return FIRMWARE_VERSION; }
+  const char* getBuildDate() override { return FIRMWARE_BUILD_DATE; }
 };

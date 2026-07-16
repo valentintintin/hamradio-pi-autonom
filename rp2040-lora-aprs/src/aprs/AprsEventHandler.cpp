@@ -12,23 +12,6 @@ AprsEventHandler::AprsEventHandler(AprsEngine& engine, CommandHandler& commandHa
 }
 
 // ============================================================================
-// Commandes qui modifient l'état de la station — exigent le mot de passe
-// admin en premier mot quand elles arrivent par message APRS.
-// ============================================================================
-bool AprsEventHandler::isPrivilegedCommand(const char* cmd) {
-  return strncmp(cmd, "set ", 4) == 0 ||
-         strncmp(cmd, "clockdate ", 10) == 0 ||
-         strcmp(cmd, "save") == 0 ||
-         strcmp(cmd, "reboot") == 0 ||
-         strcmp(cmd, "dfu") == 0 ||
-         strcmp(cmd, "defaults") == 0 ||
-         strcmp(cmd, "history clear") == 0 ||
-         strncmp(cmd, "send aprs ", 10) == 0 ||
-         strcmp(cmd, "beacon") == 0 ||
-         strcmp(cmd, "wx") == 0;
-}
-
-// ============================================================================
 // Message adressé à nous → exécuté comme une commande CLI, réponse par message
 // ============================================================================
 void AprsEventHandler::onAprsMessageReceived(const char* from, const char* message) {
@@ -51,7 +34,7 @@ void AprsEventHandler::onAprsMessageReceived(const char* from, const char* messa
     while (*cmd == ' ') {
       cmd++;
     }
-  } else if (isPrivilegedCommand(cmd)) {
+  } else if (_cmd->isPrivilegedCommand(cmd)) {
     LOG_W(TAG, "MSG de %s refusé (commande privilégiée sans mot de passe)", from);
     _engine->sendMessage(from, "Unauthorized");
     return;
@@ -83,17 +66,17 @@ void AprsEventHandler::fillTelemetryData(aprs::Telemetry& telemetry) {
     ch.value = value;
   };
 
-  setAnalog(telemetry.analog[0], "BattV", "V",  _telemetry->battery.voltage_mv / 1000.0);
-  setAnalog(telemetry.analog[1], "SolV",  "V",  _telemetry->solar.voltage_mv / 1000.0);
-  setAnalog(telemetry.analog[2], "BattI", "mA", _telemetry->battery.current_ma);
-  setAnalog(telemetry.analog[3], "SolI",  "mA", _telemetry->solar.current_ma);
-  setAnalog(telemetry.analog[4], "Temp",  "C",  _telemetry->weather.temperature_c);
+  setAnalog(telemetry.analog[0], "BattV", "V",  _telemetry->battery_mppt.voltage_mv / 1000.0);
+  setAnalog(telemetry.analog[1], "SolV",  "V",  _telemetry->solar_mppt.voltage_mv / 1000.0);
+  setAnalog(telemetry.analog[2], "BattI", "mA", _telemetry->battery_mppt.current_ma);
+  setAnalog(telemetry.analog[3], "SolI",  "mA", _telemetry->solar_mppt.current_ma);
 
-  setBool(telemetry.boolean[0], "Alert", _telemetry->mppt_alert);
-  setBool(telemetry.boolean[1], "Night", _telemetry->mppt_night);
-  setBool(telemetry.boolean[2], "WH65B", _telemetry->weather.wh65b_valid);
+  setBool(telemetry.boolean[0], "WiFi", _settings->relay[0].state);
+  setBool(telemetry.boolean[1], "Cam", _settings->relay[1].state);
+  setBool(telemetry.boolean[2], "Pi", _settings->relay[2].state);
+  // setBool(telemetry.boolean[3], "", _settings->relay[3].state);
 
-  strncpy(telemetry.projectName, "F4ISE", sizeof(telemetry.projectName) - 1);
+  strncpy(telemetry.projectName, "LoRa APRS + Meshcore", sizeof(telemetry.projectName) - 1);
 }
 
 // ============================================================================
@@ -102,28 +85,28 @@ void AprsEventHandler::fillTelemetryData(aprs::Telemetry& telemetry) {
 // ============================================================================
 void AprsEventHandler::fillWeatherData(aprs::Weather& weather) {
   weather.useTemperature = true;
-  weather.temperatureFahrenheit = (int16_t)(_telemetry->weather.temperature_c * 9.0 / 5.0 + 32.0);
+  weather.temperatureFahrenheit = (int16_t)(_telemetry->weather_outside.base.temperature_c * 9.0 / 5.0 + 32.0);
 
   weather.useHumidity = true;
-  weather.humidity = (uint8_t)_telemetry->weather.humidity;
+  weather.humidity = (uint8_t)_telemetry->weather_outside.base.humidity;
 
   weather.usePressure = true;
-  weather.pressure = (uint16_t)(_telemetry->weather.pressure_hpa * 10.0);
+  weather.pressure = (uint16_t)(_telemetry->weather_inside.pressure_hpa * 10.0);
 
-  if (_telemetry->weather.wh65b_valid) {
+  if (_telemetry->weather_outside.is_valid) {
     weather.useWindDirection = true;
-    weather.windDirectionDegrees = (uint16_t)_telemetry->weather.wind_dir_deg;
+    weather.windDirectionDegrees = (uint16_t)_telemetry->weather_outside.wind_dir_deg;
 
     weather.useWindSpeed = true;
-    weather.windSpeedMph = (uint16_t)(_telemetry->weather.wind_avg_ms * 2.23694f);
+    weather.windSpeedMph = (uint16_t)(_telemetry->weather_outside.wind_avg_ms * 2.23694f);
 
     weather.useGustSpeed = true;
-    weather.gustSpeedMph = (uint16_t)(_telemetry->weather.wind_max_ms * 2.23694f);
+    weather.gustSpeedMph = (uint16_t)(_telemetry->weather_outside.wind_max_ms * 2.23694f);
 
     // Le WH65B ne fournit qu'un cumul de pluie, pas de fenêtre glissante 24h ;
     // on le reporte tel quel dans le champ "rain 24h" faute de mieux.
     weather.useRain24Hour = true;
-    weather.rain24HourHundredthsOfAnInch = (uint16_t)(_telemetry->weather.rain_mm * 3.93701f);
+    weather.rain24HourHundredthsOfAnInch = (uint16_t)(_telemetry->weather_outside.rain_mm * 3.93701f);
   }
 }
 
@@ -132,18 +115,13 @@ void AprsEventHandler::fillWeatherData(aprs::Weather& weather) {
 // ============================================================================
 void AprsEventHandler::fillStatusText(char* buf, size_t len) {
   const char* state = "OK";
-  if (_telemetry->mppt_alert) {
-    state = "ALERT";
-  } else if (_telemetry->mppt_night) {
-    state = "NIGHT";
-  } else if (_telemetry->battery.voltage_mv > 0 && _telemetry->battery.voltage_mv < 11000) {
-    state = "LOWBATT";
-  }
+
+  // TODO gérer le statut ?
 
   snprintf(buf, len, "%s Bat=%.1fV Sol=%.1fV SOC=%.0f%% Up=%lus",
     state,
-    _telemetry->battery.voltage_mv / 1000.0f,
-    _telemetry->solar.voltage_mv / 1000.0f,
+    _telemetry->battery_mppt.voltage_mv / 1000.0f,
+    _telemetry->solar_mppt.voltage_mv / 1000.0f,
     _telemetry->victron_soc,
     _telemetry->uptime_s);
 }

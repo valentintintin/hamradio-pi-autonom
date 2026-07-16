@@ -22,7 +22,7 @@ public:
 
   // Charger la config (LittleFS > EEPROM > défauts)
   Settings load() {
-    Settings s;
+    Settings s{};
 
     // Essayer LittleFS
     if (loadFromLittleFS(s)) {

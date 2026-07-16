@@ -6,6 +6,7 @@
 // ============================================================================
 // Victron VE.Direct HAL — lecture batterie via protocole texte VE.Direct
 // Connecté sur un UART (Serial1/Serial2) à 19200 baud
+// https://www.victronenergy.com/upload/documents/VE.Direct-Protocol-3.34.pdf
 // ============================================================================
 
 class VictronHal {
@@ -22,19 +23,29 @@ public:
       return false;
     }
 
+    _ved.update();
+
+    if (!_ved.available()) {
+      return false;
+    }
+
     // Tension batterie (mV → mV, la lib retourne directement en mV)
     int32_t v = _ved.read(VE_VOLTAGE);
     if (v > 0) {
-      telemetry.victron_voltage_mv = (float)v;
+      telemetry.battery_mppt.voltage_mv = (float)v;
     }
 
-    // Courant (mA)
     int32_t i = _ved.read(VE_CURRENT);
-    telemetry.victron_current_ma = (float)i;
+    telemetry.battery_mppt.current_ma = (float)i;
 
-    // Puissance (W)
-    int32_t p = _ved.read(VE_POWER);
-    telemetry.victron_power_w = (float)p;
+    i = _ved.read(VE_PANEL_VOLTAGE);
+    telemetry.solar_mppt.voltage_mv = (float)i;
+
+    i = _ved.read(VE_PANEL_POWER) / i;
+    telemetry.solar_mppt.current_ma = (float)i;
+
+    i = _ved.read(VE_STATE_OF_OPERATION);
+    telemetry.mppt_status = i;
 
     // State of charge (0.1% → %)
     int32_t soc = _ved.read(VE_SOC);

@@ -11,11 +11,11 @@
 // et de charger les valeurs par défaut.
 // ============================================================================
 
-#define SETTINGS_MAGIC    0x46345345  // "F4SE"
+#define SETTINGS_MAGIC    0x34485656  // "4HVV"
 #define SETTINGS_VERSION  1
 
 struct AprsSettings {
-  char callsign[10];        // ex: "F4ISE-10"
+  char callsign[10];        // ex: "F4HVV-15"
   char destination[7];      // ex: "APRS"
   char path[16];            // ex: "WIDE1-1"
   char pathTelemetry[16];   // ex: "" (pas de path pour telemetry)
@@ -39,8 +39,6 @@ struct RadioSettings {
   uint8_t aprs_sf;
   uint8_t aprs_cr;
   int8_t aprs_tx_power;
-  // 868 Mesh (lecture seule pour info, pas modifiable à chaud)
-  float mesh_freq;
 };
 
 struct WeatherSettings {
@@ -53,7 +51,6 @@ struct EnergySettings {
   uint32_t poll_interval_ms;     // intervalle lecture capteurs
   uint32_t mppt_wdt_interval_ms; // intervalle feed watchdog MPPT
   bool mppt_wdt_enabled;
-  bool victron_enabled;
 };
 
 struct SystemSettings {
@@ -63,10 +60,6 @@ struct SystemSettings {
   uint8_t log_level;                   // LogLevel (0=none .. 5=trace)
 };
 
-// Relais bistable piloté via l'expandeur I2C TCA9555 (carte Interface F1ZIC,
-// cf. hal/RelayHal.h). Le mapping broche est fixé par le câblage matériel
-// (P00-P07 du TCA9555) ; seul l'état logique est persisté ici — le relais
-// bistable garde sa position mécanique sans alimentation, même après reboot.
 #define RELAY_COUNT       4
 
 struct RelayChannel {
@@ -95,7 +88,7 @@ inline Settings getDefaultSettings() {
   s.version = SETTINGS_VERSION;
 
   // APRS
-  strncpy(s.aprs.callsign, "F4ISE-10", sizeof(s.aprs.callsign));
+  strncpy(s.aprs.callsign, "F4HVV-15", sizeof(s.aprs.callsign));
   strncpy(s.aprs.destination, "APRS", sizeof(s.aprs.destination));
   strncpy(s.aprs.path, "WIDE1-1", sizeof(s.aprs.path));
   s.aprs.pathTelemetry[0] = '\0';
@@ -109,7 +102,7 @@ inline Settings getDefaultSettings() {
   s.aprs.intervalTelemetry_ms = 3600000;   // 1h
   s.aprs.intervalWeather_ms = 900000;      // 15min
   s.aprs.intervalStatus_ms = 21600000;     // 6h (filet de sécurité, sinon envoi si l'état change)
-  strncpy(s.aprs.comment, "LoRa Dual Digi", sizeof(s.aprs.comment));
+  strncpy(s.aprs.comment, "APRS Digi + Meshcore", sizeof(s.aprs.comment));
 
   // Radio
   s.radio.aprs_freq = 433.775f;
@@ -117,7 +110,6 @@ inline Settings getDefaultSettings() {
   s.radio.aprs_sf = 12;
   s.radio.aprs_cr = 5;
   s.radio.aprs_tx_power = 22;
-  s.radio.mesh_freq = 869.618f;
 
   // Weather
   s.weather.wh65b_enabled = true;
@@ -128,17 +120,16 @@ inline Settings getDefaultSettings() {
   s.energy.poll_interval_ms = 30000;       // 30s
   s.energy.mppt_wdt_interval_ms = 90000;   // 90s
   s.energy.mppt_wdt_enabled = true;
-  s.energy.victron_enabled = true;
 
   // System
-  strncpy(s.system.admin_password, "password", sizeof(s.system.admin_password));
+  strncpy(s.system.admin_password, "hvv", sizeof(s.system.admin_password));
   s.system.watchdog_enabled = false;
   s.system.telemetry_log_interval_ms = 300000; // 5min
   s.system.log_level = 3;                      // INFO par défaut
 
   // Relais — tous désactivés par défaut
-  for (int i = 0; i < RELAY_COUNT; i++) {
-    s.relay[i].state = false;
+  for (auto & [state] : s.relay) {
+    state = false;
   }
 
   return s;

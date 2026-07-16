@@ -10,32 +10,6 @@
 #include <FreeRTOS.h>
 #include <semphr.h>
 
-// ============================================================================
-// CommandHandler — parse et exécute les commandes get/set/list/save/reboot
-//
-// Peut être appelé depuis :
-//   - Serial (task_cli)
-//   - Message APRS (AprsEngine callback)
-//   - Message MeshCore (MyMesh callback, en repli si sa propre CLI ne
-//     reconnaît pas la commande — cf task_cli)
-//
-// Commandes supportées :
-//   get <key>           → affiche la valeur
-//   set <key> <value>   → modifie la valeur (en RAM)
-//   clockdate JJ/MM/AA HH:MM:SS → règle l'horloge RTC
-//   save                → persiste sur LittleFS + EEPROM
-//   list                → affiche toutes les clés
-//   status              → affiche la telemetry courante
-//   version             → version firmware / uptime / mémoire libre
-//   uptime / freemem     → diagnostics rapides
-//   beacon / wx          → force l'envoi immédiat position / météo APRS
-//   send aprs <texte>    → envoi manuel d'un paquet APRS brut
-//   history [n]         → affiche l'historique télémétrie EEPROM
-//   reboot              → redémarre le RP2040
-//   dfu                 → redémarre en mode bootloader USB (reflash UF2)
-//   defaults            → recharge les valeurs par défaut
-// ============================================================================
-
 class CommandHandler {
 public:
   CommandHandler(Settings& settings, SettingsRegistry& registry,
@@ -57,6 +31,8 @@ public:
   // Version qui écrit dans un buffer (pour réponse APRS/mesh) ; isLocal=false
   // par défaut car ce chemin est toujours utilisé pour une liaison radio.
   bool execute(const char* input, char* outBuf, size_t outLen, bool isLocal = false);
+
+  bool isPrivilegedCommand(const char* cmd);
 
 private:
   Settings* _settings;

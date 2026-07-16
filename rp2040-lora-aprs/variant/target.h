@@ -12,13 +12,13 @@
 #include <helpers/radiolib/CustomSX1262Wrapper.h>
 #include <helpers/radiolib/RadioLibWrappers.h>
 #include <helpers/SensorManager.h>
-#include "F4iseBoard.h"
+#include "MyBoard.h"
 
 // --- MeshCore radio (868 MHz, SPI1) ----------------------------------------
 extern WRAPPER_CLASS mesh_radio_driver;
 extern AutoDiscoverRTCClock rtc_clock;
 extern SensorManager sensors;
-extern F4iseBoard board;
+extern MyBoard board;
 
 // --- APRS radio (433 MHz, SPI0) --------------------------------------------
 // Utilise le meme wrapper RadioLib mais sur un autre SPI

@@ -5,9 +5,8 @@
 #include "core/StringPrint.h"
 #include <target.h>
 #include <RTClib.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstring>
+#include <cstdio>
 
 extern LogLevel g_log_level;
 
@@ -159,6 +158,24 @@ bool CommandHandler::execute(const char* input, char* outBuf, size_t outLen, boo
 }
 
 // ============================================================================
+// Commandes qui modifient l'état de la station — exigent le mot de passe
+// admin en premier mot quand elles arrivent par message APRS.
+// ============================================================================
+bool CommandHandler::isPrivilegedCommand(const char* cmd)
+{
+  return strncmp(cmd, "set ", 4) == 0 ||
+         strncmp(cmd, "clockdate ", 10) == 0 ||
+         strcmp(cmd, "save") == 0 ||
+         strcmp(cmd, "reboot") == 0 ||
+         strcmp(cmd, "dfu") == 0 ||
+         strcmp(cmd, "defaults") == 0 ||
+         strcmp(cmd, "history clear") == 0 ||
+         strncmp(cmd, "send aprs ", 10) == 0 ||
+         strcmp(cmd, "beacon") == 0 ||
+         strcmp(cmd, "wx") == 0;
+}
+
+// ============================================================================
 // Commandes
 // ============================================================================
 void CommandHandler::cmdGet(const char* key, Print& out) {
@@ -238,27 +255,23 @@ void CommandHandler::cmdSave(Print& out) {
 
 void CommandHandler::cmdStatus(Print& out) {
   out.println(F("--- Telemetry ---"));
-  out.printf("  Batterie:  %.0f mV / %.0f mA\n", _telemetry->battery.voltage_mv, _telemetry->battery.current_ma);
-  out.printf("  Solaire:   %.0f mV / %.0f mA\n", _telemetry->solar.voltage_mv, _telemetry->solar.current_ma);
-  out.printf("  Board:     %.0f mV / %.0f mA\n", _telemetry->board.voltage_mv, _telemetry->board.current_ma);
-  out.printf("  MPPT:      charge=%.0f mA, temp=%.1fC, status=0x%04X\n",
-    _telemetry->mppt_charge_ma, _telemetry->mppt_int_temp_c, _telemetry->mppt_status);
-  out.printf("  Victron:   %.0f mV / %.0f mA / %.0f W / SOC=%.1f%%\n",
-    _telemetry->victron_voltage_mv, _telemetry->victron_current_ma,
-    _telemetry->victron_power_w, _telemetry->victron_soc);
-  out.printf("  Meteo:     %.1fC / %.0f%% / %.1f hPa\n",
-    _telemetry->weather.temperature_c, _telemetry->weather.humidity, _telemetry->weather.pressure_hpa);
-  if (_telemetry->weather.wh65b_valid) {
-    out.printf("  WH65B:     vent=%.1f m/s dir=%d rain=%.1fmm UV=%d lux=%.0f\n",
-      _telemetry->weather.wind_avg_ms, _telemetry->weather.wind_dir_deg,
-      _telemetry->weather.rain_mm, _telemetry->weather.uv_index, _telemetry->weather.light_lux);
-  }
+  // out.printf("  Batterie:  %.0f mV / %.0f mA\n", _telemetry->battery.voltage_mv, _telemetry->battery.current_ma);
+  // out.printf("  Solaire:   %.0f mV / %.0f mA\n", _telemetry->solar.voltage_mv, _telemetry->solar.current_ma);
+  // out.printf("  Board:     %.0f mV / %.0f mA\n", _telemetry->board_5v.voltage_mv, _telemetry->board_5v.current_ma);
+  // out.printf("  MPPT:      status=0x%04X\n", _telemetry->mppt_status);
+  // out.printf("  Meteo:     %.1fC / %.0f%% / %.1f hPa\n",
+  //   _telemetry->weather.temperature_c, _telemetry->weather.humidity, _telemetry->weather.pressure_hpa);
+  // out.printf("  WH65B:     vent=%.1f m/s dir=%d rain=%.1fmm UV=%d lux=%.0f\n",
+  //   _telemetry->weather.wind_avg_ms, _telemetry->weather.wind_dir_deg,
+  //   _telemetry->weather.rain_mm, _telemetry->weather.uv_index, _telemetry->weather.light_lux);
+  // TODO revoir cette commande
   out.printf("  Uptime:    %lu s\n", _telemetry->uptime_s);
 }
 
 void CommandHandler::cmdVersion(Print& out) {
   out.printf("%s build %s\n", FIRMWARE_VERSION, FIRMWARE_BUILD_DATE);
-  out.println(F("Board: F4ISE RP-LoRA Mini v3 dual (RP2040)"));
+  out.print(F("Board:"));
+  out.println(board.getManufacturerName());
   out.printf("Uptime: %lu s  Free heap: %u\n", _telemetry->uptime_s, (unsigned)rp2040.getFreeHeap());
 }
 
@@ -284,7 +297,7 @@ void CommandHandler::cmdHistory(const char* args, Print& out) {
   // "history" ou "history N" — affiche les N derniers records (défaut: 20)
   uint16_t n = 20;
   if (args[0] >= '0' && args[0] <= '9') {
-    n = atoi(args);
+    n = strtol(args, nullptr, 10);
   }
   _history->dump(out, n);
 }

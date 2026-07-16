@@ -13,7 +13,7 @@
 #include "core/Log.h"
 #include "config/Settings.h"
 #include "aprs/AprsDispatcher.h"
-#include "aprs/AprsRadioMode.h"
+#include "aprs/LoRa433RadioMode.h"
 #include "hal/Telemetry.h"
 #include "task_heartbeat.h"
 #include <FineOffsetWH65B.h>
@@ -72,13 +72,13 @@ static bool listenAndDecode() {
   }
 
   // Stocker
-  telemetry.weather.wh65b_valid = true;
-  telemetry.weather.wind_avg_ms = data.wind_avg_m_s;
-  telemetry.weather.wind_max_ms = data.wind_max_m_s;
-  telemetry.weather.wind_dir_deg = data.wind_dir_deg;
-  telemetry.weather.rain_mm = data.rainfall_mm;
-  telemetry.weather.light_lux = data.light_lux;
-  telemetry.weather.uv_index = data.uvi;
+  telemetry.weather_outside.is_valid = true;
+  telemetry.weather_outside.wind_avg_ms = data.wind_avg_m_s;
+  telemetry.weather_outside.wind_max_ms = data.wind_max_m_s;
+  telemetry.weather_outside.wind_dir_deg = data.wind_dir_deg;
+  telemetry.weather_outside.rain_mm = data.rainfall_mm;
+  telemetry.weather_outside.light_lux = data.light_lux;
+  telemetry.weather_outside.uv_index = data.uvi;
 
   float rssi = aprs_radio_hw.getRSSI();
   LOG_I(TAG, "WH65B T:%.1fC H:%d%% V:%.1fm/s D:%d R:%.1fmm UV:%d RSSI:%.0f",
@@ -103,11 +103,11 @@ void taskWeather(void* params) {
       LOG_T(TAG, "Début cycle FSK");
 
       aprs_dispatcher.pause();
-      bool ok = AprsRadioMode::switchToFsk(onFskRxDone);
+      bool ok = LoRa433RadioMode::switchToFsk(onFskRxDone);
       if (ok) {
         listenAndDecode();
       }
-      AprsRadioMode::switchBackToLora();
+      LoRa433RadioMode::switchToLora();
       aprs_dispatcher.resume();
 
       LOG_T(TAG, "Fin cycle, retour APRS");
