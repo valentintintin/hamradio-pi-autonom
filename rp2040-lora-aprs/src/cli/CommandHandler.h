@@ -4,6 +4,7 @@
 #include "config/SettingsManager.h"
 #include "hal/Telemetry.h"
 #include "hal/TelemetryHistory.h"
+#include "hal/EventLogHistory.h"
 #include "hal/RelayHal.h"
 #include "hal/MpptChargerHal.h"
 #include "aprs/AprsEngine.h"
@@ -17,11 +18,12 @@ public:
                  SettingsManager& manager, TelemetryData& telemetry,
                  AprsEngine& aprsEngine, RelayHal& relay,
                  TelemetryHistory* history = nullptr,
-                 MpptChargerHal* mppt = nullptr)
+                 MpptChargerHal* mppt = nullptr,
+                 EventLogHistory* eventLog = nullptr)
     : _settings(&settings), _registry(&registry),
       _manager(&manager), _telemetry(&telemetry),
       _aprs(&aprsEngine), _relay(&relay), _history(history), _mppt(mppt),
-      _mutex(aprsEngine.getMutex()) {}
+      _event_log(eventLog),  _mutex(aprsEngine.getMutex()) {}
 
   // Exécute une commande, écrit la réponse dans out.
   // Retourne true si la commande a été reconnue.
@@ -45,6 +47,7 @@ private:
   RelayHal* _relay;
   TelemetryHistory* _history;
   MpptChargerHal* _mppt;
+  EventLogHistory* _event_log;
 
   // Settings/SettingsRegistry/relais sont partagés entre les tâches série,
   // APRS et mesh (MeshcoreRepeater retombe désormais aussi sur execute()) :
@@ -63,6 +66,7 @@ private:
   void cmdStatus(Print& out);
   void cmdVersion(Print& out);
   void cmdDefaults(Print& out);
-  void cmdHistory(const char* args, Print& out);
+  void cmdHistory(const char* args, Print& out, bool isLocal);
+  void cmdEventLog(const char* args, Print& out, bool isLocal);
   void cmdSendAprs(const char* content, Print& out);
 };

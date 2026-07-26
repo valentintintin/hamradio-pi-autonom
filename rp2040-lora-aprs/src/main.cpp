@@ -29,6 +29,7 @@
 #include "hal/VictronHal.h"
 #include "hal/ChargeControllerHal.h"
 #include "hal/TelemetryHistory.h"
+#include "hal/EventLogHistory.h"
 #include "hal/Tca9555Hal.h"
 #include "hal/RelayHal.h"
 #include "energy/LowVoltageCutoffController.h"
@@ -83,20 +84,26 @@ ChargeControllerHal* active_charger = nullptr;
 // Historique télémétrie EEPROM
 TelemetryHistory telemetry_history(eeprom);
 
+// Log d'événements critiques EEPROM (code + données numériques, cf.
+// hal/EventLogHistory.h) — journalisé explicitement par ses sites d'origine
+// (task_watchdog.cpp, energy/LowVoltageCutoffController.cpp,
+// energy/MpptShutdownMonitor.cpp)
+EventLogHistory event_log(eeprom);
+
 // Relais bistables (carte Interface F1ZIC, expandeur TCA9555 @0x20 sur I2C0)
 Tca9555Hal relay_expander(i2c_bus, TCA9555_RELAY_ADDR);
 RelayHal relay_hal(relay_expander);
 
 // Supervision énergie (cf. src/energy/, orchestrée par task_energy.cpp)
-LowVoltageCutoffController low_voltage_cutoff(settings, relay_hal);
+LowVoltageCutoffController low_voltage_cutoff(settings, relay_hal, event_log);
 RelayPeriodicController relay_periodic(settings, relay_hal, low_voltage_cutoff);
-MpptShutdownMonitor mppt_shutdown_monitor(mppt, aprs_engine);
+MpptShutdownMonitor mppt_shutdown_monitor(mppt, aprs_engine, event_log);
 
 // Configuration (settings elle-même déclarée plus haut, cf. commentaire)
 SettingsManager settings_manager(&eeprom);
 SettingsRegistry settings_registry;
 CommandHandler command_handler(settings, settings_registry, settings_manager, telemetry,
-                               aprs_engine, relay_hal, &telemetry_history, &mppt);
+                               aprs_engine, relay_hal, &telemetry_history, &mppt, &event_log);
 
 // Relie AprsEngine à la télémétrie et au CLI (query météo, telemetry, CLI par message)
 AprsEventHandler aprs_event_handler(aprs_engine, command_handler, telemetry, settings);
@@ -178,6 +185,9 @@ void setup() {
     LOG_I("I2C", "EEPROM M24M01 OK");
     if (telemetry_history.begin()) {
       LOG_I("I2C", "Historique EEPROM: %d slots", telemetry_history.getMaxRecords());
+    }
+    if (event_log.begin()) {
+      LOG_I("I2C", "Log événements EEPROM: %d slots", event_log.getMaxRecords());
     }
   } else {
     LOG_W("I2C", "EEPROM non détectée");

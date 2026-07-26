@@ -113,7 +113,13 @@ bool CommandHandler::execute(const char* input, Print& out, bool isLocal) {
 
   if (strncmp(cmd, "history", 7) == 0) {
     const char* args = (cmd[7] == ' ') ? cmd + 8 : "";
-    cmdHistory(args, out);
+    cmdHistory(args, out, isLocal);
+    return true;
+  }
+
+  if (strncmp(cmd, "eventlog", 8) == 0) {
+    const char* args = (cmd[8] == ' ') ? cmd + 9 : "";
+    cmdEventLog(args, out, isLocal);
     return true;
   }
 
@@ -144,7 +150,8 @@ bool CommandHandler::execute(const char* input, Print& out, bool isLocal) {
     if (isLocal) {
       out.println(F("Commandes: get <key>, set <key> <value>, clockdate JJ/MM/AA HH:MM:SS,"));
       out.println(F("  list, save, status, version, uptime, freemem, beacon, wx,"));
-      out.println(F("  send aprs <texte>, history [n], defaults, reboot, dfu, help"));
+      out.println(F("  send aprs <texte>, history [n]/clear/dump [n], eventlog [n]/clear/dump [n],"));
+      out.println(F("  defaults, reboot, dfu, help"));
     }
     return true;
   }
@@ -170,6 +177,7 @@ bool CommandHandler::isPrivilegedCommand(const char* cmd)
          strcmp(cmd, "dfu") == 0 ||
          strcmp(cmd, "defaults") == 0 ||
          strcmp(cmd, "history clear") == 0 ||
+         strcmp(cmd, "eventlog clear") == 0 ||
          strncmp(cmd, "send aprs ", 10) == 0 ||
          strcmp(cmd, "beacon") == 0 ||
          strcmp(cmd, "wx") == 0;
@@ -294,7 +302,7 @@ void CommandHandler::cmdDefaults(Print& out) {
   out.println(F("Valeurs par défaut chargées (non sauvé, 'save' pour persister)"));
 }
 
-void CommandHandler::cmdHistory(const char* args, Print& out) {
+void CommandHandler::cmdHistory(const char* args, Print& out, bool isLocal) {
   if (!_history || !_history->isInitialized()) {
     out.println(F("Historique EEPROM non disponible"));
     return;
@@ -307,12 +315,101 @@ void CommandHandler::cmdHistory(const char* args, Print& out) {
     return;
   }
 
-  // "history" ou "history N" — affiche les N derniers records (défaut: 20)
-  uint16_t n = 20;
+  // "history dump [n]" — dump binaire brut (EepromDumpHeader + records),
+  // pour récupération efficace par un outil côté PC. Réservé au port série
+  // local : sortie brute non formatée, ça n'a pas de sens sur une liaison
+  // radio (et casserait le tampon texte APRS/mesh).
+  if (strcmp(args, "dump") == 0 || strncmp(args, "dump ", 5) == 0) {
+    if (!isLocal) {
+      out.println(F("history dump: série uniquement"));
+      return;
+    }
+    uint16_t n = 0;
+    const char* nArg = (args[4] == ' ') ? args + 5 : "";
+    if (nArg[0] >= '0' && nArg[0] <= '9') {
+      n = strtol(nArg, nullptr, 10);
+    }
+    _history->dumpBinary(out, n);
+    return;
+  }
+
+  // "history" ou "history N" — affiche les N derniers records (défaut: 1,
+  // le plus récent — sans argument, c'est toujours "le dernier")
+  uint16_t n = 1;
   if (args[0] >= '0' && args[0] <= '9') {
     n = strtol(args, nullptr, 10);
   }
+
+  // En distant (APRS/mesh), le tampon de réponse est minuscule (~100-160
+  // octets) : seul le dernier record tient, et sans bannière/en-tête CSV.
+  if (!isLocal) {
+    if (n != 1) {
+      out.println(F("history: seul le dernier ('history' ou 'history 1') est autorisé en distant"));
+      return;
+    }
+    _history->dump(out, 1, false);
+    return;
+  }
+
   _history->dump(out, n);
+}
+
+void CommandHandler::cmdEventLog(const char* args, Print& out, bool isLocal) {
+  if (!_event_log || !_event_log->isInitialized()) {
+    out.println(F("Log événements EEPROM non disponible"));
+    return;
+  }
+
+  if (strcmp(args, "clear") == 0) {
+    _event_log->clear();
+    out.println(F("Log événements effacé"));
+    return;
+  }
+
+  // "eventlog dump [n]" — même principe que "history dump", cf. commentaire
+  // ci-dessus.
+  if (strcmp(args, "dump") == 0 || strncmp(args, "dump ", 5) == 0) {
+    if (!isLocal) {
+      out.println(F("eventlog dump: série uniquement"));
+      return;
+    }
+    uint16_t n = 0;
+    const char* nArg = (args[4] == ' ') ? args + 5 : "";
+    if (nArg[0] >= '0' && nArg[0] <= '9') {
+      n = strtol(nArg, nullptr, 10);
+    }
+    _event_log->dumpBinary(out, n);
+    return;
+  }
+
+  // "eventlog" ou "eventlog N" — affiche les N derniers événements (défaut:
+  // 1, le plus récent — sans argument, c'est toujours "le dernier")
+  uint16_t n = 1;
+  if (args[0] >= '0' && args[0] <= '9') {
+    n = strtol(args, nullptr, 10);
+  }
+
+  // En distant (APRS/mesh), le tampon de réponse est minuscule (~100-160
+  // octets) : seul le dernier événement tient, et sans bannière.
+  if (!isLocal && n != 1) {
+    out.println(F("eventlog: seul le dernier ('eventlog' ou 'eventlog 1') est autorisé en distant"));
+    return;
+  }
+
+  uint16_t total = _event_log->getCount();
+  uint16_t count = (n > 0 && n < total) ? n : total;
+  uint16_t start = total - count;
+
+  if (isLocal) {
+    out.printf("--- Log événements: %d/%d records ---\n", total, _event_log->getMaxRecords());
+  }
+  EventLogRecord rec{};
+  for (uint16_t i = start; i < total; i++) {
+    if (_event_log->readRecord(i, rec)) {
+      out.printf("%lu %s data=%ld,%ld\n",
+        (unsigned long)rec.timestamp, eventCodeName(rec.code), (long)rec.data0, (long)rec.data1);
+    }
+  }
 }
 
 void CommandHandler::cmdSendAprs(const char* content, Print& out) {

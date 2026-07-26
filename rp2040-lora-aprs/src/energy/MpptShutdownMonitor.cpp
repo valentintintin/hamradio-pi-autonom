@@ -28,6 +28,7 @@ void MpptShutdownMonitor::update() {
 
   if ((isr_fired || i2c_says_alert) && !_alert_sent) {
     LOG_E(TAG, "MPPT: extinction imminente détectée (%s)", isr_fired ? "GPIO" : "I2C");
+    _event_log->log(EVENT_MPPT_SHUTDOWN_ALERT, isr_fired ? 0 : 1);
     _aprs->sendStatus("ALERTE MPPT: extinction imminente");
     _alert_sent = true;
   } else if (!isr_fired && !i2c_says_alert) {

@@ -1,6 +1,7 @@
 #include "tasks.h"
 #include "core/Log.h"
 #include "config/Settings.h"
+#include "hal/EventLogHistory.h"
 #include "task_heartbeat.h"
 #include <hardware/structs/watchdog.h>
 #include <Timer.h>
@@ -26,6 +27,7 @@
 // ============================================================================
 
 extern Settings settings;
+extern EventLogHistory event_log;
 
 #define TAG "WDT"
 #define WATCHDOG_TIMEOUT_MS         8000              // proche du max matériel RP2040 (~8.3s)
@@ -93,7 +95,8 @@ void taskWatchdog(void* params) {
   uint32_t reboot_count = watchdog_hw->scratch[WDT_SCRATCH_REBOOT_COUNT];
   if (rp2040.getResetReason() == RP2040::WDT_RESET) {
     reboot_count++;
-    LOG_W(TAG, "Reboot causé par le watchdog (#%lu consécutif)", (unsigned long)reboot_count);
+    LOG_E(TAG, "Reboot cause par watchdog (#%lu)", (unsigned long)reboot_count);
+    event_log.log(EVENT_WATCHDOG_REBOOT, (int32_t)reboot_count);
   } else {
     reboot_count = 0; // reset "propre" (alimentation, reboot manuel...) : on repart à zéro
   }
@@ -103,6 +106,7 @@ void taskWatchdog(void* params) {
     LOG_E(TAG, "Trop de reboots watchdog consécutifs (%lu) : watchdog désarmé pour ce cycle, "
                "l'appareil reste up en mode dégradé plutôt que de boucler indéfiniment",
                (unsigned long)reboot_count);
+    event_log.log(EVENT_WATCHDOG_TOO_MANY_REBOOTS, (int32_t)reboot_count);
     vTaskDelete(nullptr);
     return;
   }

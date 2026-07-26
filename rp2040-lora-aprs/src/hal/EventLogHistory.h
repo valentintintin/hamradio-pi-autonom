@@ -1,0 +1,198 @@
+#pragma once
+
+#include "M24M01Hal.h"
+#include "EepromDumpHeader.h"
+#include "core/Log.h"
+#include <stdint.h>
+
+#include "target.h"
+
+// ============================================================================
+// EventLogHistory — Ring buffer sur EEPROM M24M01, dédié aux événements
+// critiques (reboot watchdog, alerte MPPT, coupure/reprise basse-tension...),
+// journalisés explicitement par leurs sites d'origine (cf. task_watchdog.cpp,
+// energy/MpptShutdownMonitor.cpp, energy/LowVoltageCutoffController.cpp) —
+// pour une analyse post-mortem après un reboot inattendu.
+//
+// Record code+data plutôt que texte libre : compact (14 bytes, ~1150 records
+// dans les 16KB réservés), pas de coût de formatage, et directement
+// exploitable par un outil côté PC sans avoir à parser une chaîne. Distinct
+// de TelemetryHistory (télémétrie périodique, valeurs physiques).
+//
+// Vit dans les 16KB réservés en fin d'EEPROM par TelemetryHistory (cf.
+// TELEMETRY_HISTORY_RESERVED_TAIL_BYTES) — les deux constantes de taille
+// doivent rester cohérentes entre les deux fichiers.
+// ============================================================================
+
+#define EVENT_LOG_MAGIC            0x45564C32  // "EVL2" (v2 : record code+data, pas texte)
+#define EVENT_LOG_VERSION          2
+#define EVENT_LOG_RESERVED_BYTES   (16 * 1024)
+#define EVENT_LOG_ADDR             (M24M01_SIZE_BYTES - EVENT_LOG_RESERVED_BYTES)
+
+// Codes d'événement — ajouter en fin de liste (ne pas renuméroter, les
+// records déjà en EEPROM référencent ces valeurs).
+enum EventCode : uint16_t {
+  EVENT_NONE = 0,
+  EVENT_WATCHDOG_REBOOT,           // data0 = nb de reboots watchdog consécutifs
+  EVENT_WATCHDOG_TOO_MANY_REBOOTS, // data0 = nb de reboots watchdog consécutifs (chien désarmé pour ce cycle)
+  EVENT_MPPT_SHUTDOWN_ALERT,       // data0 = source (0=GPIO, 1=I2C ALERT)
+  EVENT_LOW_VOLTAGE_CUTOFF,        // data0 = numéro de relais (1..RELAY_COUNT), data1 = tension mV
+  EVENT_LOW_VOLTAGE_RESTORE,       // data0 = numéro de relais (1..RELAY_COUNT), data1 = tension mV
+};
+
+inline const char* eventCodeName(uint16_t code) {
+  switch (code) {
+    case EVENT_WATCHDOG_REBOOT:           return "WDT_REBOOT";
+    case EVENT_WATCHDOG_TOO_MANY_REBOOTS: return "WDT_TOO_MANY_REBOOTS";
+    case EVENT_MPPT_SHUTDOWN_ALERT:       return "MPPT_SHUTDOWN";
+    case EVENT_LOW_VOLTAGE_CUTOFF:        return "LOW_VOLTAGE_CUTOFF";
+    case EVENT_LOW_VOLTAGE_RESTORE:       return "LOW_VOLTAGE_RESTORE";
+    default:                              return "?";
+  }
+}
+
+// Record compact (14 bytes)
+struct __attribute__((packed)) EventLogRecord {
+  uint32_t timestamp;
+  uint16_t code;   // EventCode
+  int32_t data0;
+  int32_t data1;
+};
+
+// Header du ring buffer (12 bytes)
+struct __attribute__((packed)) EventLogHeader {
+  uint32_t magic;
+  uint16_t version;
+  uint16_t write_index;
+  uint16_t count;
+  uint16_t max_records;
+};
+
+class EventLogHistory {
+public:
+  EventLogHistory(M24M01Hal& eeprom)
+    : _eeprom(&eeprom), _initialized(false), _max_records(0), _write_index(0), _count(0)
+  {
+  }
+
+  bool begin() {
+    if (!_eeprom->isInitialized()) {
+      return false;
+    }
+
+    uint32_t data_start = EVENT_LOG_ADDR + sizeof(EventLogHeader);
+    uint32_t available = M24M01_SIZE_BYTES - data_start;
+    _max_records = available / sizeof(EventLogRecord);
+    if (_max_records == 0) {
+      return false;
+    }
+
+    EventLogHeader hdr;
+    if (!_eeprom->read(EVENT_LOG_ADDR, (uint8_t*)&hdr, sizeof(hdr))) {
+      return false;
+    }
+
+    if (hdr.magic == EVENT_LOG_MAGIC && hdr.version == EVENT_LOG_VERSION
+        && hdr.max_records == _max_records) {
+      _write_index = hdr.write_index % _max_records;
+      _count = hdr.count > _max_records ? _max_records : hdr.count;
+    } else {
+      _write_index = 0;
+      _count = 0;
+      if (!saveHeader()) {
+        return false;
+      }
+      LOG_I("EEPROM", "Log événements initialisé, %d slots", _max_records);
+    }
+
+    _initialized = true;
+    LOG_I("EEPROM", "Log événements: %d/%d records", _count, _max_records);
+    return true;
+  }
+
+  // Enregistrer un événement : code + jusqu'à deux valeurs numériques
+  // annexes (cf. EventCode ci-dessus pour la signification de data0/data1
+  // selon le code).
+  bool log(uint16_t code, int32_t data0 = 0, int32_t data1 = 0) {
+    if (!_initialized) {
+      return false;
+    }
+
+    EventLogRecord rec{};
+    rec.timestamp = rtc_clock.getCurrentTime();
+    rec.code = code;
+    rec.data0 = data0;
+    rec.data1 = data1;
+
+    uint32_t addr = recordAddr(_write_index);
+    if (!_eeprom->write(addr, (const uint8_t*)&rec, sizeof(rec))) {
+      return false;
+    }
+
+    _write_index = (_write_index + 1) % _max_records;
+    if (_count < _max_records) {
+      _count++;
+    }
+
+    return saveHeader();
+  }
+
+  // Lire un record par index (0 = plus ancien)
+  bool readRecord(uint16_t index, EventLogRecord& rec) const {
+    if (!_initialized || index >= _count) {
+      return false;
+    }
+
+    uint16_t actual = (_write_index + _max_records - _count + index) % _max_records;
+    return _eeprom->read(recordAddr(actual), (uint8_t*)&rec, sizeof(rec));
+  }
+
+  // Dump binaire brut (EepromDumpHeader + records packed), cf.
+  // TelemetryHistory::dumpBinary — CLI "eventlog dump".
+  void dumpBinary(Print& out, uint16_t last_n = 0) const {
+    uint16_t n = (last_n > 0 && last_n < _count) ? last_n : _count;
+    uint16_t start = _count - n;
+
+    EepromDumpHeader hdr{ EVENT_LOG_MAGIC, (uint16_t)sizeof(EventLogRecord), n };
+    out.write((const uint8_t*)&hdr, sizeof(hdr));
+
+    EventLogRecord rec{};
+    for (uint16_t i = start; i < _count; i++) {
+      if (readRecord(i, rec)) {
+        out.write((const uint8_t*)&rec, sizeof(rec));
+      }
+    }
+  }
+
+  bool clear() {
+    _write_index = 0;
+    _count = 0;
+    return saveHeader();
+  }
+
+  uint16_t getCount() const { return _count; }
+  uint16_t getMaxRecords() const { return _max_records; }
+  bool isInitialized() const { return _initialized; }
+
+private:
+  M24M01Hal* _eeprom;
+  bool _initialized;
+  uint16_t _max_records;
+  uint16_t _write_index;
+  uint16_t _count;
+
+  uint32_t recordAddr(uint16_t index) const {
+    return EVENT_LOG_ADDR + sizeof(EventLogHeader)
+           + (uint32_t)index * sizeof(EventLogRecord);
+  }
+
+  bool saveHeader() {
+    EventLogHeader hdr;
+    hdr.magic = EVENT_LOG_MAGIC;
+    hdr.version = EVENT_LOG_VERSION;
+    hdr.write_index = _write_index;
+    hdr.count = _count;
+    hdr.max_records = _max_records;
+    return _eeprom->write(EVENT_LOG_ADDR, (const uint8_t*)&hdr, sizeof(hdr));
+  }
+};

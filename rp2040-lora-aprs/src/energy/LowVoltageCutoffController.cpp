@@ -63,6 +63,7 @@ void LowVoltageCutoffController::update(float voltage_mv, bool have_voltage) {
       if (_cutoff_confirm_timer[i].hasExpired()) {
         LOG_W(TAG, "Sous-tension confirmée (%.0fmV < %umV depuis %lums) : coupure relais %u",
           voltage_mv, rule.min_voltage_mv, (unsigned long)rule.debounce_ms, rule.relay_number);
+        _event_log->log(EVENT_LOW_VOLTAGE_CUTOFF, rule.relay_number, (int32_t)voltage_mv);
         _relay->setState(idx, false);
         _cutoff_confirm_armed[i] = false;
       }
@@ -78,6 +79,7 @@ void LowVoltageCutoffController::update(float voltage_mv, bool have_voltage) {
       if (_restore_confirm_timer[i].hasExpired()) {
         LOG_I(TAG, "Tension rétablie confirmée (%.0fmV >= %umV depuis %lums) : reconnexion relais %u",
           voltage_mv, rule.restore_voltage_mv, (unsigned long)rule.debounce_ms, rule.relay_number);
+        _event_log->log(EVENT_LOW_VOLTAGE_RESTORE, rule.relay_number, (int32_t)voltage_mv);
         _relay->setState(idx, true);
         _restore_confirm_armed[i] = false;
       }

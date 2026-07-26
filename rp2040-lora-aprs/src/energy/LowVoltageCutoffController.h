@@ -2,6 +2,7 @@
 
 #include "config/Settings.h"
 #include "hal/RelayHal.h"
+#include "hal/EventLogHistory.h"
 #include <Timer.h>
 
 // ============================================================================
@@ -12,8 +13,8 @@
 
 class LowVoltageCutoffController {
 public:
-  LowVoltageCutoffController(Settings& settings, RelayHal& relay)
-    : _settings(&settings), _relay(&relay) {}
+  LowVoltageCutoffController(Settings& settings, RelayHal& relay, EventLogHistory& eventLog)
+    : _settings(&settings), _relay(&relay), _event_log(&eventLog) {}
 
   // À appeler à chaque tick avec la tension batterie courante (cf.
   // task_energy.cpp). Ne fait rien si low_voltage_cutoff_enabled est faux ou
@@ -34,6 +35,7 @@ public:
 private:
   Settings* _settings;
   RelayHal* _relay;
+  EventLogHistory* _event_log;
 
   bool _override_active[RELAY_COUNT] = {false};
 

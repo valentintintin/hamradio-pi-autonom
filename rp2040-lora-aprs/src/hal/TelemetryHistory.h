@@ -2,6 +2,7 @@
 
 #include "M24M01Hal.h"
 #include "Telemetry.h"
+#include "EepromDumpHeader.h"
 #include "core/Log.h"
 #include <stdint.h>
 
@@ -11,21 +12,34 @@
 // TelemetryHistory — Ring buffer sur EEPROM M24M01
 //
 // Stocke un historique compact de télémétrie pour analyse post-mortem.
-// Avec ~20 bytes/record et ~127KB disponibles : ~6500 records.
-// À 5min/record : ~22 jours d'historique.
+// Avec 21 bytes/record et ~111KB disponibles (16KB réservés en fin
+// d'EEPROM pour EventLogHistory, cf. plus bas) : ~5400 records.
+// À 5min/record : ~18 jours d'historique.
 // ============================================================================
 
 #define TELEMETRY_HISTORY_MAGIC     0x54454C48  // "TELH"
-#define TELEMETRY_HISTORY_VERSION   1
+#define TELEMETRY_HISTORY_VERSION   2  // v2 : TelemetryRecord.battery/solar en CompactEnergyData (21 bytes, pas 29)
 
 // Adresse EEPROM (après la zone settings — 1KB de marge)
 #define TELEMETRY_HISTORY_ADDR      1024
 
-// Record compact (20 bytes)
+// Réservés en fin d'EEPROM pour EventLogHistory (cf. hal/EventLogHistory.h,
+// EVENT_LOG_RESERVED_BYTES — les deux constantes doivent rester cohérentes).
+#define TELEMETRY_HISTORY_RESERVED_TAIL_BYTES (16 * 1024)
+
+// Type compact dédié au stockage (pas EnergyData de Telemetry.h, qui est en
+// float — 8 bytes/champ au lieu de 4, et ferait passer TelemetryRecord de
+// 21 à 29 bytes en plus d'un mismatch de type avec le "%d" de dump()).
+struct __attribute__((packed)) CompactEnergyData {
+  int16_t voltage_mv;
+  int16_t current_ma;
+};
+
+// Record compact (21 bytes)
 struct __attribute__((packed)) TelemetryRecord {
   uint32_t timestamp;
-  EnergyData battery;
-  EnergyData solar;
+  CompactEnergyData battery;
+  CompactEnergyData solar;
   int16_t  temperature_inside_c10;  // température * 10
   uint8_t  humidity_inside;         // 0-100
   int16_t  temperature_outside_c10;  // température * 10
@@ -55,7 +69,7 @@ public:
 
     // Calculer la capacité disponible
     uint32_t data_start = TELEMETRY_HISTORY_ADDR + sizeof(TelemetryHistoryHeader);
-    uint32_t available = M24M01_SIZE_BYTES - data_start;
+    uint32_t available = M24M01_SIZE_BYTES - TELEMETRY_HISTORY_RESERVED_TAIL_BYTES - data_start;
     _max_records = available / sizeof(TelemetryRecord);
     if (_max_records == 0) {
       return false;
@@ -129,24 +143,47 @@ public:
     return _eeprom->read(recordAddr(actual), (uint8_t*)&rec, sizeof(rec));
   }
 
-  // Dump vers Print (serial ou APRS response buffer)
-  void dump(Print& out, uint16_t last_n = 0) const {
+  // Dump vers Print (serial ou APRS response buffer). includeHeader=false
+  // omet la bannière et l'en-tête CSV (cf. CommandHandler::cmdHistory, cas
+  // "history 1" en distant APRS/mesh où le tampon de réponse est minuscule).
+  void dump(Print& out, uint16_t last_n = 0, bool includeHeader = true) const {
     uint16_t n = (last_n > 0 && last_n < _count) ? last_n : _count;
     uint16_t start = _count - n;
 
-    out.printf("--- Historique: %d/%d records ---\n", _count, _max_records);
-    out.println(F("date,bat_mV,bat_mA,sol_mV,sol_mA,temp_in,hum_in,temp_out,uptime"));
+    if (includeHeader) {
+      out.printf("--- Historique: %d/%d records ---\n", _count, _max_records);
+      out.println(F("date,bat_mV,bat_mA,sol_mV,sol_mA,temp_in,hum_in,temp_out,uptime"));
+    }
 
     TelemetryRecord rec{};
     for (uint16_t i = start; i < _count; i++) {
       if (readRecord(i, rec)) {
         out.printf("%lu,%d,%d,%d,%d,%.1f,%d,%.1f,%d\n",
           rec.timestamp,
-          rec.battery.voltage_mv, rec.battery.voltage_mv,
+          rec.battery.voltage_mv, rec.battery.current_ma,
           rec.solar.voltage_mv, rec.solar.current_ma,
           rec.temperature_inside_c10 / 10.0f, rec.humidity_inside,
           rec.temperature_outside_c10 / 10.0f,
           rec.uptime_s);
+      }
+    }
+  }
+
+  // Dump binaire brut (EepromDumpHeader + records packed) — bien plus rapide
+  // à produire (pas de formatage) et à transférer que dump() ; utilisé par
+  // le CLI "history dump" (cf. CommandHandler), destiné à un outil côté PC
+  // qui reparse ces records directement plutôt qu'à une lecture humaine.
+  void dumpBinary(Print& out, uint16_t last_n = 0) const {
+    uint16_t n = (last_n > 0 && last_n < _count) ? last_n : _count;
+    uint16_t start = _count - n;
+
+    EepromDumpHeader hdr{ TELEMETRY_HISTORY_MAGIC, (uint16_t)sizeof(TelemetryRecord), n };
+    out.write((const uint8_t*)&hdr, sizeof(hdr));
+
+    TelemetryRecord rec{};
+    for (uint16_t i = start; i < _count; i++) {
+      if (readRecord(i, rec)) {
+        out.write((const uint8_t*)&rec, sizeof(rec));
       }
     }
   }
