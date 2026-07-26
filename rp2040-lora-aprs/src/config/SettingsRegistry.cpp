@@ -51,6 +51,8 @@ void SettingsRegistry::init(Settings& s) {
   add("system.watchdog",       ST_BOOL,   &s.system.watchdog_enabled);
   add("system.log_interval",   ST_UINT32, &s.system.telemetry_log_interval_ms, 10000.0f, 3600000.0f);
   add("system.log_level",      ST_UINT8,  &s.system.log_level, 0.0f, 5.0f);
+  // OperatingMode : 0=aprs, 1=meshcore, 2=aprs+meshcore, 3=full (cf. config/Settings.h)
+  add("system.mode",           ST_UINT8,  &s.system.mode,      0.0f, 3.0f);
 
   // --- Relais (bistables, pilotés via TCA9555 I2C — cf. hal/relay/RelayHal.h) ----
   add("relay.1.state", ST_BOOL, &s.relay[0].state);

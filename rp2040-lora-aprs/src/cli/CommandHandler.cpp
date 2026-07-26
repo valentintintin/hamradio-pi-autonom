@@ -207,6 +207,12 @@ void CommandHandler::cmdSet(const char* key, const char* value, Print& out) {
       out.printf("Log level: %s\n", logLevelName(g_log_level));
     }
 
+    // Mode de fonctionnement : ne prend effet qu'au reboot (les tâches
+    // FreeRTOS ne sont créées qu'une fois, dans setup() — cf. core/Boot.cpp)
+    if (strcmp(key, "system.mode") == 0) {
+      out.printf("Mode: %s (effectif après 'save' + 'reboot')\n", modeName(_settings->system.mode));
+    }
+
     // Relais : appliquer immédiatement l'impulsion I2C (la clé venant d'être
     // écrite dans _settings)
     int relayNum = 0;

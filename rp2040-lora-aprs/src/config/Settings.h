@@ -12,7 +12,42 @@
 // ============================================================================
 
 #define SETTINGS_MAGIC    0x34485656  // "4HVV"
-#define SETTINGS_VERSION  4
+#define SETTINGS_VERSION  5
+
+// ============================================================================
+// Mode de fonctionnement — la carte peut être déployée en standalone (juste
+// un digipeater APRS, ou juste un répéteur MeshCore) ou complète (station
+// solaire avec relais + télémétrie). Détermine quelles tâches FreeRTOS sont
+// créées et quels sous-systèmes sont initialisés (cf. core/Boot.cpp).
+// Numérique uniquement côté CLI ("set system.mode 3"), comme system.log_level
+// — modifiable à chaud dans les settings, mais ne prend effet qu'au reboot
+// (la création des tâches ne se fait qu'une fois, dans setup()).
+// ============================================================================
+enum OperatingMode : uint8_t {
+  MODE_APRS_ONLY     = 0,
+  MODE_MESHCORE_ONLY = 1,
+  MODE_APRS_MESHCORE = 2,
+  MODE_FULL          = 3,  // APRS + MeshCore + relais + télémétrie (fonctionnement normal)
+};
+
+inline bool modeHasAprs(uint8_t mode) {
+  return mode == MODE_APRS_ONLY || mode == MODE_APRS_MESHCORE || mode == MODE_FULL;
+}
+inline bool modeHasMeshcore(uint8_t mode) {
+  return mode == MODE_MESHCORE_ONLY || mode == MODE_APRS_MESHCORE || mode == MODE_FULL;
+}
+inline bool modeIsFull(uint8_t mode) {
+  return mode == MODE_FULL;
+}
+inline const char* modeName(uint8_t mode) {
+  switch (mode) {
+    case MODE_APRS_ONLY:     return "aprs";
+    case MODE_MESHCORE_ONLY: return "meshcore";
+    case MODE_APRS_MESHCORE: return "aprs+meshcore";
+    case MODE_FULL:          return "full";
+    default:                 return "?";
+  }
+}
 
 struct AprsSettings {
   char callsign[10];        // ex: "F4HVV-15"
@@ -66,6 +101,7 @@ struct SystemSettings {
   bool watchdog_enabled;
   uint32_t telemetry_log_interval_ms;  // intervalle log EEPROM
   uint8_t log_level;                   // LogLevel (0=none .. 5=trace)
+  uint8_t mode;                        // OperatingMode (0..3, cf. ci-dessus)
 };
 
 #define RELAY_COUNT       4
@@ -172,6 +208,7 @@ inline Settings getDefaultSettings() {
   s.system.watchdog_enabled = false;
   s.system.telemetry_log_interval_ms = 300000; // 5min
   s.system.log_level = 3;                      // INFO par défaut
+  s.system.mode = MODE_FULL;                   // fonctionnement normal par défaut
 
   // Relais — tous désactivés par défaut
   for (auto & [state] : s.relay) {

@@ -41,7 +41,10 @@ extern EventLogHistory event_log;
 static bool isTaskStale(HeartbeatTask task, uint32_t max_age_ms) {
   unsigned long last = g_heartbeat_ms[task];
   if (last == 0) {
-    return false; // tâche pas encore démarrée (juste après boot) : pas encore de verdict
+    // Tâche pas encore démarrée (juste après boot), ou jamais créée dans le
+    // mode de fonctionnement courant (cf. core/Boot.cpp:bootCreateTasks,
+    // config/Settings.h: OperatingMode) : pas de verdict, jamais "figée".
+    return false;
   }
   return (millis() - last) > max_age_ms;
 }

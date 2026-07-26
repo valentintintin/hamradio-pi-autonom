@@ -65,25 +65,63 @@ void bootInitCore() {
   LittleFS.begin();
 }
 
-void bootInitRadios() {
-  if (!mesh_radio_init()) {
-    LOG_E("RADIO", "Init radio 868 FAIL");
-  } else {
-    LOG_I("RADIO", "Init radio 868 OK");
-  }
+// I2C bus + EEPROM seuls : nécessaire dans TOUS les modes pour que
+// bootLoadConfig() puisse retomber sur l'EEPROM si LittleFS est vide/corrompu
+// — à cet instant settings.system.mode n'est pas encore connu.
+void bootInitEeprom() {
+  i2c_bus.begin();
+  LOG_I("I2C", "Bus initialisé");
 
-  if (!aprs_radio_init()) {
-    LOG_E("RADIO", "Init radio 433 FAIL");
+  if (eeprom.begin()) {
+    LOG_I("I2C", "EEPROM M24M01 OK");
   } else {
-    LOG_I("RADIO", "Init radio 433 OK");
+    LOG_W("I2C", "EEPROM non détectée");
   }
 }
 
+void bootLoadConfig() {
+  settings = settings_manager.load();
+  settings_registry.init(settings);
+  g_log_level = (LogLevel)settings.system.log_level;
+  LOG_I("CONFIG", "%d paramètres, log=%s, mode=%s",
+    settings_registry.count(), logLevelName(g_log_level), modeName(settings.system.mode));
+}
+
+void bootInitRadios() {
+  uint8_t mode = settings.system.mode;
+
+  if (modeHasMeshcore(mode)) {
+    if (!mesh_radio_init()) {
+      LOG_E("RADIO", "Init radio 868 FAIL");
+    } else {
+      LOG_I("RADIO", "Init radio 868 OK");
+    }
+  }
+
+  if (modeHasAprs(mode)) {
+    if (!aprs_radio_init()) {
+      LOG_E("RADIO", "Init radio 433 FAIL");
+    } else {
+      LOG_I("RADIO", "Init radio 433 OK");
+    }
+  }
+}
+
+// RNG et identité MeshCore utilisent le bruit de la radio 868 (cf.
+// variant/target.cpp: radio_get_rng_seed/radio_new_identity) — inutiles (et
+// la radio non initialisée) si MeshCore n'est pas actif dans ce mode.
 void bootSeedRng() {
+  if (!modeHasMeshcore(settings.system.mode)) {
+    return;
+  }
   fast_rng.begin(radio_get_rng_seed());
 }
 
 void bootInitIdentity() {
+  if (!modeHasMeshcore(settings.system.mode)) {
+    return;
+  }
+
   IdentityStore store(LittleFS, "/identity");
   store.begin();
 
@@ -103,9 +141,14 @@ void bootInitIdentity() {
   Serial.println();
 }
 
+// Capteurs/chargeurs/historique EEPROM : partie "télémétrie" du mode complet
+// uniquement (relais + télémétrie = fonctionnement normal, cf. Settings.h).
+// L'I2C bus et l'EEPROM elle-même sont déjà initialisés par bootInitEeprom()
+// (nécessaire dans tous les modes pour le fallback settings).
 void bootInitSensors() {
-  i2c_bus.begin();
-  LOG_I("I2C", "Bus initialisé");
+  if (!modeIsFull(settings.system.mode)) {
+    return;
+  }
 
   if (ina3221.begin()) {
     LOG_I("I2C", "INA3221 OK");
@@ -125,16 +168,13 @@ void bootInitSensors() {
     LOG_W("I2C", "BME280 non détecté");
   }
 
-  if (eeprom.begin()) {
-    LOG_I("I2C", "EEPROM M24M01 OK");
+  if (eeprom.isInitialized()) {
     if (telemetry_history.begin()) {
       LOG_I("I2C", "Historique EEPROM: %d slots", telemetry_history.getMaxRecords());
     }
     if (event_log.begin()) {
       LOG_I("I2C", "Log événements EEPROM: %d slots", event_log.getMaxRecords());
     }
-  } else {
-    LOG_W("I2C", "EEPROM non détectée");
   }
 
   if (victron.begin()) {
@@ -154,39 +194,52 @@ void bootInitSensors() {
   }
 }
 
-void bootLoadConfig() {
-  settings = settings_manager.load();
-  settings_registry.init(settings);
-  g_log_level = (LogLevel)settings.system.log_level;
-  LOG_I("CONFIG", "%d paramètres, log=%s", settings_registry.count(), logLevelName(g_log_level));
-}
-
 void bootInitRelays() {
+  if (!modeIsFull(settings.system.mode)) {
+    return;
+  }
   relay_hal.begin(settings.relay, RELAY_COUNT);
 }
 
 void bootInitMeshAndAprs() {
-  sensors.begin();
-  the_mesh.begin(&LittleFS);
+  uint8_t mode = settings.system.mode;
 
-  aprs_dispatcher.begin();
-  aprs_dispatcher.setRxCallback(&aprs_engine);
-  aprs_engine.setEventCallback(&aprs_event_handler);
+  if (modeHasMeshcore(mode)) {
+    sensors.begin();
+    the_mesh.begin(&LittleFS);
+    the_mesh.sendSelfAdvertisement(16000, false);
+  }
 
-  the_mesh.sendSelfAdvertisement(16000, false);
+  if (modeHasAprs(mode)) {
+    aprs_dispatcher.begin();
+    aprs_dispatcher.setRxCallback(&aprs_engine);
+    aprs_engine.setEventCallback(&aprs_event_handler);
+  }
 }
 
 void bootCreateTasks() {
-  LOG_I("RTOS", "Création des tasks...");
+  uint8_t mode = settings.system.mode;
+  LOG_I("RTOS", "Création des tasks (mode=%s)...", modeName(mode));
 
-  xTaskCreate(taskMeshLoop,   "mesh",    TASK_STACK_MESH,    nullptr, TASK_PRIO_MESH_LOOP, nullptr);
-  xTaskCreate(taskAprsLoop,   "aprs",    TASK_STACK_APRS,    nullptr, TASK_PRIO_APRS_LOOP, nullptr);
-  xTaskCreate(taskAprsBeacon, "beacon",  TASK_STACK_BEACON,  nullptr, TASK_PRIO_BEACON,    nullptr);
-  xTaskCreate(taskSensors,    "sensors", TASK_STACK_SENSORS, nullptr, TASK_PRIO_SENSORS,   nullptr);
-  xTaskCreate(taskEnergy,     "energy",  TASK_STACK_ENERGY,  nullptr, TASK_PRIO_ENERGY,    nullptr);
-  xTaskCreate(taskWeather,    "weather", TASK_STACK_WEATHER, nullptr, TASK_PRIO_WEATHER,   nullptr);
-  xTaskCreate(taskCli,        "cli",     TASK_STACK_CLI,     nullptr, TASK_PRIO_CLI,       nullptr);
-  xTaskCreate(taskWatchdog,   "wdt",     TASK_STACK_WATCHDOG, nullptr, TASK_PRIO_WATCHDOG, nullptr);
+  if (modeHasMeshcore(mode)) {
+    xTaskCreate(taskMeshLoop, "mesh", TASK_STACK_MESH, nullptr, TASK_PRIO_MESH_LOOP, nullptr);
+  }
+
+  if (modeHasAprs(mode)) {
+    xTaskCreate(taskAprsLoop,   "aprs",    TASK_STACK_APRS,    nullptr, TASK_PRIO_APRS_LOOP, nullptr);
+    xTaskCreate(taskAprsBeacon, "beacon",  TASK_STACK_BEACON,  nullptr, TASK_PRIO_BEACON,    nullptr);
+    xTaskCreate(taskWeather,    "weather", TASK_STACK_WEATHER, nullptr, TASK_PRIO_WEATHER,   nullptr);
+  }
+
+  if (modeIsFull(mode)) {
+    xTaskCreate(taskSensors, "sensors", TASK_STACK_SENSORS, nullptr, TASK_PRIO_SENSORS, nullptr);
+    xTaskCreate(taskEnergy,  "energy",  TASK_STACK_ENERGY,  nullptr, TASK_PRIO_ENERGY,  nullptr);
+  }
+
+  // Toujours créées, quel que soit le mode : configuration/diagnostic
+  // (série) et watchdog matériel restent utiles en standalone.
+  xTaskCreate(taskCli,      "cli", TASK_STACK_CLI,      nullptr, TASK_PRIO_CLI,      nullptr);
+  xTaskCreate(taskWatchdog, "wdt", TASK_STACK_WATCHDOG, nullptr, TASK_PRIO_WATCHDOG, nullptr);
 
   LOG_I("RTOS", "Scheduler démarré");
 }
