@@ -3,10 +3,10 @@
 #include "config/SettingsRegistry.h"
 #include "config/SettingsManager.h"
 #include "hal/Telemetry.h"
-#include "hal/TelemetryHistory.h"
-#include "hal/EventLogHistory.h"
-#include "hal/RelayHal.h"
-#include "hal/MpptChargerHal.h"
+#include "hal/eeprom/TelemetryHistory.h"
+#include "hal/eeprom/EventLogHistory.h"
+#include "hal/relay/RelayHal.h"
+#include "hal/chargers/MpptChargerHal.h"
 #include "aprs/AprsEngine.h"
 #include <Arduino.h>
 #include <FreeRTOS.h>

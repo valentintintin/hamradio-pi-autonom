@@ -52,7 +52,7 @@ void SettingsRegistry::init(Settings& s) {
   add("system.log_interval",   ST_UINT32, &s.system.telemetry_log_interval_ms, 10000.0f, 3600000.0f);
   add("system.log_level",      ST_UINT8,  &s.system.log_level, 0.0f, 5.0f);
 
-  // --- Relais (bistables, pilotés via TCA9555 I2C — cf. hal/RelayHal.h) ----
+  // --- Relais (bistables, pilotés via TCA9555 I2C — cf. hal/relay/RelayHal.h) ----
   add("relay.1.state", ST_BOOL, &s.relay[0].state);
   add("relay.2.state", ST_BOOL, &s.relay[1].state);
   add("relay.3.state", ST_BOOL, &s.relay[2].state);

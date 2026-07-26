@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Telemetry.h"
+#include "hal/Telemetry.h"
 #include "ChargeControllerHal.h"
 #include <VEDirect.h>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Telemetry.h"
+#include "hal/Telemetry.h"
 
 // ============================================================================
 // ChargeControllerHal — interface commune aux sources de charge solaire qui

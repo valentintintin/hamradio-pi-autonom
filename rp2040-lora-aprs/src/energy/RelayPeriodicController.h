@@ -1,7 +1,7 @@
 #pragma once
 
 #include "config/Settings.h"
-#include "hal/RelayHal.h"
+#include "hal/relay/RelayHal.h"
 #include "LowVoltageCutoffController.h"
 #include <Timer.h>
 

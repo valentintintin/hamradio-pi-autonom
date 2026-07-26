@@ -3,6 +3,12 @@
 //
 // Dual SX1262 : MeshCore (868 MHz, SPI1) + APRS (433 MHz, SPI0)
 // FreeRTOS sur RP2040 (Pico W, earlephilhower core)
+//
+// Racine de composition de l'appli : tous les objets globaux (radios, bus
+// I2C, HAL, contrôleurs énergie, CLI...) sont déclarés ici et référencés par
+// extern ailleurs (tasks/task_*.cpp, core/Boot.cpp). setup() ne fait que
+// dérouler la séquence de boot (cf. core/Boot.h) — le détail de chaque étape
+// vit dans core/Boot.cpp pour rester lisible.
 // ============================================================================
 
 #include <Arduino.h>
@@ -14,7 +20,6 @@
 // MeshCore core
 #include <helpers/SimpleMeshTables.h>
 #include <helpers/ArduinoHelpers.h>
-#include <helpers/IdentityStore.h>
 
 // Nos modules
 #include "mesh/MeshcoreRepeater.h"
@@ -22,20 +27,21 @@
 #include "aprs/AprsEngine.h"
 #include "aprs/AprsEventHandler.h"
 #include "hal/Telemetry.h"
-#include "hal/I2CBus.h"
-#include "hal/Ina3221Hal.h"
-#include "hal/MpptChargerHal.h"
-#include "hal/Bme280Hal.h"
-#include "hal/VictronHal.h"
-#include "hal/ChargeControllerHal.h"
-#include "hal/TelemetryHistory.h"
-#include "hal/EventLogHistory.h"
-#include "hal/Tca9555Hal.h"
-#include "hal/RelayHal.h"
+#include "hal/i2c/I2CBus.h"
+#include "hal/sensors/Ina3221Hal.h"
+#include "hal/chargers/MpptChargerHal.h"
+#include "hal/sensors/Bme280Hal.h"
+#include "hal/chargers/VictronHal.h"
+#include "hal/chargers/ChargeControllerHal.h"
+#include "hal/eeprom/TelemetryHistory.h"
+#include "hal/eeprom/EventLogHistory.h"
+#include "hal/i2c/Tca9555Hal.h"
+#include "hal/relay/RelayHal.h"
 #include "energy/LowVoltageCutoffController.h"
 #include "energy/RelayPeriodicController.h"
 #include "energy/MpptShutdownMonitor.h"
 #include "core/Log.h"
+#include "core/Boot.h"
 #include "config/Settings.h"
 #include "config/SettingsManager.h"
 #include "config/SettingsRegistry.h"
@@ -50,7 +56,7 @@ LogLevel g_log_level = LOG_INFO;
 
 // Horloge + RNG
 static ArduinoMillis ms_clock;
-static StdRNG fast_rng;
+StdRNG fast_rng;
 
 // Configuration — déclarée tôt : plusieurs modules (AprsEngine...) référencent
 // directement ses sous-structures plutôt que d'en garder une copie locale.
@@ -77,15 +83,16 @@ VictronHal victron(Serial1);  // VE.Direct sur UART1
 M24M01Hal eeprom(i2c_bus);
 
 // Un seul chargeur solaire présent à la fois selon la révision de carte
-// (MPPT I2C ou Victron VE.Direct) — déterminé au boot (cf. setup()) une fois
-// les deux begin() tentés. nullptr si aucun des deux n'est détecté.
+// (MPPT I2C ou Victron VE.Direct) — déterminé au boot (cf. core/Boot.cpp:
+// bootInitSensors) une fois les deux begin() tentés. nullptr si aucun des
+// deux n'est détecté.
 ChargeControllerHal* active_charger = nullptr;
 
 // Historique télémétrie EEPROM
 TelemetryHistory telemetry_history(eeprom);
 
 // Log d'événements critiques EEPROM (code + données numériques, cf.
-// hal/EventLogHistory.h) — journalisé explicitement par ses sites d'origine
+// hal/eeprom/EventLogHistory.h) — journalisé explicitement par ses sites d'origine
 // (task_watchdog.cpp, energy/LowVoltageCutoffController.cpp,
 // energy/MpptShutdownMonitor.cpp)
 EventLogHistory event_log(eeprom);
@@ -109,140 +116,20 @@ CommandHandler command_handler(settings, settings_registry, settings_manager, te
 AprsEventHandler aprs_event_handler(aprs_engine, command_handler, telemetry, settings);
 
 // ============================================================================
-// Setup
+// Setup — la séquence détaillée vit dans core/Boot.cpp, une fonction par
+// étape (ordre important : ex. bootInitRelays dépend des settings chargés
+// par bootLoadConfig).
 // ============================================================================
 void setup() {
-  Serial.begin(115200);
-  delay(2000); // attendre USB serial
-
-  // Board init
-  board.begin();
-
-  // Filesystem
-  LittleFS.begin();
-
-  // --- Init radio MeshCore (868 MHz, SPI1) ---------------------------------
-  if (!mesh_radio_init()) {
-    LOG_E("RADIO", "Init radio 868 FAIL");
-  } else {
-    LOG_I("RADIO", "Init radio 868 OK");
-  }
-
-  // --- Init radio APRS (433 MHz, SPI0) ------------------------------------
-  if (!aprs_radio_init()) {
-    LOG_E("RADIO", "Init radio 433 FAIL");
-  } else {
-    LOG_I("RADIO", "Init radio 433 OK");
-  }
-
-  // --- RNG — seed depuis bruit radio ---------------------------------------
-  fast_rng.begin(radio_get_rng_seed());
-
-  // --- Identity MeshCore — charge ou génère --------------------------------
-  {
-    IdentityStore store(LittleFS, "/identity");
-    store.begin();
-
-    if (!store.load("_main", the_mesh.self_id)) {
-      LOG_W("MESH", "Génération nouvelle identité");
-      the_mesh.self_id = radio_new_identity();   // create new random identity
-      int count = 0;
-      while (count < 10 && (the_mesh.self_id.pub_key[0] == 0x00 || the_mesh.self_id.pub_key[0] == 0xFF)) {  // reserved id hashes
-        the_mesh.self_id = radio_new_identity();
-        count++;
-      }
-      store.save("_main", the_mesh.self_id);
-    }
-
-    Serial.print("Repeater ID: ");
-    mesh::Utils::printHex(Serial, the_mesh.self_id.pub_key, PUB_KEY_SIZE);
-    Serial.println();
-  }
-
-  // --- Init I2C bus + capteurs ----------------------------------------------
-  i2c_bus.begin();
-  LOG_I("I2C", "Bus initialisé");
-
-  if (ina3221.begin()) {
-    LOG_I("I2C", "INA3221 OK");
-  } else {
-    LOG_W("I2C", "INA3221 non détecté");
-  }
-
-  if (mppt.begin()) {
-    LOG_I("I2C", "MPPT charger OK");
-  } else {
-    LOG_W("I2C", "MPPT non détecté");
-  }
-
-  if (bme280.begin()) {
-    LOG_I("I2C", "BME280 OK");
-  } else {
-    LOG_W("I2C", "BME280 non détecté");
-  }
-
-  if (eeprom.begin()) {
-    LOG_I("I2C", "EEPROM M24M01 OK");
-    if (telemetry_history.begin()) {
-      LOG_I("I2C", "Historique EEPROM: %d slots", telemetry_history.getMaxRecords());
-    }
-    if (event_log.begin()) {
-      LOG_I("I2C", "Log événements EEPROM: %d slots", event_log.getMaxRecords());
-    }
-  } else {
-    LOG_W("I2C", "EEPROM non détectée");
-  }
-
-  if (victron.begin()) {
-    LOG_I("VICTRON", "VE.Direct OK");
-  } else {
-    LOG_W("VICTRON", "VE.Direct non détecté");
-  }
-
-  // Un seul chargeur solaire à la fois selon la carte : MPPT prioritaire
-  // s'il répond, sinon Victron.
-  if (mppt.isInitialized()) {
-    active_charger = &mppt;
-  } else if (victron.isInitialized()) {
-    active_charger = &victron;
-  } else {
-    LOG_W("I2C", "Aucun chargeur solaire détecté (ni MPPT, ni Victron)");
-  }
-
-  // --- Charger la configuration --------------------------------------------
-  settings = settings_manager.load();
-  settings_registry.init(settings);
-  g_log_level = (LogLevel)settings.system.log_level;
-  LOG_I("CONFIG", "%d paramètres, log=%s", settings_registry.count(), logLevelName(g_log_level));
-
-  // --- Relais bistables (broches configurées via CLI, cf settings.relay) --
-  relay_hal.begin(settings.relay, RELAY_COUNT);
-
-  // --- Init MeshCore -------------------------------------------------------
-  sensors.begin();
-  the_mesh.begin(&LittleFS);
-
-  // --- Init APRS -----------------------------------------------------------
-  aprs_dispatcher.begin();
-  aprs_dispatcher.setRxCallback(&aprs_engine);
-  aprs_engine.setEventCallback(&aprs_event_handler);
-
-  // --- Advert initial ------------------------------------------------------
-  the_mesh.sendSelfAdvertisement(16000, false);
-
-  // --- Créer les tasks FreeRTOS --------------------------------------------
-  LOG_I("RTOS", "Création des tasks...");
-
-  xTaskCreate(taskMeshLoop,   "mesh",    TASK_STACK_MESH,    nullptr, TASK_PRIO_MESH_LOOP, nullptr);
-  xTaskCreate(taskAprsLoop,   "aprs",    TASK_STACK_APRS,    nullptr, TASK_PRIO_APRS_LOOP, nullptr);
-  xTaskCreate(taskAprsBeacon, "beacon",  TASK_STACK_BEACON,  nullptr, TASK_PRIO_BEACON,    nullptr);
-  xTaskCreate(taskSensors,    "sensors", TASK_STACK_SENSORS, nullptr, TASK_PRIO_SENSORS,   nullptr);
-  xTaskCreate(taskEnergy,     "energy",  TASK_STACK_ENERGY,  nullptr, TASK_PRIO_ENERGY,    nullptr);
-  xTaskCreate(taskWeather,    "weather", TASK_STACK_WEATHER, nullptr, TASK_PRIO_WEATHER,   nullptr);
-  xTaskCreate(taskCli,        "cli",     TASK_STACK_CLI,     nullptr, TASK_PRIO_CLI,       nullptr);
-  xTaskCreate(taskWatchdog,   "wdt",     TASK_STACK_WATCHDOG, nullptr, TASK_PRIO_WATCHDOG, nullptr);
-
-  LOG_I("RTOS", "Scheduler démarré");
+  bootInitCore();
+  bootInitRadios();
+  bootSeedRng();
+  bootInitIdentity();
+  bootInitSensors();
+  bootLoadConfig();
+  bootInitRelays();
+  bootInitMeshAndAprs();
+  bootCreateTasks();
 
   board.onBootComplete();
 }

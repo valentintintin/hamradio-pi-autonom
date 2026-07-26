@@ -1,7 +1,7 @@
 #pragma once
 
 #include "M24M01Hal.h"
-#include "Telemetry.h"
+#include "hal/Telemetry.h"
 #include "EepromDumpHeader.h"
 #include "core/Log.h"
 #include <stdint.h>
@@ -16,7 +16,7 @@
 // d'EEPROM pour EventLogHistory, cf. plus bas) : ~5411 records.
 // À 5min/record : ~18 jours d'historique.
 //
-// Plan mémoire EEPROM (128KB, cf. M24M01_SIZE_BYTES) — cf. hal/EventLogHistory.h
+// Plan mémoire EEPROM (128KB, cf. M24M01_SIZE_BYTES) — cf. hal/eeprom/EventLogHistory.h
 // pour le détail complet et la vérification de non-chevauchement :
 //   [0, 1024) Settings · [1024, 114688) TelemetryHistory · [114688, 131072) EventLogHistory
 // ============================================================================
@@ -27,7 +27,7 @@
 // Adresse EEPROM (après la zone settings — 1KB de marge)
 #define TELEMETRY_HISTORY_ADDR      1024
 
-// Réservés en fin d'EEPROM pour EventLogHistory (cf. hal/EventLogHistory.h,
+// Réservés en fin d'EEPROM pour EventLogHistory (cf. hal/eeprom/EventLogHistory.h,
 // EVENT_LOG_RESERVED_BYTES — les deux constantes doivent rester cohérentes).
 #define TELEMETRY_HISTORY_RESERVED_TAIL_BYTES (16 * 1024)
 

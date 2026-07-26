@@ -7,10 +7,10 @@
 #include "core/Log.h"
 #include "config/Settings.h"
 #include "hal/Telemetry.h"
-#include "hal/TelemetryHistory.h"
-#include "hal/Ina3221Hal.h"
-#include "hal/Bme280Hal.h"
-#include "hal/ChargeControllerHal.h"
+#include "hal/eeprom/TelemetryHistory.h"
+#include "hal/sensors/Ina3221Hal.h"
+#include "hal/sensors/Bme280Hal.h"
+#include "hal/chargers/ChargeControllerHal.h"
 #include "task_heartbeat.h"
 #include <Timer.h>
 

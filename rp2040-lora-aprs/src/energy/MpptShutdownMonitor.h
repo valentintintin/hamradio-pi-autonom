@@ -1,13 +1,13 @@
 #pragma once
 
-#include "hal/MpptChargerHal.h"
-#include "hal/EventLogHistory.h"
+#include "hal/chargers/MpptChargerHal.h"
+#include "hal/eeprom/EventLogHistory.h"
 #include "aprs/AprsEngine.h"
 
 // ============================================================================
 // MpptShutdownMonitor — alerte "extinction imminente" de la carte MPPT :
 // GPIO (interruption, MPPT_ALERT_PIN) + bit I2C ALERT en secours, envoi d'un
-// statut APRS une seule fois par épisode (cf. hal/MpptChargerHal.h).
+// statut APRS une seule fois par épisode (cf. hal/chargers/MpptChargerHal.h).
 // ============================================================================
 
 class MpptShutdownMonitor {

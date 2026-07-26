@@ -2,7 +2,7 @@
 
 #include "Settings.h"
 #include "core/Log.h"
-#include "hal/M24M01Hal.h"
+#include "hal/eeprom/M24M01Hal.h"
 #include <LittleFS.h>
 
 // ============================================================================

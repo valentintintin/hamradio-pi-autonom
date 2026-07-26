@@ -1,7 +1,7 @@
 #pragma once
 
 #include "hal/gpio/GpioHal.h"
-#include "hal/Tca9555Hal.h"
+#include "hal/i2c/Tca9555Hal.h"
 
 // GpioHal — broche (0-15) d'un expandeur I2C TCA9555.
 class Tca9555GpioHal : public GpioHal {

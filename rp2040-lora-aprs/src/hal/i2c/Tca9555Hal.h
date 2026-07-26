@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hal/I2CBus.h"
+#include "I2CBus.h"
 #include <TCA9555.h>
 #include <stdint.h>
 

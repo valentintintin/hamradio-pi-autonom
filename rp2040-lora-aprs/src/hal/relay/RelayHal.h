@@ -1,7 +1,7 @@
 #pragma once
 
 #include "config/Settings.h"
-#include "hal/Tca9555Hal.h"
+#include "hal/i2c/Tca9555Hal.h"
 #include <stdint.h>
 
 // ============================================================================

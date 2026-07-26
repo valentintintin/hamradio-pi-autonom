@@ -1,8 +1,8 @@
 #pragma once
 
 #include "config/Settings.h"
-#include "hal/RelayHal.h"
-#include "hal/EventLogHistory.h"
+#include "hal/relay/RelayHal.h"
+#include "hal/eeprom/EventLogHistory.h"
 #include <Timer.h>
 
 // ============================================================================

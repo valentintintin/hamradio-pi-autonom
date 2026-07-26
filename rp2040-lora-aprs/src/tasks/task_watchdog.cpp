@@ -1,7 +1,7 @@
 #include "tasks.h"
 #include "core/Log.h"
 #include "config/Settings.h"
-#include "hal/EventLogHistory.h"
+#include "hal/eeprom/EventLogHistory.h"
 #include "task_heartbeat.h"
 #include <hardware/structs/watchdog.h>
 #include <Timer.h>

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "I2CBus.h"
-#include "Telemetry.h"
+#include "hal/i2c/I2CBus.h"
+#include "hal/Telemetry.h"
 #include <Adafruit_BME280.h>
 
 // ============================================================================
