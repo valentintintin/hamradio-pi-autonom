@@ -60,6 +60,19 @@ void SettingsRegistry::init(Settings& s) {
   add("sstv.cw_repeats", ST_UINT8, &s.cw_sstv.cw_repeats, 1.0f, 10.0f);
   add("sstv.power_dbm", ST_INT8, &s.cw_sstv.power_dbm,  -9.0f, 22.0f);
 
+  // --- Canaux de groupe MeshCore (mesh.channel.N.name/region) --------------
+  // Clés générées dynamiquement (nombre de canaux = MAX_GROUP_CHANNELS,
+  // configurable au build) : buffers `static` car add() garde le pointeur de
+  // la clé tel quel (pas de copie), donc une variable locale non-static ici
+  // laisserait un pointeur pendouillant après le retour de la boucle.
+  static char channel_keys[MAX_GROUP_CHANNELS][2][24];
+  for (int i = 0; i < MAX_GROUP_CHANNELS; i++) {
+    snprintf(channel_keys[i][0], sizeof(channel_keys[i][0]), "mesh.channel.%d.name", i);
+    snprintf(channel_keys[i][1], sizeof(channel_keys[i][1]), "mesh.channel.%d.region", i);
+    add(channel_keys[i][0], ST_STRING, s.mesh_channels[i].name,   sizeof(s.mesh_channels[i].name));
+    add(channel_keys[i][1], ST_STRING, s.mesh_channels[i].region, sizeof(s.mesh_channels[i].region));
+  }
+
   // --- Energy --------------------------------------------------------------
   add("energy.poll_interval",     ST_UINT32, &s.energy.poll_interval_ms,     5000.0f, 600000.0f);
   add("energy.mppt_wdt.interval", ST_UINT32, &s.energy.mppt_wdt_interval_ms, 10000.0f, 300000.0f);
@@ -123,7 +136,7 @@ void SettingsRegistry::init(Settings& s) {
 // Ajouter une entrée (sans bornes)
 // ============================================================================
 void SettingsRegistry::add(const char* key, SettingType type, void* ptr, uint8_t maxLen) {
-  if (_count >= 96) {
+  if (_count >= 128) {
     return;
   }
   _entries[_count++] = { key, type, ptr, maxLen, 0, 0, false, nullptr, 0 };
@@ -133,7 +146,7 @@ void SettingsRegistry::add(const char* key, SettingType type, void* ptr, uint8_t
 // Ajouter une entrée (avec bornes min/max)
 // ============================================================================
 void SettingsRegistry::add(const char* key, SettingType type, void* ptr, float min, float max) {
-  if (_count >= 96) {
+  if (_count >= 128) {
     return;
   }
   _entries[_count++] = { key, type, ptr, 0, min, max, true, nullptr, 0 };
@@ -143,7 +156,7 @@ void SettingsRegistry::add(const char* key, SettingType type, void* ptr, float m
 // Ajouter une entrée enum par nom (ST_ENUM8, cf. SettingsRegistry.h)
 // ============================================================================
 void SettingsRegistry::add(const char* key, void* ptr, const EnumNameEntry* table, uint8_t tableCount) {
-  if (_count >= 96) {
+  if (_count >= 128) {
     return;
   }
   _entries[_count++] = { key, ST_ENUM8, ptr, 0, 0, 0, false, table, tableCount };

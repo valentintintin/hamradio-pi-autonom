@@ -12,7 +12,7 @@
 // ============================================================================
 
 #define SETTINGS_MAGIC    0x34485656  // "4HVV"
-#define SETTINGS_VERSION  6
+#define SETTINGS_VERSION  7
 
 // ============================================================================
 // Mode de fonctionnement — la carte peut être déployée en standalone (juste
@@ -101,6 +101,17 @@ struct CwSstvSettings {
   int8_t power_dbm;     // puissance CW+SSTV, ex: 22 — "sstv.power_dbm"
 };
 
+// Canaux de groupe MeshCore ("mesh.channel.N.name"/"mesh.channel.N.region",
+// N = 0..MAX_GROUP_CHANNELS-1 — cf. mesh/MeshcoreRepeater.h). Seuls le nom et
+// la région sont persistés : le secret/hash réel du canal est dérivé du nom
+// par sha256 au chargement (MeshcoreRepeater::loadChannelsFromSettings/
+// add_meshcore_bridge_channel), jamais stocké tel quel ici. name[0]=='\0'
+// signifie un slot inutilisé (ignoré au chargement).
+struct MeshChannelSettings {
+  char name[32];    // "" = inutilisé ; "Public" = canal public MeshCore standard (PSK connue)
+  char region[31];  // "*" = pas de restriction régionale
+};
+
 struct EnergySettings {
   uint32_t poll_interval_ms;     // intervalle lecture capteurs
   uint32_t mppt_wdt_interval_ms; // intervalle feed watchdog MPPT
@@ -172,6 +183,7 @@ struct Settings {
   EnergySettings energy;
   SystemSettings system;
   CwSstvSettings cw_sstv;
+  MeshChannelSettings mesh_channels[MAX_GROUP_CHANNELS];
   RelayChannel relay[RELAY_COUNT];
   RelayCutoffRule relay_cutoff[RELAY_CUTOFF_COUNT];
   RelayPeriodicRule relay_periodic[RELAY_COUNT];
@@ -224,6 +236,15 @@ inline Settings getDefaultSettings() {
   s.cw_sstv.cw_wpm = 20;
   s.cw_sstv.cw_repeats = 3;
   s.cw_sstv.power_dbm = 22;
+
+  // Canaux MeshCore — canal 0 = "Public" (PSK bien connue) par défaut, les
+  // autres slots inutilisés (name[0] == '\0')
+  for (auto& ch : s.mesh_channels) {
+    ch.name[0] = '\0';
+    ch.region[0] = '\0';
+  }
+  strncpy(s.mesh_channels[0].name, "Public", sizeof(s.mesh_channels[0].name));
+  strncpy(s.mesh_channels[0].region, "*", sizeof(s.mesh_channels[0].region));
 
   // Energy
   s.energy.poll_interval_ms = 30000;       // 30s

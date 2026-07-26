@@ -13,6 +13,8 @@
 #include <FreeRTOS.h>
 #include <semphr.h>
 
+class MeshcoreRepeater;  // cf. mesh/MeshcoreRepeater.h — juste un pointeur ici
+
 class CommandHandler {
 public:
   CommandHandler(Settings& settings, SettingsRegistry& registry,
@@ -21,11 +23,12 @@ public:
                  TelemetryHistory* history = nullptr,
                  MpptChargerHal* mppt = nullptr,
                  EventLogHistory* eventLog = nullptr,
-                 SstvTransmitter* sstv = nullptr)
+                 SstvTransmitter* sstv = nullptr,
+                 MeshcoreRepeater* mesh = nullptr)
     : _settings(&settings), _registry(&registry),
       _manager(&manager), _telemetry(&telemetry),
       _aprs(&aprsEngine), _relay(&relay), _history(history), _mppt(mppt),
-      _event_log(eventLog), _sstv(sstv), _mutex(aprsEngine.getMutex()) {}
+      _event_log(eventLog), _sstv(sstv), _mesh(mesh), _mutex(aprsEngine.getMutex()) {}
 
   // Exécute une commande, écrit la réponse dans out.
   // Retourne true si la commande a été reconnue.
@@ -51,6 +54,7 @@ private:
   MpptChargerHal* _mppt;
   EventLogHistory* _event_log;
   SstvTransmitter* _sstv;
+  MeshcoreRepeater* _mesh;
 
   // Settings/SettingsRegistry/relais sont partagés entre les tâches série,
   // APRS et mesh (MeshcoreRepeater retombe désormais aussi sur execute()) :

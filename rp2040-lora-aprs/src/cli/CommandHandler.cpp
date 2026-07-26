@@ -4,6 +4,7 @@
 #include "core/LockGuard.h"
 #include "core/StringPrint.h"
 #include "aprs/LoRa433RadioMode.h"
+#include "mesh/MeshcoreRepeater.h"
 #include <target.h>
 #include <RTClib.h>
 #include <cstring>
@@ -266,6 +267,14 @@ void CommandHandler::cmdSet(const char* key, const char* value, Print& out) {
       if (!ok) {
         out.printf("Attention: échec reconfiguration radio\n");
       }
+    }
+
+    // Canaux de groupe MeshCore : recharger immédiatement plutôt que d'attendre
+    // un reboot — juste dérive le secret/hash depuis le nom (sha256) et écrit
+    // dans le tableau en RAM de MeshcoreRepeater, aucun accès radio/mutex
+    // supplémentaire donc rien à encadrer ici.
+    if (_mesh && strncmp(key, "mesh.channel.", 13) == 0 && modeHasMeshcore(_settings->system.mode)) {
+      _mesh->loadChannelsFromSettings(*_settings);
     }
   } else {
     // Si set retourne false mais que la clé existe, c'est une erreur de validation

@@ -66,7 +66,7 @@ public:
   void listAll(Print& out) const;
 
 private:
-  SettingEntry _entries[96]{};  // assez large pour tous les champs
+  SettingEntry _entries[128]{};  // assez large pour tous les champs
   int _count = 0;
 
   void add(const char* key, SettingType type, void* ptr, uint8_t maxLen = 0);

@@ -38,7 +38,7 @@
 extern LogLevel g_log_level;
 extern StdRNG fast_rng;
 extern Settings settings;
-extern MyMesh the_mesh;
+extern MeshcoreRepeater the_mesh;
 extern AprsDispatcher aprs_dispatcher;
 extern AprsEngine aprs_engine;
 extern AprsEventHandler aprs_event_handler;
@@ -210,6 +210,9 @@ void bootInitMeshAndAprs() {
   if (modeHasMeshcore(mode)) {
     sensors.begin();
     the_mesh.begin(&LittleFS);
+    // Canaux de groupe (nom/région, cf. config/Settings.h: MeshChannelSettings)
+    // depuis les settings — après begin() pour ne pas être écrasés par lui.
+    the_mesh.loadChannelsFromSettings(settings);
     the_mesh.sendSelfAdvertisement(16000, false);
   }
 

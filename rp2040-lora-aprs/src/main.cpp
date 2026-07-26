@@ -117,7 +117,7 @@ SstvTransmitter sstv_transmitter;
 
 CommandHandler command_handler(settings, settings_registry, settings_manager, telemetry,
                                aprs_engine, relay_hal, &telemetry_history, &mppt, &event_log,
-                               &sstv_transmitter);
+                               &sstv_transmitter, &the_mesh);
 
 // Relie AprsEngine à la télémétrie et au CLI (query météo, telemetry, CLI par message)
 AprsEventHandler aprs_event_handler(aprs_engine, command_handler, telemetry, settings);
