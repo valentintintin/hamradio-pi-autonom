@@ -156,7 +156,7 @@ public:
 
     if (includeHeader) {
       out.printf("--- Historique: %d/%d records ---\n", _count, _max_records);
-      out.println(F("date,bat_mV,bat_mA,sol_mV,sol_mA,temp_in,hum_in,temp_out,uptime"));
+      out.println("date,bat_mV,bat_mA,sol_mV,sol_mA,temp_in,hum_in,temp_out,uptime");
     }
 
     TelemetryRecord rec{};

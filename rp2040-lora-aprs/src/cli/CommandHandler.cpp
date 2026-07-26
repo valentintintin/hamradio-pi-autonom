@@ -56,7 +56,7 @@ bool CommandHandler::execute(const char* input, Print& out, bool isLocal) {
       }
       cmdSet(key, value, out);
     } else {
-      out.println(F("Usage: set <key> <value>"));
+      out.println("Usage: set <key> <value>");
     }
     return true;
   }
@@ -99,12 +99,12 @@ bool CommandHandler::execute(const char* input, Print& out, bool isLocal) {
   }
 
   if (strcmp(cmd, "beacon") == 0) {
-    out.println(_aprs->sendPosition(_settings->aprs.comment) ? F("Position envoyée") : F("Échec envoi position"));
+    out.println(_aprs->sendPosition(_settings->aprs.comment) ? "Position envoyée" : "Échec envoi position");
     return true;
   }
 
   if (strcmp(cmd, "wx") == 0) {
-    out.println(_aprs->sendWeather() ? F("Météo envoyée") : F("Échec envoi météo"));
+    out.println(_aprs->sendWeather() ? "Météo envoyée" : "Échec envoi météo");
     return true;
   }
 
@@ -135,7 +135,7 @@ bool CommandHandler::execute(const char* input, Print& out, bool isLocal) {
   }
 
   if (strcmp(cmd, "reboot") == 0) {
-    out.println(F("Redémarrage..."));
+    out.println("Redémarrage...");
     out.flush();
     delay(100);
     rp2040.reboot();
@@ -143,7 +143,7 @@ bool CommandHandler::execute(const char* input, Print& out, bool isLocal) {
   }
 
   if (strcmp(cmd, "dfu") == 0) {
-    out.println(F("Redémarrage en mode bootloader USB (UF2)..."));
+    out.println("Redémarrage en mode bootloader USB (UF2)...");
     out.flush();
     delay(100);
     rp2040.rebootToBootloader();
@@ -159,10 +159,10 @@ bool CommandHandler::execute(const char* input, Print& out, bool isLocal) {
     // Pas de texte d'aide sur une liaison radio distante (APRS/mesh) : ça ne
     // ferait que gaspiller l'airtime pour un client qui explore la commande.
     if (isLocal) {
-      out.println(F("Commandes: get <key>, set <key> <value>, clockdate JJ/MM/AA HH:MM:SS,"));
-      out.println(F("  list, save, status, version, uptime, freemem, beacon, wx,"));
-      out.println(F("  send aprs <texte>, history [n]/clear/dump [n], eventlog [n]/clear/dump [n],"));
-      out.println(F("  image <n> (upload binaire série)/send/cancel, defaults, reboot, dfu, help"));
+      out.println("Commandes: get <key>, set <key> <value>, clockdate JJ/MM/AA HH:MM:SS,");
+      out.println("  list, save, status, version, uptime, freemem, beacon, wx,");
+      out.println("  send aprs <texte>, history [n]/clear/dump [n], eventlog [n]/clear/dump [n],");
+      out.println("  image <n> (upload binaire série)/send/cancel, defaults, reboot, dfu, help");
     }
     return true;
   }
@@ -258,7 +258,7 @@ void CommandHandler::cmdSet(const char* key, const char* value, Print& out) {
     // task_weather.cpp/SstvTransmitter.cpp).
     if ((strcmp(key, "radio.aprs.freq") == 0 || strcmp(key, "radio.aprs.bw") == 0 ||
          strcmp(key, "radio.aprs.sf") == 0 || strcmp(key, "radio.aprs.cr") == 0 ||
-         strcmp(key, "radio.aprs.power")) &&
+         strcmp(key, "radio.aprs.power") == 0) &&
         modeHasAprs(_settings->system.mode)) {
       aprs_dispatcher.pause();
       bool ok = LoRa433RadioMode::switchToLora();
@@ -282,7 +282,7 @@ void CommandHandler::cmdSet(const char* key, const char* value, Print& out) {
 void CommandHandler::cmdSetClockDate(const char* value, Print& out) {
   int day, month, year, hour, minute, second;
   if (sscanf(value, "%d/%d/%d %d:%d:%d", &day, &month, &year, &hour, &minute, &second) != 6) {
-    out.println(F("Usage: clock JJ/MM/AA HH:MM:SS"));
+    out.println("Usage: clock JJ/MM/AA HH:MM:SS");
     return;
   }
   if (year < 100) {
@@ -297,20 +297,20 @@ void CommandHandler::cmdSetClockDate(const char* value, Print& out) {
 }
 
 void CommandHandler::cmdList(Print& out) {
-  out.println(F("--- Configuration ---"));
+  out.println("--- Configuration ---");
   _registry->listAll(out);
 }
 
 void CommandHandler::cmdSave(Print& out) {
   if (_manager->save(*_settings)) {
-    out.println(F("Configuration sauvegardée"));
+    out.println("Configuration sauvegardée");
   } else {
-    out.println(F("Erreur sauvegarde"));
+    out.println("Erreur sauvegarde");
   }
 }
 
 void CommandHandler::cmdStatus(Print& out) {
-  out.println(F("--- Telemetry ---"));
+  out.println("--- Telemetry ---");
   // out.printf("  Batterie:  %.0f mV / %.0f mA\n", _telemetry->battery.voltage_mv, _telemetry->battery.current_ma);
   // out.printf("  Solaire:   %.0f mV / %.0f mA\n", _telemetry->solar.voltage_mv, _telemetry->solar.current_ma);
   // out.printf("  Board:     %.0f mV / %.0f mA\n", _telemetry->board_5v.voltage_mv, _telemetry->board_5v.current_ma);
@@ -326,7 +326,7 @@ void CommandHandler::cmdStatus(Print& out) {
 
 void CommandHandler::cmdVersion(Print& out) {
   out.printf("%s build %s\n", FIRMWARE_VERSION, FIRMWARE_BUILD_DATE);
-  out.print(F("Board:"));
+  out.print("Board:");
   out.println(board.getManufacturerName());
   out.printf("Uptime: %lu s  Free heap: %u\n", _telemetry->uptime_s, (unsigned)rp2040.getFreeHeap());
 }
@@ -334,19 +334,19 @@ void CommandHandler::cmdVersion(Print& out) {
 void CommandHandler::cmdDefaults(Print& out) {
   *_settings = getDefaultSettings();
   _registry->init(*_settings);  // re-pointer les entrées
-  out.println(F("Valeurs par défaut chargées (non sauvé, 'save' pour persister)"));
+  out.println("Valeurs par défaut chargées (non sauvé, 'save' pour persister)");
 }
 
 void CommandHandler::cmdHistory(const char* args, Print& out, bool isLocal) {
   if (!_history || !_history->isInitialized()) {
-    out.println(F("Historique EEPROM non disponible"));
+    out.println("Historique EEPROM non disponible");
     return;
   }
 
   // "history clear" — efface l'historique
   if (strcmp(args, "clear") == 0) {
     _history->clear();
-    out.println(F("Historique effacé"));
+    out.println("Historique effacé");
     return;
   }
 
@@ -356,7 +356,7 @@ void CommandHandler::cmdHistory(const char* args, Print& out, bool isLocal) {
   // radio (et casserait le tampon texte APRS/mesh).
   if (strcmp(args, "dump") == 0 || strncmp(args, "dump ", 5) == 0) {
     if (!isLocal) {
-      out.println(F("history dump: série uniquement"));
+      out.println("history dump: série uniquement");
       return;
     }
     uint16_t n = 0;
@@ -379,7 +379,7 @@ void CommandHandler::cmdHistory(const char* args, Print& out, bool isLocal) {
   // octets) : seul le dernier record tient, et sans bannière/en-tête CSV.
   if (!isLocal) {
     if (n != 1) {
-      out.println(F("history: seul le dernier ('history' ou 'history 1') est autorisé en distant"));
+      out.println("history: seul le dernier ('history' ou 'history 1') est autorisé en distant");
       return;
     }
     _history->dump(out, 1, false);
@@ -391,13 +391,13 @@ void CommandHandler::cmdHistory(const char* args, Print& out, bool isLocal) {
 
 void CommandHandler::cmdEventLog(const char* args, Print& out, bool isLocal) {
   if (!_event_log || !_event_log->isInitialized()) {
-    out.println(F("Log événements EEPROM non disponible"));
+    out.println("Log événements EEPROM non disponible");
     return;
   }
 
   if (strcmp(args, "clear") == 0) {
     _event_log->clear();
-    out.println(F("Log événements effacé"));
+    out.println("Log événements effacé");
     return;
   }
 
@@ -405,7 +405,7 @@ void CommandHandler::cmdEventLog(const char* args, Print& out, bool isLocal) {
   // ci-dessus.
   if (strcmp(args, "dump") == 0 || strncmp(args, "dump ", 5) == 0) {
     if (!isLocal) {
-      out.println(F("eventlog dump: série uniquement"));
+      out.println("eventlog dump: série uniquement");
       return;
     }
     uint16_t n = 0;
@@ -427,7 +427,7 @@ void CommandHandler::cmdEventLog(const char* args, Print& out, bool isLocal) {
   // En distant (APRS/mesh), le tampon de réponse est minuscule (~100-160
   // octets) : seul le dernier événement tient, et sans bannière.
   if (!isLocal && n != 1) {
-    out.println(F("eventlog: seul le dernier ('eventlog' ou 'eventlog 1') est autorisé en distant"));
+    out.println("eventlog: seul le dernier ('eventlog' ou 'eventlog 1') est autorisé en distant");
     return;
   }
 
@@ -450,19 +450,19 @@ void CommandHandler::cmdEventLog(const char* args, Print& out, bool isLocal) {
 
 void CommandHandler::cmdSendAprs(const char* content, Print& out) {
   if (_aprs->sendRaw(content)) {
-    out.println(F("Paquet APRS envoyé"));
+    out.println("Paquet APRS envoyé");
   } else {
-    out.println(F("Échec envoi (contenu vide ou trop long)"));
+    out.println("Échec envoi (contenu vide ou trop long)");
   }
 }
 
 void CommandHandler::cmdImage(const char* args, Print& out, bool isLocal) {
   if (!modeHasAprs(_settings->system.mode)) {
-    out.println(F("APRS non actif dans ce mode"));
+    out.println("APRS non actif dans ce mode");
     return;
   }
   if (!_sstv) {
-    out.println(F("SSTV non disponible"));
+    out.println("SSTV non disponible");
     return;
   }
 
@@ -476,9 +476,9 @@ void CommandHandler::cmdImage(const char* args, Print& out, bool isLocal) {
   // "image cancel" : abandonne un upload en cours
   if (strcmp(args, "cancel") == 0) {
     _sstv->cancelUpload();
-    out.println(F("Upload annulé"));
+    out.println("Upload annulé");
     return;
   }
 
-  out.println(F("Usage: image <n> (upload, série uniquement) | image send | image cancel"));
+  out.println("Usage: image <n> (upload, série uniquement) | image send | image cancel");
 }

@@ -45,7 +45,7 @@ static void receiveImageBinary(uint32_t expected_bytes) {
       size_t n = Serial.readBytes(buf, to_read);
       if (n > 0) {
         if (!sstv_transmitter.writeImageChunk(buf, n)) {
-          LOG_W(F("Erreur écriture, upload annulé"));
+          LOG_W("CLI IMAGE", "Erreur écriture, upload annulé");
           sstv_transmitter.cancelUpload();
           return;
         }
@@ -54,7 +54,7 @@ static void receiveImageBinary(uint32_t expected_bytes) {
       }
     } else {
       if (millis() - last_byte_time > IMAGE_UPLOAD_INACTIVITY_TIMEOUT_MS) {
-        LOG_W(F("Timeout upload (inactivité), annulé"));
+        LOG_W("CLI IMAGE", "Timeout upload (inactivité), annulé");
         sstv_transmitter.cancelUpload();
         return;
       }
@@ -62,7 +62,7 @@ static void receiveImageBinary(uint32_t expected_bytes) {
     }
   }
 
-  LOG_I(F("Upload terminé"));
+  LOG_I("CLI IMAGE", "Upload terminé, tapez 'image send'");
 }
 
 void taskCli(void* params) {

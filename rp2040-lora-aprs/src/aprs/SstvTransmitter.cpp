@@ -72,7 +72,7 @@ bool SstvTransmitter::beginImageUpload(uint32_t announced_bytes, Print* out) {
   _upload_file = LittleFS.open(SSTV_IMAGE_PATH, "w");
   if (!_upload_file) {
     if (out) {
-      out->println(F("Erreur ouverture fichier image sur LittleFS"));
+      out->println("Erreur ouverture fichier image sur LittleFS");
     }
     return false;
   }
@@ -125,13 +125,13 @@ void SstvTransmitter::cancelUpload() {
 bool SstvTransmitter::requestTransmit(Print* out) {
   if (!_upload_complete) {
     if (out) {
-      out->println(F("Aucune image complète en attente ('image <n>' d'abord)"));
+      out->println("Aucune image complète en attente ('image <n>' d'abord)");
     }
     return false;
   }
   _transmit_requested = true;
   if (out) {
-    out->println(F("Transmission CW+SSTV programmée"));
+    out->println("Transmission CW+SSTV programmée");
   }
   return true;
 }
