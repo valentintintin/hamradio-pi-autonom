@@ -42,6 +42,9 @@ void SettingsRegistry::init(Settings& s) {
   add("energy.poll_interval",     ST_UINT32, &s.energy.poll_interval_ms,     5000.0f, 600000.0f);
   add("energy.mppt_wdt.interval", ST_UINT32, &s.energy.mppt_wdt_interval_ms, 10000.0f, 300000.0f);
   add("energy.mppt_wdt.enabled",  ST_BOOL,   &s.energy.mppt_wdt_enabled);
+  add("energy.low_voltage_cutoff.enabled", ST_BOOL, &s.energy.low_voltage_cutoff_enabled);
+  add("energy.mppt_pwr_off_mv", ST_UINT16, &s.energy.mppt_pwr_off_mv, 0.0f, 30000.0f);
+  add("energy.mppt_pwr_on_mv",  ST_UINT16, &s.energy.mppt_pwr_on_mv,  0.0f, 30000.0f);
 
   // --- System --------------------------------------------------------------
   add("system.password",       ST_STRING, s.system.admin_password, sizeof(s.system.admin_password));
@@ -54,13 +57,49 @@ void SettingsRegistry::init(Settings& s) {
   add("relay.2.state", ST_BOOL, &s.relay[1].state);
   add("relay.3.state", ST_BOOL, &s.relay[2].state);
   add("relay.4.state", ST_BOOL, &s.relay[3].state);
+
+  // --- Coupure basse-tension (cf. task_energy.cpp) -------------------------
+  add("relay_cutoff.1.relay",       ST_UINT8,  &s.relay_cutoff[0].relay_number,       0.0f, (float)RELAY_COUNT);
+  add("relay_cutoff.1.min_mv",      ST_UINT16, &s.relay_cutoff[0].min_voltage_mv,     0.0f, 30000.0f);
+  add("relay_cutoff.1.restore_mv",  ST_UINT16, &s.relay_cutoff[0].restore_voltage_mv, 0.0f, 30000.0f);
+  add("relay_cutoff.1.debounce_ms", ST_UINT32, &s.relay_cutoff[0].debounce_ms,        0.0f, 600000.0f);
+  add("relay_cutoff.2.relay",       ST_UINT8,  &s.relay_cutoff[1].relay_number,       0.0f, (float)RELAY_COUNT);
+  add("relay_cutoff.2.min_mv",      ST_UINT16, &s.relay_cutoff[1].min_voltage_mv,     0.0f, 30000.0f);
+  add("relay_cutoff.2.restore_mv",  ST_UINT16, &s.relay_cutoff[1].restore_voltage_mv, 0.0f, 30000.0f);
+  add("relay_cutoff.2.debounce_ms", ST_UINT32, &s.relay_cutoff[1].debounce_ms,        0.0f, 600000.0f);
+  add("relay_cutoff.3.relay",       ST_UINT8,  &s.relay_cutoff[2].relay_number,       0.0f, (float)RELAY_COUNT);
+  add("relay_cutoff.3.min_mv",      ST_UINT16, &s.relay_cutoff[2].min_voltage_mv,     0.0f, 30000.0f);
+  add("relay_cutoff.3.restore_mv",  ST_UINT16, &s.relay_cutoff[2].restore_voltage_mv, 0.0f, 30000.0f);
+  add("relay_cutoff.3.debounce_ms", ST_UINT32, &s.relay_cutoff[2].debounce_ms,        0.0f, 600000.0f);
+  add("relay_cutoff.4.relay",       ST_UINT8,  &s.relay_cutoff[3].relay_number,       0.0f, (float)RELAY_COUNT);
+  add("relay_cutoff.4.min_mv",      ST_UINT16, &s.relay_cutoff[3].min_voltage_mv,     0.0f, 30000.0f);
+  add("relay_cutoff.4.restore_mv",  ST_UINT16, &s.relay_cutoff[3].restore_voltage_mv, 0.0f, 30000.0f);
+  add("relay_cutoff.4.debounce_ms", ST_UINT32, &s.relay_cutoff[3].debounce_ms,        0.0f, 600000.0f);
+
+  // --- Réveil périodique par relais (cf. task_energy.cpp) -------------------
+  add("relay_periodic.1.enabled",      ST_BOOL,   &s.relay_periodic[0].enabled);
+  add("relay_periodic.1.interval_ms",  ST_UINT32, &s.relay_periodic[0].interval_ms,     60000.0f, 86400000.0f);
+  add("relay_periodic.1.on_duration_ms", ST_UINT32, &s.relay_periodic[0].on_duration_ms, 1000.0f, 3600000.0f);
+  add("relay_periodic.1.override_low_voltage", ST_BOOL, &s.relay_periodic[0].override_low_voltage);
+  add("relay_periodic.2.enabled",      ST_BOOL,   &s.relay_periodic[1].enabled);
+  add("relay_periodic.2.interval_ms",  ST_UINT32, &s.relay_periodic[1].interval_ms,     60000.0f, 86400000.0f);
+  add("relay_periodic.2.on_duration_ms", ST_UINT32, &s.relay_periodic[1].on_duration_ms, 1000.0f, 3600000.0f);
+  add("relay_periodic.2.override_low_voltage", ST_BOOL, &s.relay_periodic[1].override_low_voltage);
+  add("relay_periodic.3.enabled",      ST_BOOL,   &s.relay_periodic[2].enabled);
+  add("relay_periodic.3.interval_ms",  ST_UINT32, &s.relay_periodic[2].interval_ms,     60000.0f, 86400000.0f);
+  add("relay_periodic.3.on_duration_ms", ST_UINT32, &s.relay_periodic[2].on_duration_ms, 1000.0f, 3600000.0f);
+  add("relay_periodic.3.override_low_voltage", ST_BOOL, &s.relay_periodic[2].override_low_voltage);
+  add("relay_periodic.4.enabled",      ST_BOOL,   &s.relay_periodic[3].enabled);
+  add("relay_periodic.4.interval_ms",  ST_UINT32, &s.relay_periodic[3].interval_ms,     60000.0f, 86400000.0f);
+  add("relay_periodic.4.on_duration_ms", ST_UINT32, &s.relay_periodic[3].on_duration_ms, 1000.0f, 3600000.0f);
+  add("relay_periodic.4.override_low_voltage", ST_BOOL, &s.relay_periodic[3].override_low_voltage);
 }
 
 // ============================================================================
 // Ajouter une entrée (sans bornes)
 // ============================================================================
 void SettingsRegistry::add(const char* key, SettingType type, void* ptr, uint8_t maxLen) {
-  if (_count >= 64) {
+  if (_count >= 96) {
     return;
   }
   _entries[_count++] = { key, type, ptr, maxLen, 0, 0, false };
@@ -70,7 +109,7 @@ void SettingsRegistry::add(const char* key, SettingType type, void* ptr, uint8_t
 // Ajouter une entrée (avec bornes min/max)
 // ============================================================================
 void SettingsRegistry::add(const char* key, SettingType type, void* ptr, float min, float max) {
-  if (_count >= 64) {
+  if (_count >= 96) {
     return;
   }
   _entries[_count++] = { key, type, ptr, 0, min, max, true };

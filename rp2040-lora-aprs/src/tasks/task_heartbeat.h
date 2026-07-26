@@ -15,6 +15,7 @@ enum HeartbeatTask {
   HB_MESH = 0,
   HB_APRS,
   HB_BEACON,
+  HB_SENSORS,
   HB_ENERGY,
   HB_WEATHER,
   HB_CLI,

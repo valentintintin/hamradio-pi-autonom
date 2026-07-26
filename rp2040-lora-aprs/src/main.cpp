@@ -27,9 +27,13 @@
 #include "hal/MpptChargerHal.h"
 #include "hal/Bme280Hal.h"
 #include "hal/VictronHal.h"
+#include "hal/ChargeControllerHal.h"
 #include "hal/TelemetryHistory.h"
 #include "hal/Tca9555Hal.h"
 #include "hal/RelayHal.h"
+#include "energy/LowVoltageCutoffController.h"
+#include "energy/RelayPeriodicController.h"
+#include "energy/MpptShutdownMonitor.h"
 #include "core/Log.h"
 #include "config/Settings.h"
 #include "config/SettingsManager.h"
@@ -71,6 +75,11 @@ Bme280Hal bme280(i2c_bus);
 VictronHal victron(Serial1);  // VE.Direct sur UART1
 M24M01Hal eeprom(i2c_bus);
 
+// Un seul chargeur solaire présent à la fois selon la révision de carte
+// (MPPT I2C ou Victron VE.Direct) — déterminé au boot (cf. setup()) une fois
+// les deux begin() tentés. nullptr si aucun des deux n'est détecté.
+ChargeControllerHal* active_charger = nullptr;
+
 // Historique télémétrie EEPROM
 TelemetryHistory telemetry_history(eeprom);
 
@@ -78,11 +87,16 @@ TelemetryHistory telemetry_history(eeprom);
 Tca9555Hal relay_expander(i2c_bus, TCA9555_RELAY_ADDR);
 RelayHal relay_hal(relay_expander);
 
+// Supervision énergie (cf. src/energy/, orchestrée par task_energy.cpp)
+LowVoltageCutoffController low_voltage_cutoff(settings, relay_hal);
+RelayPeriodicController relay_periodic(settings, relay_hal, low_voltage_cutoff);
+MpptShutdownMonitor mppt_shutdown_monitor(mppt, aprs_engine);
+
 // Configuration (settings elle-même déclarée plus haut, cf. commentaire)
 SettingsManager settings_manager(&eeprom);
 SettingsRegistry settings_registry;
 CommandHandler command_handler(settings, settings_registry, settings_manager, telemetry,
-                               aprs_engine, relay_hal, &telemetry_history);
+                               aprs_engine, relay_hal, &telemetry_history, &mppt);
 
 // Relie AprsEngine à la télémétrie et au CLI (query météo, telemetry, CLI par message)
 AprsEventHandler aprs_event_handler(aprs_engine, command_handler, telemetry, settings);
@@ -175,6 +189,16 @@ void setup() {
     LOG_W("VICTRON", "VE.Direct non détecté");
   }
 
+  // Un seul chargeur solaire à la fois selon la carte : MPPT prioritaire
+  // s'il répond, sinon Victron.
+  if (mppt.isInitialized()) {
+    active_charger = &mppt;
+  } else if (victron.isInitialized()) {
+    active_charger = &victron;
+  } else {
+    LOG_W("I2C", "Aucun chargeur solaire détecté (ni MPPT, ni Victron)");
+  }
+
   // --- Charger la configuration --------------------------------------------
   settings = settings_manager.load();
   settings_registry.init(settings);
@@ -202,6 +226,7 @@ void setup() {
   xTaskCreate(taskMeshLoop,   "mesh",    TASK_STACK_MESH,    nullptr, TASK_PRIO_MESH_LOOP, nullptr);
   xTaskCreate(taskAprsLoop,   "aprs",    TASK_STACK_APRS,    nullptr, TASK_PRIO_APRS_LOOP, nullptr);
   xTaskCreate(taskAprsBeacon, "beacon",  TASK_STACK_BEACON,  nullptr, TASK_PRIO_BEACON,    nullptr);
+  xTaskCreate(taskSensors,    "sensors", TASK_STACK_SENSORS, nullptr, TASK_PRIO_SENSORS,   nullptr);
   xTaskCreate(taskEnergy,     "energy",  TASK_STACK_ENERGY,  nullptr, TASK_PRIO_ENERGY,    nullptr);
   xTaskCreate(taskWeather,    "weather", TASK_STACK_WEATHER, nullptr, TASK_PRIO_WEATHER,   nullptr);
   xTaskCreate(taskCli,        "cli",     TASK_STACK_CLI,     nullptr, TASK_PRIO_CLI,       nullptr);

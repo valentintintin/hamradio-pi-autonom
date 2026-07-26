@@ -1,88 +1,102 @@
 // ============================================================================
-// Task énergie — polling périodique INA3221 + MPPT + BME280 + Victron
-//                + enregistrement historique EEPROM
+// Task énergie — orchestration : watchdog MPPT + coupure/reprise basse-
+// tension + réveil périodique par relais + alerte extinction MPPT.
+//
+// La logique de chaque volet vit dans src/energy/ (LowVoltageCutoffController,
+// RelayPeriodicController, MpptShutdownMonitor) ; cette tâche se contente de
+// les construire (cf. main.cpp) et de les faire tourner à chaque tick, comme
+// task_beacon.cpp le fait pour AprsEngine.
+//
+// Ne lit plus les capteurs elle-même (cf. task_sensors.cpp, seul écrivain de
+// `telemetry`) : cette tâche ne fait que réagir aux valeurs déjà publiées.
 // ============================================================================
 
 #include "tasks.h"
 #include "core/Log.h"
 #include "config/Settings.h"
 #include "hal/Telemetry.h"
-#include "hal/TelemetryHistory.h"
-#include "hal/I2CBus.h"
 #include "hal/Ina3221Hal.h"
 #include "hal/MpptChargerHal.h"
-#include "hal/Bme280Hal.h"
-#include "hal/VictronHal.h"
+#include "hal/ChargeControllerHal.h"
+#include "energy/LowVoltageCutoffController.h"
+#include "energy/RelayPeriodicController.h"
+#include "energy/MpptShutdownMonitor.h"
 #include "task_heartbeat.h"
 #include <Timer.h>
 
 extern TelemetryData telemetry;
 extern Settings settings;
-extern I2CBus i2c_bus;
 extern Ina3221Hal ina3221;
 extern MpptChargerHal mppt;
-extern Bme280Hal bme280;
-extern VictronHal victron;
-extern TelemetryHistory telemetry_history;
+extern ChargeControllerHal* active_charger; // MPPT ou Victron, un seul à la fois (cf. main.cpp)
+extern LowVoltageCutoffController low_voltage_cutoff;
+extern RelayPeriodicController relay_periodic;
+extern MpptShutdownMonitor mppt_shutdown_monitor;
 
 #define TAG "ENERGY"
 #define ENERGY_BOOT_DELAY_MS (10 * 1000)
+
+// Tension batterie à surveiller : le mini des sources disponibles (chargeur
+// solaire actif et/ou INA3221), pour couper si l'une des deux indique une
+// tension basse — plus prudent que de dépendre d'une seule source. Une
+// source non initialisée est ignorée plutôt que de faire chuter le mini à 0
+// (ce qui déclencherait la coupure en permanence). Retourne false si aucune
+// source n'est disponible.
+static bool getBatteryVoltageMv(float& voltage_mv) {
+  bool have_reading = false;
+
+  if (active_charger) {
+    voltage_mv = telemetry.battery_mppt.voltage_mv;
+    have_reading = true;
+  }
+  if (ina3221.isInitialized()) {
+    float v = telemetry.battery_ina.voltage_mv;
+    voltage_mv = have_reading ? min(voltage_mv, v) : v;
+    have_reading = true;
+  }
+
+  return have_reading;
+}
 
 void taskEnergy(void* params) {
   (void)params;
   vTaskDelay(pdMS_TO_TICKS(ENERGY_BOOT_DELAY_MS));
   LOG_D(TAG, "Task démarrée");
 
+  mppt_shutdown_monitor.begin();
+
+  // Pousser les seuils de coupure/reprise matériels au chip s'ils sont
+  // configurés (0 = laisser le réglage usine, cf. Settings.h)
+  if (mppt.isInitialized()) {
+    if (settings.energy.mppt_pwr_off_mv > 0) {
+      mppt.setPowerOffThreshold(settings.energy.mppt_pwr_off_mv);
+    }
+    if (settings.energy.mppt_pwr_on_mv > 0) {
+      mppt.setPowerOnThreshold(settings.energy.mppt_pwr_on_mv);
+    }
+  }
+
   Timer wdt_feed_timer(settings.energy.mppt_wdt_interval_ms);
-  Timer history_timer(settings.system.telemetry_log_interval_ms);
 
   for (;;) {
     heartbeat(HB_ENERGY);
 
-    if (ina3221.isInitialized() && !ina3221.query(telemetry)) {
-      LOG_W(TAG, "Erreur lecture INA3221");
-    }
-
-    if (mppt.isInitialized()) {
-      if (!mppt.query(telemetry)) {
-        LOG_W(TAG, "Erreur lecture MPPT");
-      }
-
-      if (settings.energy.mppt_wdt_enabled) {
-        // Resynchroniser l'intervalle si modifié à chaud
-        wdt_feed_timer.setInterval(settings.energy.mppt_wdt_interval_ms, false);
-        if (wdt_feed_timer.hasExpired()) {
-          mppt.feedWatchdog(120);
-          wdt_feed_timer.restart();
-          LOG_T(TAG, "MPPT watchdog nourri");
-        }
+    if (mppt.isInitialized() && settings.energy.mppt_wdt_enabled) {
+      // Resynchroniser l'intervalle si modifié à chaud
+      wdt_feed_timer.setInterval(settings.energy.mppt_wdt_interval_ms, false);
+      if (wdt_feed_timer.hasExpired()) {
+        mppt.feedWatchdog(120);
+        wdt_feed_timer.restart();
+        LOG_T(TAG, "MPPT watchdog nourri");
       }
     }
 
-    if (bme280.isInitialized() && !bme280.query(telemetry.weather_inside)) {
-      LOG_W(TAG, "Erreur lecture BME280");
-    }
+    float voltage_mv = 0;
+    bool have_voltage = getBatteryVoltageMv(voltage_mv);
 
-    if (victron.isInitialized() && !victron.query(telemetry)) {
-      LOG_W(TAG, "Erreur lecture Victron");
-    }
-
-    telemetry.uptime_s = millis() / 1000;
-    telemetry.last_update_ms = millis();
-
-    // Enregistrement EEPROM périodique
-    history_timer.setInterval(settings.system.telemetry_log_interval_ms, false);
-    if (telemetry_history.isInitialized() && history_timer.hasExpired()) {
-      telemetry_history.record(telemetry);
-      history_timer.restart();
-      LOG_T(TAG, "Historique EEPROM: %d/%d",
-        telemetry_history.getCount(), telemetry_history.getMaxRecords());
-    }
-
-    // TODO voir si je garde les valeurs mppt ou ina ?
-    LOG_T(TAG, "Bat:%.0fmV/%.0fmA Sol:%.0fmV/%.0fmA",
-      telemetry.battery_mppt.voltage_mv, telemetry.battery_mppt.current_ma,
-      telemetry.solar_mppt.voltage_mv, telemetry.solar_mppt.current_ma);
+    low_voltage_cutoff.update(voltage_mv, have_voltage);
+    relay_periodic.update(voltage_mv, have_voltage);
+    mppt_shutdown_monitor.update();
 
     vTaskDelay(pdMS_TO_TICKS(settings.energy.poll_interval_ms));
   }

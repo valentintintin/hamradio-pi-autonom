@@ -2,6 +2,7 @@
 
 #include "I2CBus.h"
 #include "Telemetry.h"
+#include "ChargeControllerHal.h"
 #include <mpptChg.h>
 
 // ============================================================================
@@ -9,11 +10,15 @@
 // Lecture batterie, solaire, température, watchdog
 // ============================================================================
 
-class MpptChargerHal {
+// GPIO RP2040 câblé sur le pin d'interruption "extinction imminente" de la
+// carte MPPT (actif haut). TODO: ajuster selon le câblage réel de la carte.
+#define MPPT_ALERT_PIN 26
+
+class MpptChargerHal : public ChargeControllerHal {
 public:
   MpptChargerHal(I2CBus& bus) : _bus(&bus), _initialized(false) {}
 
-  bool begin() {
+  bool begin() override {
     if (!_bus->lock()) {
       return false;
     }
@@ -22,7 +27,7 @@ public:
     return _initialized;
   }
 
-  bool query(TelemetryData& telemetry) {
+  bool query(TelemetryData& telemetry) override {
     if (!_initialized) {
       return false;
     }
@@ -79,7 +84,72 @@ public:
     return ok;
   }
 
-  bool isInitialized() const { return _initialized; }
+  // Bit d'état ALERT (registre STATUS) : lecture I2C redondante avec le
+  // GPIO MPPT_ALERT_PIN — utile si l'interruption matérielle est manquée ou
+  // si ce pin n'est pas câblé sur un build donné (cf. task_energy.cpp).
+  bool isAlertEnabled(bool& alert) {
+    if (!_initialized) {
+      return false;
+    }
+    if (!_bus->lock()) {
+      return false;
+    }
+    bool ok = _mppt.isAlert(&alert);
+    _bus->unlock();
+    return ok;
+  }
+
+  // Seuils de coupure/reprise matériels de la carte (registres
+  // CFG_PWR_OFF_TH / CFG_PWR_ON_TH) — cf. settings.energy.mppt_pwr_off_mv/on_mv.
+  bool setPowerOffThreshold(uint16_t mv) {
+    if (!_initialized) {
+      return false;
+    }
+    if (!_bus->lock()) {
+      return false;
+    }
+    bool ok = _mppt.setConfigurationValue(CFG_PWR_OFF_TH, mv);
+    _bus->unlock();
+    return ok;
+  }
+
+  bool getPowerOffThreshold(uint16_t& mv) {
+    if (!_initialized) {
+      return false;
+    }
+    if (!_bus->lock()) {
+      return false;
+    }
+    bool ok = _mppt.getConfigurationValue(CFG_PWR_OFF_TH, &mv);
+    _bus->unlock();
+    return ok;
+  }
+
+  bool setPowerOnThreshold(uint16_t mv) {
+    if (!_initialized) {
+      return false;
+    }
+    if (!_bus->lock()) {
+      return false;
+    }
+    bool ok = _mppt.setConfigurationValue(CFG_PWR_ON_TH, mv);
+    _bus->unlock();
+    return ok;
+  }
+
+  bool getPowerOnThreshold(uint16_t& mv) {
+    if (!_initialized) {
+      return false;
+    }
+    if (!_bus->lock()) {
+      return false;
+    }
+    bool ok = _mppt.getConfigurationValue(CFG_PWR_ON_TH, &mv);
+    _bus->unlock();
+    return ok;
+  }
+
+  bool isInitialized() const override { return _initialized; }
 
 private:
   I2CBus* _bus;

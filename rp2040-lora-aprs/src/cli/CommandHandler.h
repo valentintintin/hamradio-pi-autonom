@@ -5,6 +5,7 @@
 #include "hal/Telemetry.h"
 #include "hal/TelemetryHistory.h"
 #include "hal/RelayHal.h"
+#include "hal/MpptChargerHal.h"
 #include "aprs/AprsEngine.h"
 #include <Arduino.h>
 #include <FreeRTOS.h>
@@ -15,10 +16,11 @@ public:
   CommandHandler(Settings& settings, SettingsRegistry& registry,
                  SettingsManager& manager, TelemetryData& telemetry,
                  AprsEngine& aprsEngine, RelayHal& relay,
-                 TelemetryHistory* history = nullptr)
+                 TelemetryHistory* history = nullptr,
+                 MpptChargerHal* mppt = nullptr)
     : _settings(&settings), _registry(&registry),
       _manager(&manager), _telemetry(&telemetry),
-      _aprs(&aprsEngine), _relay(&relay), _history(history),
+      _aprs(&aprsEngine), _relay(&relay), _history(history), _mppt(mppt),
       _mutex(aprsEngine.getMutex()) {}
 
   // Exécute une commande, écrit la réponse dans out.
@@ -42,6 +44,7 @@ private:
   AprsEngine* _aprs;
   RelayHal* _relay;
   TelemetryHistory* _history;
+  MpptChargerHal* _mppt;
 
   // Settings/SettingsRegistry/relais sont partagés entre les tâches série,
   // APRS et mesh (MeshcoreRepeater retombe désormais aussi sur execute()) :

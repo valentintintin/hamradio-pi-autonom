@@ -211,6 +211,19 @@ void CommandHandler::cmdSet(const char* key, const char* value, Print& out) {
         out.printf("Attention: expandeur relais (TCA9555) non détecté, pas d'action matérielle\n");
       }
     }
+
+    // MPPT : pousser immédiatement les seuils de coupure/reprise matériels
+    // (registres du chip, pas juste des valeurs relues périodiquement)
+    if (_mppt && strcmp(key, "energy.mppt_pwr_off_mv") == 0) {
+      if (!_mppt->setPowerOffThreshold(_settings->energy.mppt_pwr_off_mv)) {
+        out.printf("Attention: MPPT non détecté ou écriture échouée, pas d'action matérielle\n");
+      }
+    }
+    if (_mppt && strcmp(key, "energy.mppt_pwr_on_mv") == 0) {
+      if (!_mppt->setPowerOnThreshold(_settings->energy.mppt_pwr_on_mv)) {
+        out.printf("Attention: MPPT non détecté ou écriture échouée, pas d'action matérielle\n");
+      }
+    }
   } else {
     // Si set retourne false mais que la clé existe, c'est une erreur de validation
     // (le message a déjà été affiché par validate())

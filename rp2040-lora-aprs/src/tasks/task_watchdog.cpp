@@ -44,10 +44,11 @@ static bool isTaskStale(HeartbeatTask task, uint32_t max_age_ms) {
   return (millis() - last) > max_age_ms;
 }
 
-// Âges max tolérés par tâche. Pour energy/weather, dont la période est
-// configurable via settings, la marge est calculée sur la valeur réellement
-// en vigueur plutôt qu'une constante figée (sinon un intervalle configuré
-// plus long que la marge fixe déclencherait des faux positifs en continu).
+// Âges max tolérés par tâche. Pour sensors/energy/weather, dont la période
+// est configurable via settings, la marge est calculée sur la valeur
+// réellement en vigueur plutôt qu'une constante figée (sinon un intervalle
+// configuré plus long que la marge fixe déclencherait des faux positifs en
+// continu).
 static bool allTasksAlive() {
   if (isTaskStale(HB_MESH, 5000)) {
     LOG_E(TAG, "Tâche mesh bloquée");
@@ -59,6 +60,10 @@ static bool allTasksAlive() {
   }
   if (isTaskStale(HB_BEACON, 30000)) {
     LOG_E(TAG, "Tâche beacon bloquée");
+    return false;
+  }
+  if (isTaskStale(HB_SENSORS, settings.energy.poll_interval_ms + 15000)) {
+    LOG_E(TAG, "Tâche sensors bloquée");
     return false;
   }
   if (isTaskStale(HB_ENERGY, settings.energy.poll_interval_ms + 15000)) {

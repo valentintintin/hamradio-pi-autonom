@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Telemetry.h"
+#include "ChargeControllerHal.h"
 #include <VEDirect.h>
 
 // ============================================================================
@@ -9,16 +10,16 @@
 // https://www.victronenergy.com/upload/documents/VE.Direct-Protocol-3.34.pdf
 // ============================================================================
 
-class VictronHal {
+class VictronHal : public ChargeControllerHal {
 public:
   VictronHal(HardwareSerial& serial) : _ved(serial), _initialized(false) {}
 
-  bool begin() {
+  bool begin() override {
     _initialized = _ved.begin();
     return _initialized;
   }
 
-  bool query(TelemetryData& telemetry) {
+  bool query(TelemetryData& telemetry) override {
     if (!_initialized) {
       return false;
     }
@@ -56,7 +57,7 @@ public:
     return true;
   }
 
-  bool isInitialized() const { return _initialized; }
+  bool isInitialized() const override { return _initialized; }
 
 private:
   VEDirect _ved;
