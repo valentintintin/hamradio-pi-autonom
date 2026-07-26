@@ -65,7 +65,7 @@ header = read_exact(8)
 magic, record_size, count = struct.unpack("<IHH", header)
 
 TELH_MAGIC = 0x54454C48  # "TELH" (TelemetryHistory)
-EVL2_MAGIC = 0x45564C32  # "EVL2" (EventLogHistory)
+EVL3_MAGIC = 0x45564C33  # "EVL3" (EventLogHistory, v3 : 5 champs data)
 
 if magic == TELH_MAGIC:
     fmt = "<IhhhhhBhI"  # timestamp,bat_mV,bat_mA,sol_mV,sol_mA,temp_in_c10,hum_in,temp_out_c10,uptime_ms
@@ -77,15 +77,15 @@ if magic == TELH_MAGIC:
         ts, bat_mv, bat_ma, sol_mv, sol_ma, temp_in, hum_in, temp_out, uptime = struct.unpack(fmt, read_exact(record_size))
         print(f"{ts},{bat_mv},{bat_ma},{sol_mv},{sol_ma},{temp_in / 10:.1f},{hum_in},{temp_out / 10:.1f},{uptime}")
 
-elif magic == EVL2_MAGIC:
-    fmt = "<IHii"  # timestamp,code,data0,data1
+elif magic == EVL3_MAGIC:
+    fmt = "<IHiiiii"  # timestamp,code,data0,data1,data2,data3,data4
     if record_size != struct.calcsize(fmt):
         sys.exit(f"Taille de record inattendue ({record_size}, attendu {struct.calcsize(fmt)}) "
                   "— firmware/script désynchronisés (EventLogRecord a changé ?)")
-    print("timestamp,code,data0,data1")
+    print("timestamp,code,data0,data1,data2,data3,data4")
     for _ in range(count):
-        ts, code, data0, data1 = struct.unpack(fmt, read_exact(record_size))
-        print(f"{ts},{code},{data0},{data1}")
+        ts, code, d0, d1, d2, d3, d4 = struct.unpack(fmt, read_exact(record_size))
+        print(f"{ts},{code},{d0},{d1},{d2},{d3},{d4}")
 
 else:
     sys.exit(f"Magic inconnu: 0x{magic:08X} (dump vide, port/vitesse incorrects, ou mauvaise commande envoyée ?)")

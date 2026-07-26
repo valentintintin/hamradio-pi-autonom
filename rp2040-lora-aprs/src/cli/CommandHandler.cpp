@@ -406,8 +406,9 @@ void CommandHandler::cmdEventLog(const char* args, Print& out, bool isLocal) {
   EventLogRecord rec{};
   for (uint16_t i = start; i < total; i++) {
     if (_event_log->readRecord(i, rec)) {
-      out.printf("%lu %s data=%ld,%ld\n",
-        (unsigned long)rec.timestamp, eventCodeName(rec.code), (long)rec.data0, (long)rec.data1);
+      out.printf("%lu %s data=%ld,%ld,%ld,%ld,%ld\n",
+        (unsigned long)rec.timestamp, eventCodeName(rec.code),
+        (long)rec.data0, (long)rec.data1, (long)rec.data2, (long)rec.data3, (long)rec.data4);
     }
   }
 }

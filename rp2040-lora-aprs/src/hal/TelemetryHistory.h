@@ -13,8 +13,12 @@
 //
 // Stocke un historique compact de télémétrie pour analyse post-mortem.
 // Avec 21 bytes/record et ~111KB disponibles (16KB réservés en fin
-// d'EEPROM pour EventLogHistory, cf. plus bas) : ~5400 records.
+// d'EEPROM pour EventLogHistory, cf. plus bas) : ~5411 records.
 // À 5min/record : ~18 jours d'historique.
+//
+// Plan mémoire EEPROM (128KB, cf. M24M01_SIZE_BYTES) — cf. hal/EventLogHistory.h
+// pour le détail complet et la vérification de non-chevauchement :
+//   [0, 1024) Settings · [1024, 114688) TelemetryHistory · [114688, 131072) EventLogHistory
 // ============================================================================
 
 #define TELEMETRY_HISTORY_MAGIC     0x54454C48  // "TELH"

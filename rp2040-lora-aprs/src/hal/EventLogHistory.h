@@ -14,7 +14,7 @@
 // energy/MpptShutdownMonitor.cpp, energy/LowVoltageCutoffController.cpp) —
 // pour une analyse post-mortem après un reboot inattendu.
 //
-// Record code+data plutôt que texte libre : compact (14 bytes, ~1150 records
+// Record code+data plutôt que texte libre : compact (26 bytes, ~629 records
 // dans les 16KB réservés), pas de coût de formatage, et directement
 // exploitable par un outil côté PC sans avoir à parser une chaîne. Distinct
 // de TelemetryHistory (télémétrie périodique, valeurs physiques).
@@ -22,10 +22,15 @@
 // Vit dans les 16KB réservés en fin d'EEPROM par TelemetryHistory (cf.
 // TELEMETRY_HISTORY_RESERVED_TAIL_BYTES) — les deux constantes de taille
 // doivent rester cohérentes entre les deux fichiers.
+//
+// Plan mémoire EEPROM (128KB, cf. M24M01_SIZE_BYTES), vérifié non chevauchant :
+//   [0                                , 1024)              Settings (sizeof(Settings) = 304, marge 720)
+//   [1024                             , 114688)             TelemetryHistory (~5411 records × 21 bytes)
+//   [114688 = EVENT_LOG_ADDR          , 131072)              EventLogHistory (~629 records × 26 bytes)
 // ============================================================================
 
-#define EVENT_LOG_MAGIC            0x45564C32  // "EVL2" (v2 : record code+data, pas texte)
-#define EVENT_LOG_VERSION          2
+#define EVENT_LOG_MAGIC            0x45564C33  // "EVL3" (v3 : 3 champs data supplémentaires)
+#define EVENT_LOG_VERSION          3
 #define EVENT_LOG_RESERVED_BYTES   (16 * 1024)
 #define EVENT_LOG_ADDR             (M24M01_SIZE_BYTES - EVENT_LOG_RESERVED_BYTES)
 
@@ -51,12 +56,17 @@ inline const char* eventCodeName(uint16_t code) {
   }
 }
 
-// Record compact (14 bytes)
+// Record compact (26 bytes). data2/data3/data4 : réservées ("au cas où"),
+// inutilisées par les codes actuels (cf. EventCode) — libres pour de futurs
+// événements sans avoir à changer le format une nouvelle fois.
 struct __attribute__((packed)) EventLogRecord {
   uint32_t timestamp;
   uint16_t code;   // EventCode
   int32_t data0;
   int32_t data1;
+  int32_t data2;
+  int32_t data3;
+  int32_t data4;
 };
 
 // Header du ring buffer (12 bytes)
@@ -110,10 +120,11 @@ public:
     return true;
   }
 
-  // Enregistrer un événement : code + jusqu'à deux valeurs numériques
-  // annexes (cf. EventCode ci-dessus pour la signification de data0/data1
-  // selon le code).
-  bool log(uint16_t code, int32_t data0 = 0, int32_t data1 = 0) {
+  // Enregistrer un événement : code + jusqu'à cinq valeurs numériques
+  // annexes (cf. EventCode ci-dessus pour la signification de data0/data1 ;
+  // data2-4 réservées pour de futurs codes).
+  bool log(uint16_t code, int32_t data0 = 0, int32_t data1 = 0,
+           int32_t data2 = 0, int32_t data3 = 0, int32_t data4 = 0) {
     if (!_initialized) {
       return false;
     }
@@ -123,6 +134,9 @@ public:
     rec.code = code;
     rec.data0 = data0;
     rec.data1 = data1;
+    rec.data2 = data2;
+    rec.data3 = data3;
+    rec.data4 = data4;
 
     uint32_t addr = recordAddr(_write_index);
     if (!_eeprom->write(addr, (const uint8_t*)&rec, sizeof(rec))) {
