@@ -8,6 +8,7 @@
 #include "hal/relay/RelayHal.h"
 #include "hal/chargers/MpptChargerHal.h"
 #include "aprs/AprsEngine.h"
+#include "aprs/SstvTransmitter.h"
 #include <Arduino.h>
 #include <FreeRTOS.h>
 #include <semphr.h>
@@ -19,11 +20,12 @@ public:
                  AprsEngine& aprsEngine, RelayHal& relay,
                  TelemetryHistory* history = nullptr,
                  MpptChargerHal* mppt = nullptr,
-                 EventLogHistory* eventLog = nullptr)
+                 EventLogHistory* eventLog = nullptr,
+                 SstvTransmitter* sstv = nullptr)
     : _settings(&settings), _registry(&registry),
       _manager(&manager), _telemetry(&telemetry),
       _aprs(&aprsEngine), _relay(&relay), _history(history), _mppt(mppt),
-      _event_log(eventLog),  _mutex(aprsEngine.getMutex()) {}
+      _event_log(eventLog), _sstv(sstv), _mutex(aprsEngine.getMutex()) {}
 
   // Exécute une commande, écrit la réponse dans out.
   // Retourne true si la commande a été reconnue.
@@ -48,6 +50,7 @@ private:
   TelemetryHistory* _history;
   MpptChargerHal* _mppt;
   EventLogHistory* _event_log;
+  SstvTransmitter* _sstv;
 
   // Settings/SettingsRegistry/relais sont partagés entre les tâches série,
   // APRS et mesh (MeshcoreRepeater retombe désormais aussi sur execute()) :
@@ -69,4 +72,5 @@ private:
   void cmdHistory(const char* args, Print& out, bool isLocal);
   void cmdEventLog(const char* args, Print& out, bool isLocal);
   void cmdSendAprs(const char* content, Print& out);
+  void cmdImage(const char* args, Print& out, bool isLocal);
 };

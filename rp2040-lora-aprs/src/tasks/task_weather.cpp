@@ -18,6 +18,7 @@
 #include "task_heartbeat.h"
 #include <FineOffsetWH65B.h>
 #include <RadioLib.h>
+#include <string.h>
 
 extern AprsDispatcher aprs_dispatcher;
 extern TelemetryData telemetry;
@@ -34,8 +35,12 @@ static void onFskRxDone() {
 
 // ============================================================================
 // Écoute FSK + décodage
+//
+// raw_out (optionnel) reçoit une copie des WH65B_PAYLOAD_LEN octets bruts
+// reçus, pour le relais FSK (cf. taskWeather() ci-dessous) — non rempli si la
+// fonction retourne false avant d'avoir lu un paquet.
 // ============================================================================
-static bool listenAndDecode() {
+static bool listenAndDecode(uint8_t* raw_out = nullptr) {
   fsk_rx_flag = false;
 
   int16_t state = aprs_radio_hw.startReceive();
@@ -58,6 +63,10 @@ static bool listenAndDecode() {
   if (state != RADIOLIB_ERR_NONE) {
     LOG_E(TAG, "readData: %d", state);
     return false;
+  }
+
+  if (raw_out) {
+    memcpy(raw_out, buffer, WH65B_PAYLOAD_LEN);
   }
 
   WH65BData data = FineOffsetWH65B::decode(buffer);
@@ -105,8 +114,26 @@ void taskWeather(void* params) {
       aprs_dispatcher.pause();
       bool ok = LoRa433RadioMode::switchToFsk(onFskRxDone);
       if (ok) {
-        listenAndDecode();
+        uint8_t raw[WH65B_PAYLOAD_LEN];
+        if (listenAndDecode(raw) && settings.weather.resend_enabled) {
+          // Relais RF protocole (pas une conversion APRS) : d'autres stations
+          // WH65B à portée (dont celle de l'utilisateur, ~1km) écoutent
+          // directement ce format — on retransmet les octets bruts tels
+          // quels, même fréquence, après un délai (laisse le temps à la
+          // station d'origine de terminer son propre cycle TX).
+          vTaskDelay(pdMS_TO_TICKS(settings.weather.resend_delay_ms));
+          aprs_radio_hw.setOutputPower(settings.weather.resend_power_dbm);
+          int16_t state = aprs_radio_hw.transmit(raw, WH65B_PAYLOAD_LEN);
+          if (state != RADIOLIB_ERR_NONE) {
+            LOG_E(TAG, "Relais FSK: %d", state);
+          } else {
+            LOG_D(TAG, "Trame WH65B relayée (%d dBm)", settings.weather.resend_power_dbm);
+          }
+        }
       }
+      // switchToLora() repart des settings (radio.aprs.*), y compris la
+      // puissance normale : restaure automatiquement après le relais
+      // resend_power_dbm ci-dessus, pas de reapplication manuelle nécessaire.
       LoRa433RadioMode::switchToLora();
       aprs_dispatcher.resume();
 

@@ -22,6 +22,17 @@ namespace LoRa433RadioMode {
 
 // Configure le SX1262 APRS en réception FSK (WH65B). `onRxDone` est appelé
 // (depuis un contexte interruption RadioLib) quand une trame est reçue.
+//
+// Réutilisée telle quelle par l'émission CW/SSTV (aprs/SstvTransmitter.cpp) :
+// RadioLib exige le modem en paquet GFSK pour transmitDirect()/directMode()
+// (cf. SX126x::directMode(), qui refuse le mode direct hors GFSK) — cette
+// config WH65B, déjà validée en réception réelle, suffit à satisfier cette
+// exigence. La fréquence ici (WH65B_FREQ) n'a pas besoin de correspondre à la
+// fréquence CW/SSTV réellement utilisée : MorseClient/SSTVClient retendent la
+// porteuse eux-mêmes à chaque symbole (transmitDirect() par dot/dash/tone).
+// Seule la puissance TX doit être réappliquée explicitement après l'appel
+// (cf. SstvTransmitter::transmit()), le bitrate/déviation/bande/sync word
+// WH65B étant sans effet sur une porteuse continue en mode direct.
 bool switchToFsk(AprsRadioRxCallback onRxDone);
 
 // Restaure la configuration LoRa-APRS normale.

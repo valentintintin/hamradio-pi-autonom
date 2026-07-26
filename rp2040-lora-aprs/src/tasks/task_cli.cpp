@@ -11,14 +11,59 @@
 #include "core/Log.h"
 #include "mesh/MeshcoreRepeater.h"
 #include "cli/CommandHandler.h"
+#include "aprs/SstvTransmitter.h"
 #include "task_heartbeat.h"
 #include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
 
 extern MyMesh the_mesh;
 extern CommandHandler command_handler;
+extern SstvTransmitter sstv_transmitter;
 
 #define TAG "CLI"
 #define CLI_LINE_MAX 160
+#define IMAGE_UPLOAD_INACTIVITY_TIMEOUT_MS 10000
+
+// ============================================================================
+// Upload binaire d'une image SSTV ("image <n>", série uniquement) — lecture
+// par blocs sans le délai de 20ms de la boucle CLI normale (bien trop lent
+// pour ~230 Ko), en gardant les heartbeats CLI à jour (watchdog) et un
+// timeout d'inactivité pour ne pas rester bloqué si le PC s'arrête en cours.
+// ============================================================================
+static void receiveImageBinary(uint32_t expected_bytes) {
+  static uint8_t buf[256];
+  uint32_t received = 0;
+  unsigned long last_byte_time = millis();
+
+  while (received < expected_bytes) {
+    heartbeat(HB_CLI);
+
+    size_t avail = Serial.available();
+    if (avail > 0) {
+      size_t to_read = avail > sizeof(buf) ? sizeof(buf) : avail;
+      size_t n = Serial.readBytes(buf, to_read);
+      if (n > 0) {
+        if (!sstv_transmitter.writeImageChunk(buf, n)) {
+          LOG_W(F("Erreur écriture, upload annulé"));
+          sstv_transmitter.cancelUpload();
+          return;
+        }
+        received += n;
+        last_byte_time = millis();
+      }
+    } else {
+      if (millis() - last_byte_time > IMAGE_UPLOAD_INACTIVITY_TIMEOUT_MS) {
+        LOG_W(F("Timeout upload (inactivité), annulé"));
+        sstv_transmitter.cancelUpload();
+        return;
+      }
+      vTaskDelay(pdMS_TO_TICKS(2));
+    }
+  }
+
+  LOG_I(F("Upload terminé"));
+}
 
 void taskCli(void* params) {
   (void)params;
@@ -53,8 +98,18 @@ void taskCli(void* params) {
               Serial.printf("  -> %s\n", reply_buf);
             }
             LOG_D(TAG, "MeshCore: %s", cmd + 5);
+          } else if (strncmp(cmd, "image ", 6) == 0 && isdigit((unsigned char)cmd[6])) {
+            // "image <n>" : upload binaire, série uniquement — intercepté ici
+            // (avant CommandHandler) pour basculer la lecture en mode binaire
+            // (cf. aprs/SstvTransmitter.h). "image send"/"image cancel" (pas
+            // numériques) continuent vers CommandHandler normalement.
+            uint32_t announced = (uint32_t)strtoul(cmd + 6, nullptr, 10);
+            if (sstv_transmitter.beginImageUpload(announced, &Serial)) {
+              LOG_I("CLI IMAGE", "OK, RGB888...");
+              receiveImageBinary(announced);
+            }
           } else if (!command_handler.execute(cmd, Serial)) {
-            Serial.printf("Commande inconnue: %s (tapez 'help')\n", cmd);
+            LOG_W("CLI", "Commande inconnue: %s (tapez 'help')\n", cmd);
           }
         }
 

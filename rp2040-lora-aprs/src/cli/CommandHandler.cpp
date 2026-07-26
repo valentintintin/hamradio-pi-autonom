@@ -3,12 +3,14 @@
 #include "core/Version.h"
 #include "core/LockGuard.h"
 #include "core/StringPrint.h"
+#include "aprs/LoRa433RadioMode.h"
 #include <target.h>
 #include <RTClib.h>
 #include <cstring>
 #include <cstdio>
 
 extern LogLevel g_log_level;
+extern AprsDispatcher aprs_dispatcher;
 
 // ============================================================================
 // Execute — dispatch sur la commande
@@ -111,6 +113,15 @@ bool CommandHandler::execute(const char* input, Print& out, bool isLocal) {
     return true;
   }
 
+  // "image send"/"image cancel" uniquement ici : l'upload binaire ("image
+  // <n>") est intercepté en amont par tasks/task_cli.cpp (série uniquement,
+  // bascule la lecture en mode binaire) et n'atteint jamais ce dispatch.
+  if (strncmp(cmd, "image", 5) == 0 && (cmd[5] == '\0' || cmd[5] == ' ')) {
+    const char* args = (cmd[5] == ' ') ? cmd + 6 : "";
+    cmdImage(args, out, isLocal);
+    return true;
+  }
+
   if (strncmp(cmd, "history", 7) == 0) {
     const char* args = (cmd[7] == ' ') ? cmd + 8 : "";
     cmdHistory(args, out, isLocal);
@@ -151,7 +162,7 @@ bool CommandHandler::execute(const char* input, Print& out, bool isLocal) {
       out.println(F("Commandes: get <key>, set <key> <value>, clockdate JJ/MM/AA HH:MM:SS,"));
       out.println(F("  list, save, status, version, uptime, freemem, beacon, wx,"));
       out.println(F("  send aprs <texte>, history [n]/clear/dump [n], eventlog [n]/clear/dump [n],"));
-      out.println(F("  defaults, reboot, dfu, help"));
+      out.println(F("  image <n> (upload binaire série)/send/cancel, defaults, reboot, dfu, help"));
     }
     return true;
   }
@@ -180,7 +191,8 @@ bool CommandHandler::isPrivilegedCommand(const char* cmd)
          strcmp(cmd, "eventlog clear") == 0 ||
          strncmp(cmd, "send aprs ", 10) == 0 ||
          strcmp(cmd, "beacon") == 0 ||
-         strcmp(cmd, "wx") == 0;
+         strcmp(cmd, "wx") == 0 ||
+         strcmp(cmd, "image send") == 0;
 }
 
 // ============================================================================
@@ -236,6 +248,23 @@ void CommandHandler::cmdSet(const char* key, const char* value, Print& out) {
     if (_mppt && strcmp(key, "energy.mppt_pwr_on_mv") == 0) {
       if (!_mppt->setPowerOnThreshold(_settings->energy.mppt_pwr_on_mv)) {
         out.printf("Attention: MPPT non détecté ou écriture échouée, pas d'action matérielle\n");
+      }
+    }
+
+    // Fréquence/bande/SF/CR/Puissance : appliquer immédiatement plutôt que d'attendre
+    // le prochain retour LoRa (cycle météo, transmission CW/SSTV) ou un
+    // reboot. Un re-begin() complet du modem pouvant corrompre un paquet en
+    // cours, on encadre par pause()/resume() (même précaution que
+    // task_weather.cpp/SstvTransmitter.cpp).
+    if ((strcmp(key, "radio.aprs.freq") == 0 || strcmp(key, "radio.aprs.bw") == 0 ||
+         strcmp(key, "radio.aprs.sf") == 0 || strcmp(key, "radio.aprs.cr") == 0 ||
+         strcmp(key, "radio.aprs.power")) &&
+        modeHasAprs(_settings->system.mode)) {
+      aprs_dispatcher.pause();
+      bool ok = LoRa433RadioMode::switchToLora();
+      aprs_dispatcher.resume();
+      if (!ok) {
+        out.printf("Attention: échec reconfiguration radio\n");
       }
     }
   } else {
@@ -425,4 +454,31 @@ void CommandHandler::cmdSendAprs(const char* content, Print& out) {
   } else {
     out.println(F("Échec envoi (contenu vide ou trop long)"));
   }
+}
+
+void CommandHandler::cmdImage(const char* args, Print& out, bool isLocal) {
+  if (!modeHasAprs(_settings->system.mode)) {
+    out.println(F("APRS non actif dans ce mode"));
+    return;
+  }
+  if (!_sstv) {
+    out.println(F("SSTV non disponible"));
+    return;
+  }
+
+  // "image send" : local ET distant (APRS/mesh) — n'arme qu'une demande,
+  // l'émission tourne dans tasks/task_sstv.cpp (cf. aprs/SstvTransmitter.h).
+  if (strcmp(args, "send") == 0) {
+    _sstv->requestTransmit(&out);
+    return;
+  }
+
+  // "image cancel" : abandonne un upload en cours
+  if (strcmp(args, "cancel") == 0) {
+    _sstv->cancelUpload();
+    out.println(F("Upload annulé"));
+    return;
+  }
+
+  out.println(F("Usage: image <n> (upload, série uniquement) | image send | image cancel"));
 }

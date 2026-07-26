@@ -12,7 +12,7 @@
 // ============================================================================
 
 #define SETTINGS_MAGIC    0x34485656  // "4HVV"
-#define SETTINGS_VERSION  5
+#define SETTINGS_VERSION  6
 
 // ============================================================================
 // Mode de fonctionnement — la carte peut être déployée en standalone (juste
@@ -80,6 +80,25 @@ struct WeatherSettings {
   bool wh65b_enabled;
   uint32_t wh65b_interval_ms;    // intervalle switch FSK (10min)
   uint32_t wh65b_rx_timeout_ms;  // timeout écoute (60s)
+
+  // Relais RF brut d'une trame WH65B décodée avec succès : retransmission des
+  // mêmes octets bruts, en FSK, sur la même fréquence, après un délai — pour
+  // les autres stations/récepteurs WH65B à portée (pas une conversion APRS,
+  // cf. tasks/task_weather.cpp).
+  bool resend_enabled;
+  int8_t resend_power_dbm;    // ex: 10
+  uint32_t resend_delay_ms;   // ex: 5000
+};
+
+// Réglages CW (identification morse) + SSTV (envoi d'image), radio 433 APRS.
+// sstv_mode est réglé par nom via SettingsRegistry (ST_ENUM8, cf.
+// aprs/SstvTransmitter.h pour la table des modes disponibles).
+struct CwSstvSettings {
+  uint8_t sstv_mode;    // index dans SSTV_MODE_TABLE (aprs/SstvTransmitter.h) — "sstv.mode"
+  float freq_mhz;       // fréquence CW+SSTV, ex: 437.000 — "sstv.freq_mhz"
+  uint8_t cw_wpm;       // vitesse CW, ex: 20 — "sstv.cw_wpm"
+  uint8_t cw_repeats;   // répétitions indicatif avant ET après, ex: 3 — "sstv.cw_repeats"
+  int8_t power_dbm;     // puissance CW+SSTV, ex: 22 — "sstv.power_dbm"
 };
 
 struct EnergySettings {
@@ -152,6 +171,7 @@ struct Settings {
   WeatherSettings weather;
   EnergySettings energy;
   SystemSettings system;
+  CwSstvSettings cw_sstv;
   RelayChannel relay[RELAY_COUNT];
   RelayCutoffRule relay_cutoff[RELAY_CUTOFF_COUNT];
   RelayPeriodicRule relay_periodic[RELAY_COUNT];
@@ -194,6 +214,16 @@ inline Settings getDefaultSettings() {
   s.weather.wh65b_enabled = true;
   s.weather.wh65b_interval_ms = 600000;    // 10min
   s.weather.wh65b_rx_timeout_ms = 60000;   // 60s
+  s.weather.resend_enabled = false;
+  s.weather.resend_power_dbm = 10;
+  s.weather.resend_delay_ms = 5000;        // 5s
+
+  // CW + SSTV (radio 433, identification + envoi d'image)
+  s.cw_sstv.sstv_mode = 0;                 // cf. SSTV_MODE_TABLE[0] (aprs/SstvTransmitter.h)
+  s.cw_sstv.freq_mhz = 437.000f;
+  s.cw_sstv.cw_wpm = 20;
+  s.cw_sstv.cw_repeats = 3;
+  s.cw_sstv.power_dbm = 22;
 
   // Energy
   s.energy.poll_interval_ms = 30000;       // 30s

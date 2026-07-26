@@ -14,6 +14,7 @@
 #include "aprs/AprsDispatcher.h"
 #include "aprs/AprsEngine.h"
 #include "aprs/AprsEventHandler.h"
+#include "aprs/LoRa433RadioMode.h"
 #include "hal/i2c/I2CBus.h"
 #include "hal/sensors/Ina3221Hal.h"
 #include "hal/chargers/MpptChargerHal.h"
@@ -28,6 +29,7 @@
 #include "config/Settings.h"
 #include "config/SettingsManager.h"
 #include "config/SettingsRegistry.h"
+#include "aprs/SstvTransmitter.h"
 
 // ============================================================================
 // Objets globaux déclarés dans main.cpp (racine de composition) — mêmes
@@ -52,6 +54,7 @@ extern EventLogHistory event_log;
 extern RelayHal relay_hal;
 extern SettingsManager settings_manager;
 extern SettingsRegistry settings_registry;
+extern SstvTransmitter sstv_transmitter;
 
 // ============================================================================
 // Étapes de boot
@@ -82,6 +85,7 @@ void bootInitEeprom() {
 void bootLoadConfig() {
   settings = settings_manager.load();
   settings_registry.init(settings);
+  sstv_transmitter.init(settings);
   g_log_level = (LogLevel)settings.system.log_level;
   LOG_I("CONFIG", "%d paramètres, log=%s, mode=%s",
     settings_registry.count(), logLevelName(g_log_level), modeName(settings.system.mode));
@@ -136,9 +140,8 @@ void bootInitIdentity() {
     store.save("_main", the_mesh.self_id);
   }
 
-  Serial.print("Repeater ID: ");
+  LOG_I("MESH", "Repeater ID: ");
   mesh::Utils::printHex(Serial, the_mesh.self_id.pub_key, PUB_KEY_SIZE);
-  Serial.println();
 }
 
 // Capteurs/chargeurs/historique EEPROM : partie "télémétrie" du mode complet
@@ -211,6 +214,15 @@ void bootInitMeshAndAprs() {
   }
 
   if (modeHasAprs(mode)) {
+    // Reconfigure la radio APRS depuis les vrais settings (radio.aprs.freq/
+    // bw/sf/cr/power) : bootInitRadios() l'a initialisée plus tôt avec les
+    // defines de compile-time (APRS_FREQ/...), settings pas encore chargés à
+    // cet instant (cf. main.cpp:setup(), cette étape-ci s'exécute après
+    // bootLoadConfig()). switchToLora() fait exactement ce re-begin() à
+    // partir des settings — même fonction que celle utilisée au retour d'un
+    // cycle FSK/CW/SSTV, donc garantie cohérente avec eux.
+    LoRa433RadioMode::switchToLora();
+
     aprs_dispatcher.begin();
     aprs_dispatcher.setRxCallback(&aprs_engine);
     aprs_engine.setEventCallback(&aprs_event_handler);
@@ -229,6 +241,7 @@ void bootCreateTasks() {
     xTaskCreate(taskAprsLoop,   "aprs",    TASK_STACK_APRS,    nullptr, TASK_PRIO_APRS_LOOP, nullptr);
     xTaskCreate(taskAprsBeacon, "beacon",  TASK_STACK_BEACON,  nullptr, TASK_PRIO_BEACON,    nullptr);
     xTaskCreate(taskWeather,    "weather", TASK_STACK_WEATHER, nullptr, TASK_PRIO_WEATHER,   nullptr);
+    xTaskCreate(taskSstv,       "sstv",    TASK_STACK_SSTV,    nullptr, TASK_PRIO_SSTV,      nullptr);
   }
 
   if (modeIsFull(mode)) {

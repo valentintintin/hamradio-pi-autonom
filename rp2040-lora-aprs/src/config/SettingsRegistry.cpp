@@ -1,7 +1,19 @@
 #include "SettingsRegistry.h"
+#include "core/Log.h"
+#include "aprs/SstvTransmitter.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+// Table nom<->valeur pour system.log_level, dérivée des helpers existants de core/Log.h
+static const EnumNameEntry LOG_LEVEL_NAMES[] = {
+  { "none",  LOG_NONE },
+  { "error", LOG_ERROR },
+  { "warn",  LOG_WARN },
+  { "info",  LOG_INFO },
+  { "debug", LOG_DEBUG },
+  { "trace", LOG_TRACE },
+};
 
 // ============================================================================
 // Initialise la table avec tous les champs configurables
@@ -37,6 +49,16 @@ void SettingsRegistry::init(Settings& s) {
   add("weather.wh65b.enabled",  ST_BOOL,   &s.weather.wh65b_enabled);
   add("weather.wh65b.interval", ST_UINT32, &s.weather.wh65b_interval_ms,  60000.0f, 3600000.0f);
   add("weather.wh65b.timeout",  ST_UINT32, &s.weather.wh65b_rx_timeout_ms, 5000.0f, 120000.0f);
+  add("weather.resend.enabled", ST_BOOL,   &s.weather.resend_enabled);
+  add("weather.resend_power_dbm", ST_INT8, &s.weather.resend_power_dbm, -9.0f, 22.0f);
+  add("weather.resend_delay_ms",  ST_UINT32, &s.weather.resend_delay_ms, 0.0f, 60000.0f);
+
+  // --- CW (identification morse) + SSTV (envoi d'image), radio 433 --------
+  add("sstv.mode",     &s.cw_sstv.sstv_mode, SSTV_MODE_NAMES, SSTV_MODE_COUNT);
+  add("sstv.freq_mhz", ST_FLOAT, &s.cw_sstv.freq_mhz,   400.0f, 470.0f);
+  add("sstv.cw_wpm",   ST_UINT8, &s.cw_sstv.cw_wpm,      5.0f, 40.0f);
+  add("sstv.cw_repeats", ST_UINT8, &s.cw_sstv.cw_repeats, 1.0f, 10.0f);
+  add("sstv.power_dbm", ST_INT8, &s.cw_sstv.power_dbm,  -9.0f, 22.0f);
 
   // --- Energy --------------------------------------------------------------
   add("energy.poll_interval",     ST_UINT32, &s.energy.poll_interval_ms,     5000.0f, 600000.0f);
@@ -50,7 +72,7 @@ void SettingsRegistry::init(Settings& s) {
   add("system.password",       ST_STRING, s.system.admin_password, sizeof(s.system.admin_password));
   add("system.watchdog",       ST_BOOL,   &s.system.watchdog_enabled);
   add("system.log_interval",   ST_UINT32, &s.system.telemetry_log_interval_ms, 10000.0f, 3600000.0f);
-  add("system.log_level",      ST_UINT8,  &s.system.log_level, 0.0f, 5.0f);
+  add("system.log_level",      &s.system.log_level, LOG_LEVEL_NAMES, sizeof(LOG_LEVEL_NAMES) / sizeof(LOG_LEVEL_NAMES[0]));
   // OperatingMode : 0=aprs, 1=meshcore, 2=aprs+meshcore, 3=full (cf. config/Settings.h)
   add("system.mode",           ST_UINT8,  &s.system.mode,      0.0f, 3.0f);
 
@@ -104,7 +126,7 @@ void SettingsRegistry::add(const char* key, SettingType type, void* ptr, uint8_t
   if (_count >= 96) {
     return;
   }
-  _entries[_count++] = { key, type, ptr, maxLen, 0, 0, false };
+  _entries[_count++] = { key, type, ptr, maxLen, 0, 0, false, nullptr, 0 };
 }
 
 // ============================================================================
@@ -114,7 +136,17 @@ void SettingsRegistry::add(const char* key, SettingType type, void* ptr, float m
   if (_count >= 96) {
     return;
   }
-  _entries[_count++] = { key, type, ptr, 0, min, max, true };
+  _entries[_count++] = { key, type, ptr, 0, min, max, true, nullptr, 0 };
+}
+
+// ============================================================================
+// Ajouter une entrée enum par nom (ST_ENUM8, cf. SettingsRegistry.h)
+// ============================================================================
+void SettingsRegistry::add(const char* key, void* ptr, const EnumNameEntry* table, uint8_t tableCount) {
+  if (_count >= 96) {
+    return;
+  }
+  _entries[_count++] = { key, ST_ENUM8, ptr, 0, 0, 0, false, table, tableCount };
 }
 
 // ============================================================================
@@ -180,6 +212,19 @@ bool SettingsRegistry::get(const char* key, char* out, size_t outLen) const {
     case ST_BOOL:
       strncpy(out, *(bool*)e->ptr ? "true" : "false", outLen);
       break;
+    case ST_ENUM8: {
+      uint8_t v = *(uint8_t*)e->ptr;
+      const char* name = "?";
+      for (uint8_t i = 0; i < e->enumTableCount; i++) {
+        if (e->enumTable[i].value == v) {
+          name = e->enumTable[i].name;
+          break;
+        }
+      }
+      strncpy(out, name, outLen - 1);
+      out[outLen - 1] = '\0';
+      break;
+    }
   }
   return true;
 }
@@ -253,6 +298,22 @@ bool SettingsRegistry::set(const char* key, const char* value, Print* out) {
     case ST_BOOL:
       *(bool*)e->ptr = (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 || strcmp(value, "on") == 0);
       break;
+    case ST_ENUM8: {
+      for (uint8_t i = 0; i < e->enumTableCount; i++) {
+        if (strcmp(e->enumTable[i].name, value) == 0) {
+          *(uint8_t*)e->ptr = e->enumTable[i].value;
+          return true;
+        }
+      }
+      if (out) {
+        out->printf("Valeur invalide '%s', attendu: ", value);
+        for (uint8_t i = 0; i < e->enumTableCount; i++) {
+          out->printf("%s%s", i == 0 ? "" : "/", e->enumTable[i].name);
+        }
+        out->printf("\n");
+      }
+      return false;
+    }
   }
   return true;
 }

@@ -46,6 +46,7 @@
 #include "config/SettingsManager.h"
 #include "config/SettingsRegistry.h"
 #include "cli/CommandHandler.h"
+#include "aprs/SstvTransmitter.h"
 
 // ============================================================================
 // Instances globales
@@ -109,8 +110,14 @@ MpptShutdownMonitor mppt_shutdown_monitor(mppt, aprs_engine, event_log);
 // Configuration (settings elle-même déclarée plus haut, cf. commentaire)
 SettingsManager settings_manager(&eeprom);
 SettingsRegistry settings_registry;
+
+// Upload d'image (streaming LittleFS) + émission CW+SSTV (cf. aprs/SstvTransmitter.h,
+// tasks/task_sstv.cpp) — settings.cw_sstv, référencée directement.
+SstvTransmitter sstv_transmitter;
+
 CommandHandler command_handler(settings, settings_registry, settings_manager, telemetry,
-                               aprs_engine, relay_hal, &telemetry_history, &mppt, &event_log);
+                               aprs_engine, relay_hal, &telemetry_history, &mppt, &event_log,
+                               &sstv_transmitter);
 
 // Relie AprsEngine à la télémétrie et au CLI (query météo, telemetry, CLI par message)
 AprsEventHandler aprs_event_handler(aprs_engine, command_handler, telemetry, settings);
