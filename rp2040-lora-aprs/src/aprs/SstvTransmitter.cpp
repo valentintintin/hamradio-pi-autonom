@@ -1,13 +1,21 @@
 #include "SstvTransmitter.h"
-#include "LoRa433RadioMode.h"
 #include "AprsDispatcher.h"
 #include "core/Log.h"
 #include "target.h"
-#include <RadioLib.h>
 
 extern AprsDispatcher aprs_dispatcher;
 
 #define TAG "SSTV"
+
+// ============================================================================
+// Dimensions d'un mode SSTV (le mode RadioLib lui-même n'est plus nécessaire
+// ici, cf. commentaire sur SSTV_MODES ci-dessous).
+// ============================================================================
+struct SstvModeInfo {
+  const char* name;
+  uint16_t width;
+  uint16_t height;
+};
 
 // ============================================================================
 // Table nom<->index (SettingsRegistry, ST_ENUM8, "sstv.mode")
@@ -19,27 +27,25 @@ const EnumNameEntry SSTV_MODE_NAMES[SSTV_MODE_COUNT] = {
 #undef SSTV_MODE_NAME_ENTRY
 
 // ============================================================================
-// Table index->{mode RadioLib, dimensions} (émission)
+// Table index->dimensions (upload/affichage) — le mode RadioLib (SSTVMode_t)
+// lui-même n'est nécessaire qu'à l'émission réelle : IAprsCarrier (cf.
+// aprs/AprsCarrier.h) reçoit juste `modeIndex` et retrouve ce mode dans SA
+// propre implémentation (variant/AprsCarrierReal, seule à connaître RadioLib)
+// — ce fichier n'a donc plus besoin de RadioLib du tout.
 // ============================================================================
-struct SstvModeInfo {
-  const char* name;
-  const SSTVMode_t* mode;
-  uint16_t width;
-  uint16_t height;
-};
-
-#define SSTV_MODE_INFO_ENTRY(idx, name, mode, w, h) { name, &mode, w, h },
+#define SSTV_MODE_INFO_ENTRY(idx, name, mode, w, h) { name, w, h },
 static const SstvModeInfo SSTV_MODES[SSTV_MODE_COUNT] = {
   SSTV_MODE_LIST(SSTV_MODE_INFO_ENTRY)
 };
 #undef SSTV_MODE_INFO_ENTRY
 
-static const SstvModeInfo& currentModeInfo(const Settings* settings) {
+static uint8_t currentModeIndex(const Settings* settings) {
   uint8_t idx = settings->cw_sstv.sstv_mode;
-  if (idx >= SSTV_MODE_COUNT) {
-    idx = 0;
-  }
-  return SSTV_MODES[idx];
+  return idx < SSTV_MODE_COUNT ? idx : 0;
+}
+
+static const SstvModeInfo& currentModeInfo(const Settings* settings) {
+  return SSTV_MODES[currentModeIndex(settings)];
 }
 
 // ============================================================================
@@ -144,20 +150,11 @@ bool SstvTransmitter::consumeTransmitRequest() {
   return true;
 }
 
-// switchToFsk() attend un callback RX (cf. LoRa433RadioMode.h) ; on ne reçoit
-// jamais pendant une émission CW/SSTV (aucun startReceive() appelé), et
-// directMode() (déclenché par MorseClient/SSTVClient::begin()) ne réarme de
-// toute façon que l'IRQ TX_DONE — ce callback ne sera donc jamais invoqué.
-static void noRxCallback() {}
-
-void SstvTransmitter::sendCallsignMorse(MorseClient& morse) {
-  for (uint8_t i = 0; i < _settings->cw_sstv.cw_repeats; i++) {
-    morse.println(_settings->aprs.callsign);
-  }
-}
-
 // ============================================================================
-// Séquence bloquante CW + SSTV + CW (appelée uniquement par taskSstv)
+// Séquence CW + SSTV + CW (appelée uniquement par taskSstv) — déléguée à
+// IAprsCarrier (cf. aprs/AprsCarrier.h) : sa vraie émission RadioLib
+// (variant/AprsCarrierReal) ou sa version journalisée sans RF
+// (variant_native/AprsCarrierSim) ; ce fichier ne connaît que l'interface.
 // ============================================================================
 void SstvTransmitter::transmit() {
   const SstvModeInfo& info = currentModeInfo(_settings);
@@ -165,55 +162,16 @@ void SstvTransmitter::transmit() {
 
   aprs_dispatcher.pause();
 
-  // Réutilise switchToFsk() (déjà validée en réception WH65B réelle) plutôt
-  // qu'une config FSK dédiée : seul le fait d'être en modem GFSK compte pour
-  // transmitDirect()/directMode() (cf. LoRa433RadioMode.h), pas la fréquence
-  // WH65B_FREQ qu'elle configure — MorseClient/SSTVClient retendent la
-  // porteuse eux-mêmes sur la vraie fréquence CW/SSTV à chaque symbole. La
-  // puissance, elle, n'est pas retouchée par symbole : à réappliquer ici.
-  bool ok = LoRa433RadioMode::switchToFsk(noRxCallback);
-  if (ok) {
-    aprs_radio_hw.setOutputPower(_settings->cw_sstv.power_dbm);
-
-    MorseClient morse(&aprs_radio_hw);
-    morse.begin(_settings->cw_sstv.freq_mhz, _settings->cw_sstv.cw_wpm);
-    sendCallsignMorse(morse);
-
-    SSTVClient sstv(&aprs_radio_hw);
-    int16_t state = sstv.begin(_settings->cw_sstv.freq_mhz, *info.mode);
-    if (state == RADIOLIB_ERR_NONE) {
-      sstv.sendHeader();
-
-      File img = LittleFS.open(SSTV_IMAGE_PATH, "r");
-      if (img) {
-        static uint32_t line[640];  // max largeur supportée (modes actuels: 320px)
-        static uint8_t rgb[640 * 3];
-        for (uint16_t y = 0; y < info.height; y++) {
-          size_t n = img.read(rgb, (size_t)info.width * 3);
-          if (n != (size_t)info.width * 3) {
-            LOG_E(TAG, "Lecture image incomplète ligne %d (%u/%u octets)", y, (unsigned)n, (unsigned)(info.width * 3));
-            break;
-          }
-          for (uint16_t x = 0; x < info.width; x++) {
-            line[x] = ((uint32_t)rgb[x * 3] << 16) | ((uint32_t)rgb[x * 3 + 1] << 8) | (uint32_t)rgb[x * 3 + 2];
-          }
-          sstv.sendLine(line);
-        }
-        img.close();
-      } else {
-        LOG_E(TAG, "Impossible de relire l'image uploadée");
-      }
-    } else {
-      LOG_E(TAG, "SSTVClient::begin: %d", state);
-    }
-
-    sendCallsignMorse(morse);
-    aprs_radio_hw.standby();
+  File img = LittleFS.open(SSTV_IMAGE_PATH, "r");
+  if (img) {
+    aprs_carrier.transmitCwSstv(_settings->aprs.callsign, _settings->cw_sstv.cw_repeats,
+      _settings->cw_sstv.cw_wpm, _settings->cw_sstv.freq_mhz, _settings->cw_sstv.power_dbm,
+      currentModeIndex(_settings), info.name, info.width, info.height, img);
+    img.close();
+  } else {
+    LOG_E(TAG, "Impossible de relire l'image uploadée");
   }
 
-  // switchToLora() repart des settings (radio.aprs.*), y compris la
-  // puissance : pas de reapplication manuelle nécessaire ici.
-  LoRa433RadioMode::switchToLora();
   aprs_dispatcher.resume();
 
   LittleFS.remove(SSTV_IMAGE_PATH);

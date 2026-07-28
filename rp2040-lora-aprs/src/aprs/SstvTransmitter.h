@@ -27,8 +27,10 @@
 
 // index, nom CLI, mode RadioLib (variable extern de RadioLib/protocols/SSTV/SSTV.h),
 // largeur, hauteur — source unique, réutilisée pour construire la table
-// noms<->index consommée par SettingsRegistry ("sstv.mode") et la table
-// index->{mode RadioLib, dimensions} utilisée par SstvTransmitter.
+// noms<->index consommée par SettingsRegistry ("sstv.mode"), la table
+// index->dimensions utilisée par SstvTransmitter.cpp, et la table
+// index->SSTVMode_t* utilisée par variant/AprsCarrierReal (seule à avoir
+// besoin du mode RadioLib lui-même, cf. aprs/AprsCarrier.h).
 #define SSTV_MODE_LIST(X) \
   X(0, "robot36",   Robot36,   320, 240) \
   X(1, "robot72",   Robot72,   320, 240) \
@@ -83,6 +85,4 @@ private:
   bool _upload_complete = false;
 
   volatile bool _transmit_requested = false;
-
-  void sendCallsignMorse(class MorseClient& morse);
 };

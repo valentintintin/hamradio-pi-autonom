@@ -1,6 +1,7 @@
 #include "AprsDispatcher.h"
 #include "core/Log.h"
 #include "core/LockGuard.h"
+#include "core/RadioActivityNotify.h"
 #include <string.h>
 
 #define TAG "APRS-DSP"
@@ -188,6 +189,12 @@ bool AprsDispatcher::send(const uint8_t* data, uint8_t len, uint8_t priority, ui
   slot->send_after = futureMillis(delay_ms);
   slot->used = true;
 
+  // Réveille la tâche APRS immédiatement (elle dort peut-être en attendant un
+  // événement radio ou un paquet, cf. tasks/task_aprs.cpp) plutôt que de la
+  // laisser attendre son prochain réveil planifié pour remarquer ce nouveau
+  // paquet.
+  xTaskNotifyGive(g_aprs_task_handle);
+
   return true;
 }
 
@@ -240,4 +247,40 @@ bool AprsDispatcher::millisHasNowPassed(unsigned long timestamp) const {
 
 unsigned long AprsDispatcher::futureMillis(int millis_from_now) const {
   return _ms->getMillis() + millis_from_now;
+}
+
+// ============================================================================
+// Combien de temps avant que ce dispatcher n'ait besoin d'être rappelé — cf.
+// commentaire dans AprsDispatcher.h. Ne verrouille pas _pool_mutex : lu depuis
+// tasks/task_aprs.cpp juste après loop() (qui l'a déjà pris/relâché), une
+// lecture legèrement périmée ici ne fait au pire dormir un peu plus/moins
+// longtemps que l'idéal, jamais rater un événement (le réveil radio ou
+// xTaskNotifyGive() dans send() couvrent toujours le cas exact).
+// ============================================================================
+uint32_t AprsDispatcher::msUntilNextAction(unsigned long now) const {
+  if (_outbound_active) {
+    long remaining = (long)(_outbound_expiry - now);
+    return remaining > 0 ? (uint32_t)remaining : 0;
+  }
+
+  bool any = false;
+  unsigned long earliest = 0;
+  for (int i = 0; i < APRS_TX_QUEUE_SIZE; i++) {
+    if (_tx_pool[i].used && (!any || (long)(_tx_pool[i].send_after - earliest) < 0)) {
+      earliest = _tx_pool[i].send_after;
+      any = true;
+    }
+  }
+
+  if (!any) {
+    return 0xFFFFFFFFu;  // rien en attente : le prochain réveil viendra d'une IRQ radio ou d'un send()
+  }
+
+  // Un retry CAD retarde peut-être ce paquet au-delà de son propre send_after.
+  if ((long)(_next_tx_time - earliest) > 0) {
+    earliest = _next_tx_time;
+  }
+
+  long remaining = (long)(earliest - now);
+  return remaining > 0 ? (uint32_t)remaining : 0;
 }

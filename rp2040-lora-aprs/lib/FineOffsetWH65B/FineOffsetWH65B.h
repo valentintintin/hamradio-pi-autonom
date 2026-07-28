@@ -3,6 +3,10 @@
 
 #include <Arduino.h>
 
+// Longueur fixe d'une trame WH65B (utilisée par le mode FSK ici, et par le
+// décodeur FineOffsetWH65B côté tâche météo).
+#define WH65B_PAYLOAD_LEN 27
+
 typedef struct {
     int id;
     bool battery_ok;

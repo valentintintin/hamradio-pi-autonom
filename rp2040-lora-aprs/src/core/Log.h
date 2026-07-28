@@ -37,11 +37,23 @@ inline const char* logLevelPrefix(LogLevel lvl) {
   }
 }
 
+// Natif : en plus de Serial (stdout), les lignes sont dupliquées dans un
+// buffer circulaire (SimWorld::log_ring) affiché par le dashboard web — cf.
+// native/sim/SimLogTee.cpp.
+#ifdef NATIVE_BUILD
+void nativeLogTee(const char* prefix, const char* tag, const char* fmt, ...);
+#define NATIVE_LOG_TEE(lvl, tag, fmt, ...) nativeLogTee(logLevelPrefix(lvl), tag, fmt, ##__VA_ARGS__);
+#else
+#define NATIVE_LOG_TEE(lvl, tag, fmt, ...)
+#endif
+
 // Macro principale — compile le check de niveau avant le printf
 #define LOG_MSG(lvl, tag, fmt, ...) \
   do { \
-    if ((lvl) <= g_log_level) \
+    if ((lvl) <= g_log_level) { \
       Serial.printf("%s [%-8s] " fmt "\n", logLevelPrefix(lvl), tag, ##__VA_ARGS__); \
+      NATIVE_LOG_TEE(lvl, tag, fmt, ##__VA_ARGS__) \
+    } \
   } while(0)
 
 #define LOG_E(tag, fmt, ...) LOG_MSG(LOG_ERROR, tag, fmt, ##__VA_ARGS__)

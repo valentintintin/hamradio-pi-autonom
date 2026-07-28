@@ -1,6 +1,16 @@
 #include "M24M01Hal.h"
 #include <Arduino.h>
 
+// ============================================================================
+// M24M01Hal — implémentation matérielle réelle (bus I2C via Wire). La
+// variante native (env PlatformIO `native`, pas de bus I2C réel — persistée
+// dans de vrais fichiers JSON sous SIM_DATA_DIR/eeprom/) vit dans
+// native_sim/sim/M24M01HalSim.cpp ; platformio.ini exclut ce fichier-ci pour
+// cet env et compile l'autre à la place (même principe que variant/ vs
+// variant_native/ pour les radios) — aucun #ifdef NATIVE_BUILD nécessaire
+// ici.
+// ============================================================================
+
 #define M24M01_I2C_CHUNK_MAX     30 // limite buffer Wire (32) moins les 2 bytes d'adresse
 #define M24M01_WRITE_TIMEOUT_MS  10 // tW max = 5 ms (datasheet) + marge
 

@@ -17,6 +17,10 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+#ifdef NATIVE_BUILD
+#include "SimCli.h"
+#endif
+
 extern MyMesh the_mesh;
 extern CommandHandler command_handler;
 extern SstvTransmitter sstv_transmitter;
@@ -108,6 +112,10 @@ void taskCli(void* params) {
               LOG_I("CLI IMAGE", "OK, RGB888...");
               receiveImageBinary(announced);
             }
+#ifdef NATIVE_BUILD
+          } else if (simHandleCommand(cmd, Serial)) {
+            // traité par le simulateur (commandes "sim ...")
+#endif
           } else if (!command_handler.execute(cmd, Serial)) {
             LOG_W("CLI", "Commande inconnue: %s (tapez 'help')\n", cmd);
           }

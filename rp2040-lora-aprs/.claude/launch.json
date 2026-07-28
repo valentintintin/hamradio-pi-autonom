@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sim-web",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["native_sim/web/server.py"],
+      "port": 8088
+    }
+  ]
+}

@@ -129,11 +129,17 @@ AprsEventHandler aprs_event_handler(aprs_engine, command_handler, telemetry, set
 // ============================================================================
 void setup() {
   bootInitCore();
+  bootInitEeprom();
+  // bootLoadConfig() doit précéder toute étape qui lit settings.system.mode
+  // (bootInitRadios et les suivantes) : avant elle, settings est encore à sa
+  // valeur zéro-initialisée (MODE_APRS_ONLY), pas le mode réellement
+  // configuré — cf. commentaire de core/Boot.h sur "le mode réellement
+  // configuré".
+  bootLoadConfig();
   bootInitRadios();
   bootSeedRng();
   bootInitIdentity();
   bootInitSensors();
-  bootLoadConfig();
   bootInitRelays();
   bootInitMeshAndAprs();
   bootCreateTasks();

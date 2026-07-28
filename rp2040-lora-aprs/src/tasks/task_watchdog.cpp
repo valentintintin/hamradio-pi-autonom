@@ -54,12 +54,21 @@ static bool isTaskStale(HeartbeatTask task, uint32_t max_age_ms) {
 // réellement en vigueur plutôt qu'une constante figée (sinon un intervalle
 // configuré plus long que la marge fixe déclencherait des faux positifs en
 // continu).
+// HB_MESH/HB_APRS : depuis que ces tâches dorment jusqu'au prochain
+// événement radio réel au lieu de faire du polling en vTaskDelay(1) (cf.
+// tasks/task_mesh.cpp, tasks/task_aprs.cpp, core/RadioActivityNotify.h),
+// heartbeat() n'est plus rafraîchi qu'au maximum toutes les *_TASK_MAX_WAIT_MS
+// (60s) au lieu de chaque milliseconde — ce seuil doit rester nettement
+// au-dessus (marge pour la latence de traitement + jitter), sinon un simple
+// silence radio de plus de 5s (la norme, pas l'exception, en LoRa/mesh)
+// déclencherait un reboot correcteur pour rien.
+#define HB_RADIO_STALE_MS 90000
 static bool allTasksAlive() {
-  if (isTaskStale(HB_MESH, 5000)) {
+  if (isTaskStale(HB_MESH, HB_RADIO_STALE_MS)) {
     LOG_E(TAG, "Tâche mesh bloquée");
     return false;
   }
-  if (isTaskStale(HB_APRS, 5000)) {
+  if (isTaskStale(HB_APRS, HB_RADIO_STALE_MS)) {
     LOG_E(TAG, "Tâche APRS bloquée");
     return false;
   }

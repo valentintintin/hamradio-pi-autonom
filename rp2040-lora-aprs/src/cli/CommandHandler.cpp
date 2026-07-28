@@ -3,7 +3,6 @@
 #include "core/Version.h"
 #include "core/LockGuard.h"
 #include "core/StringPrint.h"
-#include "aprs/LoRa433RadioMode.h"
 #include "mesh/MeshcoreRepeater.h"
 #include <target.h>
 #include <RTClib.h>
@@ -262,7 +261,7 @@ void CommandHandler::cmdSet(const char* key, const char* value, Print& out) {
          strcmp(key, "radio.aprs.power") == 0) &&
         modeHasAprs(_settings->system.mode)) {
       aprs_dispatcher.pause();
-      bool ok = LoRa433RadioMode::switchToLora();
+      bool ok = aprs_radio_hw.switchToLora();
       aprs_dispatcher.resume();
       if (!ok) {
         out.printf("Attention: échec reconfiguration radio\n");
@@ -300,6 +299,12 @@ void CommandHandler::cmdSetClockDate(const char* value, Print& out) {
 
   DateTime dt(year, month, day, hour, minute, second);
   rtc_clock.setCurrentTime(dt.unixtime());
+
+  // Persiste aussi vers la puce RTC externe battery-backed si présente (cf.
+  // hal/rtc/ExternalRtc.h) : sans ça, l'heure réglée ici serait reperdue au
+  // prochain boot après une coupure d'alimentation (fallback RP2040 interne
+  // non battery-backed).
+  externalRtc.writeTime(dt.unixtime());
 
   out.printf("Horloge réglée: %02d/%02d/%04d %02d:%02d:%02d UTC\n",
     day, month, year, hour, minute, second);

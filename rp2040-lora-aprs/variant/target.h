@@ -13,6 +13,9 @@
 #include <helpers/radiolib/RadioLibWrappers.h>
 #include <helpers/SensorManager.h>
 #include "MyBoard.h"
+#include "aprs/AprsRadioHw.h"
+#include "aprs/AprsCarrier.h"
+#include "hal/rtc/ExternalRtc.h"
 
 // --- MeshCore radio (868 MHz, SPI1) ----------------------------------------
 extern WRAPPER_CLASS mesh_radio_driver;
@@ -22,8 +25,21 @@ extern MyBoard board;
 
 // --- APRS radio (433 MHz, SPI0) --------------------------------------------
 // Utilise le meme wrapper RadioLib mais sur un autre SPI
-extern CustomSX1262 aprs_radio_hw;
+extern CustomSX1262 aprs_radio_hw_sx1262;  // handle SX1262 concret (init bas niveau, cf. aprs_radio_init())
 extern CustomSX1262Wrapper aprs_radio_driver;
+
+// Bascule LoRa/FSK + réception/relais WH65B (aprs_radio_hw) et séquence
+// CW/SSTV (aprs_carrier) : mêmes noms, deux implémentations (une par
+// environnement, cf. AprsRadioHwReal/AprsCarrierReal ici et
+// variant_native/AprsRadioHwSim/AprsCarrierSim) — aucun #ifdef NATIVE_BUILD
+// nécessaire côté appelants (aprs/LoRa433RadioMode.cpp, tasks/task_weather.cpp,
+// aprs/SstvTransmitter.cpp).
+extern IAprsRadioHw& aprs_radio_hw;
+extern IAprsCarrier& aprs_carrier;
+
+// Puce RTC externe battery-backed (RX8025T, persistance entre coupures
+// d'alimentation) — cf. hal/rtc/ExternalRtc.h.
+extern IExternalRtc& externalRtc;
 
 // --- Init functions --------------------------------------------------------
 bool mesh_radio_init();

@@ -51,9 +51,15 @@ public:
       telemetry.solar_mppt.current_ma = val;
     }
 
-    bool alert = false;
-    // TODO alert
-    _mppt.isAlert(&alert);
+    // Registre STATUS complet (bits charge-state + ALERT_MASK + NIGHT_MASK,
+    // cf. mpptChg.h) : mpptChg::getStatusAsString() décode les bits charge-state
+    // à partir de cette même valeur. L'alerte "extinction imminente" n'a pas
+    // besoin d'un accès I2C séparé ici — son bit (ALERT_MASK) est déjà inclus
+    // dans ce registre, et de toute façon déjà consommée ailleurs pour de vrai
+    // par isAlertEnabled() (cf. energy/MpptShutdownMonitor.cpp).
+    if (_mppt.getStatusValue(SYS_STATUS, &uval)) {
+      telemetry.mppt_status = uval;
+    }
 
     _bus->unlock();
     return true;

@@ -14,7 +14,6 @@
 #include "aprs/AprsDispatcher.h"
 #include "aprs/AprsEngine.h"
 #include "aprs/AprsEventHandler.h"
-#include "aprs/LoRa433RadioMode.h"
 #include "hal/i2c/I2CBus.h"
 #include "hal/sensors/Ina3221Hal.h"
 #include "hal/chargers/MpptChargerHal.h"
@@ -30,6 +29,10 @@
 #include "config/SettingsManager.h"
 #include "config/SettingsRegistry.h"
 #include "aprs/SstvTransmitter.h"
+
+#ifdef NATIVE_BUILD
+#include "SimWebBridge.h"
+#endif
 
 // ============================================================================
 // Objets globaux déclarés dans main.cpp (racine de composition) — mêmes
@@ -66,6 +69,10 @@ void bootInitCore() {
 
   board.begin();
   LittleFS.begin();
+
+#ifdef NATIVE_BUILD
+  startSimWebBridge();
+#endif
 }
 
 // I2C bus + EEPROM seuls : nécessaire dans TOUS les modes pour que
@@ -140,8 +147,9 @@ void bootInitIdentity() {
     store.save("_main", the_mesh.self_id);
   }
 
-  LOG_I("MESH", "Repeater ID: ");
+  Serial.println("Repeater ID: ");
   mesh::Utils::printHex(Serial, the_mesh.self_id.pub_key, PUB_KEY_SIZE);
+  Serial.println();
 }
 
 // Capteurs/chargeurs/historique EEPROM : partie "télémétrie" du mode complet
@@ -224,7 +232,7 @@ void bootInitMeshAndAprs() {
     // bootLoadConfig()). switchToLora() fait exactement ce re-begin() à
     // partir des settings — même fonction que celle utilisée au retour d'un
     // cycle FSK/CW/SSTV, donc garantie cohérente avec eux.
-    LoRa433RadioMode::switchToLora();
+    aprs_radio_hw.switchToLora();
 
     aprs_dispatcher.begin();
     aprs_dispatcher.setRxCallback(&aprs_engine);

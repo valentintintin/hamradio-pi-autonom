@@ -76,6 +76,14 @@ public:
   uint32_t getPacketsSent() const { return _n_sent; }
   uint32_t getPacketsReceived() const { return _n_recv; }
 
+  // Combien de ms avant que ce dispatcher n'ait besoin d'être rappelé (envoi
+  // en cours à surveiller, retry CAD, paquet en attente) — 0xFFFFFFFF si rien
+  // n'est prévu (le prochain réveil viendra alors d'un événement radio réel
+  // ou d'un nouveau send(), cf. tasks/task_aprs.cpp). Permet à la tâche
+  // appelante de dormir (ulTaskNotifyTake) au lieu de faire du polling en
+  // vTaskDelay(1).
+  uint32_t msUntilNextAction(unsigned long now) const;
+
 private:
   mesh::Radio* _radio;
   mesh::MillisecondClock* _ms;

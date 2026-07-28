@@ -3,6 +3,10 @@
 #include <Arduino.h>
 #include <helpers/ArduinoHelpers.h>
 #include "InternalRp2040RTCClock.h"
+#include "AprsRadioHwReal.h"
+#include "AprsCarrierReal.h"
+#include "ExternalRtcReal.h"
+#include "core/Log.h"
 
 // ============================================================================
 // Board
@@ -18,8 +22,16 @@ WRAPPER_CLASS mesh_radio_driver(mesh_radio_hw, board);
 // ============================================================================
 // LORA 433 — APRS (SPI0)
 // ============================================================================
-CustomSX1262 aprs_radio_hw = new Module(P_APRS_NSS, P_APRS_DIO_1, P_APRS_RESET, P_APRS_BUSY, SPI);
-CustomSX1262Wrapper aprs_radio_driver(aprs_radio_hw, board);
+CustomSX1262 aprs_radio_hw_sx1262 = new Module(P_APRS_NSS, P_APRS_DIO_1, P_APRS_RESET, P_APRS_BUSY, SPI);
+CustomSX1262Wrapper aprs_radio_driver(aprs_radio_hw_sx1262, board);
+
+// Bascule LoRa/FSK + réception/relais WH65B + séquence CW/SSTV — implémentations
+// réelles (cf. AprsRadioHwReal.h/AprsCarrierReal.h), liées à `aprs_radio_hw`/
+// `aprs_carrier` (déclarés dans target.h) via ces objets concrets.
+static AprsRadioHwReal aprs_radio_hw_real(aprs_radio_hw_sx1262);
+static AprsCarrierReal aprs_carrier_real(aprs_radio_hw_sx1262);
+IAprsRadioHw& aprs_radio_hw = aprs_radio_hw_real;
+IAprsCarrier& aprs_carrier = aprs_carrier_real;
 
 // ============================================================================
 // RTC + Sensors
@@ -28,11 +40,32 @@ static InternalRp2040RTCClock fallback_clock;
 AutoDiscoverRTCClock rtc_clock(fallback_clock);
 SensorManager sensors;
 
+// Puce RTC externe battery-backed (RX8025T) — persistance de l'heure entre
+// coupures d'alimentation (cf. hal/rtc/ExternalRtc.h). N'entre pas dans
+// AutoDiscoverRTCClock (lib/MeshCore, vendorée — DS3231/RV-3028/PCF8563/
+// RX8130CE seulement, pas RX8025T) : synchronisation en un point unique
+// ci-dessous (mesh_radio_init(), au boot) plutôt qu'une lecture I2C à chaque
+// rtc_clock.getCurrentTime().
+static ExternalRtcReal external_rtc_real(Wire);
+IExternalRtc& externalRtc = external_rtc_real;
+
 // ============================================================================
 // Init radio MeshCore (868 MHz, SPI1)
 // ============================================================================
 bool mesh_radio_init() {
   rtc_clock.begin(Wire);
+
+  if (externalRtc.begin()) {
+    uint32_t chipTime;
+    if (externalRtc.readTime(&chipTime)) {
+      rtc_clock.setCurrentTime(chipTime);
+      LOG_I("RTC", "Horloge RP2040 synchronisée depuis la puce RX8025T");
+    } else {
+      LOG_W("RTC", "Puce RX8025T présente mais heure non fiable (VLF) — horloge RP2040 non synchronisée");
+    }
+  } else {
+    LOG_W("RTC", "Puce RX8025T non détectée sur le bus I2C");
+  }
 
   // Config SPI1
   SPI1.setSCK(P_LORA_SCLK);
@@ -63,7 +96,7 @@ bool aprs_radio_init() {
   SPI.begin(false);
 
   // Init manuelle du SX1262 pour APRS (paramètres LoRa-APRS)
-  int16_t state = aprs_radio_hw.begin(
+  int16_t state = aprs_radio_hw_sx1262.begin(
     APRS_FREQ,       // 433.775 MHz
     APRS_BW,         // 125 kHz
     APRS_SF,         // SF12
@@ -75,7 +108,7 @@ bool aprs_radio_init() {
 
   if (state != RADIOLIB_ERR_NONE) {
     // Retry sans TCXO
-    state = aprs_radio_hw.begin(
+    state = aprs_radio_hw_sx1262.begin(
       APRS_FREQ, APRS_BW, APRS_SF, APRS_CR,
       RADIOLIB_SX126X_SYNC_WORD_PRIVATE,
       APRS_TX_POWER, 8, 0  // TCXO = 0
@@ -87,13 +120,13 @@ bool aprs_radio_init() {
   }
 
   // Config supplémentaire
-  aprs_radio_hw.setCRC(2);  // CRC 2 bytes
-  aprs_radio_hw.setCurrentLimit(APRS_CURRENT_LIMIT);
-  aprs_radio_hw.setDio2AsRfSwitch(APRS_DIO2_AS_RF_SWITCH);
-  aprs_radio_hw.setRxBoostedGainMode(APRS_RX_BOOSTED_GAIN);
+  aprs_radio_hw_sx1262.setCRC(2);  // CRC 2 bytes
+  aprs_radio_hw_sx1262.setCurrentLimit(APRS_CURRENT_LIMIT);
+  aprs_radio_hw_sx1262.setDio2AsRfSwitch(APRS_DIO2_AS_RF_SWITCH);
+  aprs_radio_hw_sx1262.setRxBoostedGainMode(APRS_RX_BOOSTED_GAIN);
 
   // RXEN pin
-  aprs_radio_hw.setRfSwitchPins(APRS_RXEN, RADIOLIB_NC);
+  aprs_radio_hw_sx1262.setRfSwitchPins(APRS_RXEN, RADIOLIB_NC);
 
   return true;
 }

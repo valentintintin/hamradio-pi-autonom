@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>rp2040-lora-aprs — simulateur</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-icon" aria-hidden="true">📡</span>
+      <div>
+        <h1>rp2040-lora-aprs</h1>
+        <p class="subtitle">Simulateur natif — tableau de bord</p>
+      </div>
+    </div>
+    <div class="topbar-meta">
+      <span class="badge" id="uptimeBadge" title="Uptime simulateur">— s</span>
+      <span class="status" id="connStatus">
+        <span class="dot"></span><span id="connText">Connexion…</span>
+      </span>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="dashboard" role="tab" aria-selected="true">Tableau de bord</button>
+    <button class="tab" data-tab="sim" role="tab" aria-selected="false">Simulation</button>
+    <button class="tab" data-tab="trames" role="tab" aria-selected="false">Trames radio</button>
+    <button class="tab" data-tab="systeme" role="tab" aria-selected="false">Système</button>
+    <button class="tab" data-tab="journal" role="tab" aria-selected="false">Journal</button>
+  </nav>
+
+  <main>
+
+    <!-- ============================== DASHBOARD ============================== -->
+    <section id="panel-dashboard" class="panel active">
+      <div class="section-block">
+        <h2>Alimentation</h2>
+        <div class="grid" id="cards-power"></div>
+      </div>
+      <div class="section-block">
+        <h2>Météo</h2>
+        <div class="grid" id="cards-weather"></div>
+      </div>
+      <div class="section-block">
+        <h2>Radios</h2>
+        <div class="grid" id="cards-radio"></div>
+      </div>
+      <div class="section-block">
+        <div class="section-head">
+          <h2>Relais</h2>
+        </div>
+        <div class="relays" id="relays"></div>
+      </div>
+    </section>
+
+    <!-- ============================== SIMULATION ============================== -->
+    <section id="panel-sim" class="panel">
+
+      <div class="section-block">
+        <div class="section-head">
+          <h2>⚡ Alimentation simulée</h2>
+          <div class="presets" id="presets"></div>
+        </div>
+        <div class="form-grid">
+
+          <form class="control-card" id="form-battery">
+            <h3>Batterie</h3>
+            <div class="field">
+              <label for="battery_mv">Tension (mV)</label>
+              <div class="slider-row">
+                <input type="range" id="battery_mv_r" min="9000" max="15000" step="10">
+                <input type="number" id="battery_mv" step="10" value="12800">
+              </div>
+            </div>
+            <div class="field">
+              <label for="battery_ma">Courant (mA) — négatif = décharge</label>
+              <div class="slider-row">
+                <input type="range" id="battery_ma_r" min="-3000" max="3000" step="10">
+                <input type="number" id="battery_ma" step="10" value="-180">
+              </div>
+            </div>
+            <button type="submit">Appliquer</button>
+          </form>
+
+          <form class="control-card" id="form-solar">
+            <h3>Solaire</h3>
+            <div class="field">
+              <label for="solar_mv">Tension (mV)</label>
+              <div class="slider-row">
+                <input type="range" id="solar_mv_r" min="0" max="24000" step="100">
+                <input type="number" id="solar_mv" step="100" value="18000">
+              </div>
+            </div>
+            <div class="field">
+              <label for="solar_ma">Courant (mA)</label>
+              <div class="slider-row">
+                <input type="range" id="solar_ma_r" min="0" max="3000" step="10">
+                <input type="number" id="solar_ma" step="10" value="350">
+              </div>
+            </div>
+            <button type="submit">Appliquer</button>
+          </form>
+
+          <form class="control-card" id="form-board5v">
+            <h3>Board 5V</h3>
+            <div class="field">
+              <label for="board5v_mv">Tension (mV)</label>
+              <div class="slider-row">
+                <input type="range" id="board5v_mv_r" min="4500" max="5500" step="10">
+                <input type="number" id="board5v_mv" step="10" value="5000">
+              </div>
+            </div>
+            <div class="field">
+              <label for="board5v_ma">Courant (mA)</label>
+              <div class="slider-row">
+                <input type="range" id="board5v_ma_r" min="0" max="2000" step="10">
+                <input type="number" id="board5v_ma" step="10" value="120">
+              </div>
+            </div>
+            <button type="submit">Appliquer</button>
+          </form>
+
+        </div>
+      </div>
+
+      <div class="section-block">
+        <h2>🌡️ Météo intérieure (BME280)</h2>
+        <form class="control-card wide" id="form-weather">
+          <div class="field-row">
+            <div class="field">
+              <label for="temp_c">Température (°C)</label>
+              <div class="slider-row">
+                <input type="range" id="temp_c_r" min="-20" max="50" step="0.5">
+                <input type="number" id="temp_c" step="0.1" value="21.5">
+              </div>
+            </div>
+            <div class="field">
+              <label for="humidity">Humidité (%)</label>
+              <div class="slider-row">
+                <input type="range" id="humidity_r" min="0" max="100" step="1">
+                <input type="number" id="humidity" step="1" value="48">
+              </div>
+            </div>
+            <div class="field">
+              <label for="pressure_hpa">Pression (hPa)</label>
+              <div class="slider-row">
+                <input type="range" id="pressure_hpa_r" min="950" max="1050" step="0.5">
+                <input type="number" id="pressure_hpa" step="0.1" value="1013">
+              </div>
+            </div>
+          </div>
+          <button type="submit">Appliquer la météo</button>
+        </form>
+      </div>
+
+    </section>
+
+    <!-- ============================== TRAMES RADIO ============================== -->
+    <section id="panel-trames" class="panel">
+
+      <div class="section-block">
+        <h2>📻 Injection brute</h2>
+        <form class="control-card wide" id="form-rx">
+          <div class="field-row">
+            <div class="field">
+              <label for="rx_which">Canal</label>
+              <select id="rx_which">
+                <option value="mesh">mesh (868 MHz)</option>
+                <option value="aprs">aprs (433 MHz, LoRa)</option>
+                <option value="fsk">fsk (433 MHz, météo WH65B — 27 octets)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="rx_format">Format</label>
+              <select id="rx_format">
+                <option value="hex">hex</option>
+                <option value="ascii">ascii</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="rx_payload">Trame</label>
+            <div class="payload-row">
+              <input type="text" id="rx_payload" placeholder="hex : A1B2C3…  ou texte APRS en ascii (SRC>DST,PATH:contenu)">
+              <button type="button" id="rx_example" class="btn-ghost">Exemple APRS</button>
+            </div>
+          </div>
+          <button type="submit">Injecter la trame</button>
+          <p class="hint">Pour l'APRS, le header LoRa-APRS 3 octets est ajouté automatiquement par le simulateur — entre juste "SRC&gt;DST,PATH:contenu".</p>
+        </form>
+      </div>
+
+      <div class="section-block">
+        <div class="section-head">
+          <h2>📡 Construction de trame APRS</h2>
+        </div>
+        <div class="control-card wide">
+          <div class="field-row">
+            <div class="field">
+              <label for="aprs_source">Source (spoof, pour l'injection RX)</label>
+              <input type="text" id="aprs_source" value="F4TEST-9">
+            </div>
+            <div class="field">
+              <label for="aprs_dest">Destination</label>
+              <input type="text" id="aprs_dest" value="APRS">
+            </div>
+            <div class="field">
+              <label for="aprs_path">Chemin (path)</label>
+              <input type="text" id="aprs_path" value="WIDE1-1,WIDE2-1">
+            </div>
+            <div class="field">
+              <label for="aprs_type">Type de trame</label>
+              <select id="aprs_type">
+                <option value="position">Position</option>
+                <option value="weather">Météo (position + WX)</option>
+                <option value="status">Statut</option>
+                <option value="message">Message</option>
+                <option value="object">Objet</option>
+                <option value="item">Item</option>
+                <option value="query">Requête (?APRS?/?WX?/?PING?)</option>
+                <option value="telemetry">Télémétrie (T#)</option>
+                <option value="raw">Brut (contenu libre)</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="aprs_fields_position" class="aprs-type-fields field-row">
+            <div class="field"><label>Latitude (°, + = N)</label><input type="number" id="aprs_lat" value="48.8566" step="0.0001"></div>
+            <div class="field"><label>Longitude (°, + = E)</label><input type="number" id="aprs_lon" value="2.3522" step="0.0001"></div>
+            <div class="field"><label>Symbole (table/code)</label>
+              <div class="slider-row"><input type="text" id="aprs_sym_table" value="/" maxlength="1" style="width:3rem"><input type="text" id="aprs_sym_code" value=">" maxlength="1" style="width:3rem"></div>
+            </div>
+            <div class="field"><label>Cap (°) / Vitesse (nds)</label>
+              <div class="slider-row"><input type="number" id="aprs_course" value="0" min="0" max="360"><input type="number" id="aprs_speed" value="0" min="0"></div>
+            </div>
+            <div class="field"><label>Altitude (pieds, 0 = omise)</label><input type="number" id="aprs_alt" value="0"></div>
+            <div class="field wide"><label>Commentaire</label><input type="text" id="aprs_comment" value="Test depuis le simulateur"></div>
+          </div>
+
+          <div id="aprs_fields_weather" class="aprs-type-fields field-row" style="display:none">
+            <div class="field"><label>Latitude</label><input type="number" id="aprs_wx_lat" value="48.8566" step="0.0001"></div>
+            <div class="field"><label>Longitude</label><input type="number" id="aprs_wx_lon" value="2.3522" step="0.0001"></div>
+            <div class="field"><label>Vent moyen (m/s)</label><input type="number" id="aprs_wx_wind" value="4.5" step="0.1"></div>
+            <div class="field"><label>Rafale (m/s)</label><input type="number" id="aprs_wx_gust" value="7.0" step="0.1"></div>
+            <div class="field"><label>Direction vent (°)</label><input type="number" id="aprs_wx_dir" value="270" min="0" max="360"></div>
+            <div class="field"><label>Température (°C)</label><input type="number" id="aprs_wx_temp" value="18" step="0.1"></div>
+            <div class="field"><label>Pluie 1h (mm)</label><input type="number" id="aprs_wx_rain1h" value="0" step="0.1"></div>
+            <div class="field"><label>Pluie 24h (mm)</label><input type="number" id="aprs_wx_rain24h" value="0" step="0.1"></div>
+            <div class="field"><label>Humidité (%)</label><input type="number" id="aprs_wx_hum" value="60" min="0" max="100"></div>
+            <div class="field"><label>Pression (hPa)</label><input type="number" id="aprs_wx_pres" value="1013" step="0.1"></div>
+          </div>
+
+          <div id="aprs_fields_status" class="aprs-type-fields field-row" style="display:none">
+            <div class="field wide"><label>Texte de statut</label><input type="text" id="aprs_status_text" value="En ligne, tout va bien"></div>
+          </div>
+
+          <div id="aprs_fields_message" class="aprs-type-fields field-row" style="display:none">
+            <div class="field"><label>Destinataire (callsign)</label><input type="text" id="aprs_msg_to" value="F4TEST"></div>
+            <div class="field wide"><label>Message</label><input type="text" id="aprs_msg_text" value="set relay.1.state on"></div>
+            <div class="field"><label>Demander accusé (ID, optionnel)</label><input type="text" id="aprs_msg_ack" value="" maxlength="4" placeholder="ex: 42"></div>
+            <p class="hint wide">Un message adressé au callsign de la station est exécuté comme commande CLI (cf. AprsEventHandler) — préfixe-le du mot de passe admin si la commande est privilégiée.</p>
+          </div>
+
+          <div id="aprs_fields_object" class="aprs-type-fields field-row" style="display:none">
+            <div class="field"><label>Nom de l'objet (9 car. max)</label><input type="text" id="aprs_obj_name" value="BALISE1" maxlength="9"></div>
+            <div class="field"><label>Vivant</label><select id="aprs_obj_alive"><option value="1">Oui</option><option value="0">Tué (killed)</option></select></div>
+            <div class="field"><label>Latitude</label><input type="number" id="aprs_obj_lat" value="48.8566" step="0.0001"></div>
+            <div class="field"><label>Longitude</label><input type="number" id="aprs_obj_lon" value="2.3522" step="0.0001"></div>
+            <div class="field"><label>Symbole (table/code)</label>
+              <div class="slider-row"><input type="text" id="aprs_obj_sym_table" value="/" maxlength="1" style="width:3rem"><input type="text" id="aprs_obj_sym_code" value="o" maxlength="1" style="width:3rem"></div>
+            </div>
+            <div class="field wide"><label>Commentaire</label><input type="text" id="aprs_obj_comment" value=""></div>
+          </div>
+
+          <div id="aprs_fields_item" class="aprs-type-fields field-row" style="display:none">
+            <div class="field"><label>Nom de l'item</label><input type="text" id="aprs_item_name" value="ITEM1" maxlength="9"></div>
+            <div class="field"><label>Vivant</label><select id="aprs_item_alive"><option value="1">Oui</option><option value="0">Tué (killed)</option></select></div>
+            <div class="field"><label>Latitude</label><input type="number" id="aprs_item_lat" value="48.8566" step="0.0001"></div>
+            <div class="field"><label>Longitude</label><input type="number" id="aprs_item_lon" value="2.3522" step="0.0001"></div>
+            <div class="field wide"><label>Commentaire</label><input type="text" id="aprs_item_comment" value=""></div>
+          </div>
+
+          <div id="aprs_fields_query" class="aprs-type-fields field-row" style="display:none">
+            <div class="field"><label>Type</label>
+              <select id="aprs_query_type"><option value="APRS">APRS (demande position)</option><option value="WX">WX (demande météo)</option><option value="PING">PING</option></select>
+            </div>
+            <div class="field"><label>Dirigée vers (vide = générale)</label><input type="text" id="aprs_query_dest" value=""></div>
+          </div>
+
+          <div id="aprs_fields_telemetry" class="aprs-type-fields field-row" style="display:none">
+            <div class="field"><label>Séquence</label><input type="number" id="aprs_tlm_seq" value="1" min="0" max="999"></div>
+            <div class="field"><label>Analogique 1-5 (0-255)</label>
+              <div class="slider-row">
+                <input type="number" id="aprs_tlm_a1" value="120" min="0" max="255">
+                <input type="number" id="aprs_tlm_a2" value="80" min="0" max="255">
+                <input type="number" id="aprs_tlm_a3" value="0" min="0" max="255">
+                <input type="number" id="aprs_tlm_a4" value="0" min="0" max="255">
+                <input type="number" id="aprs_tlm_a5" value="0" min="0" max="255">
+              </div>
+            </div>
+            <div class="field"><label>Bits numériques (8, gauche=1)</label><input type="text" id="aprs_tlm_bits" value="00000000" maxlength="8"></div>
+          </div>
+
+          <div id="aprs_fields_raw" class="aprs-type-fields field-row" style="display:none">
+            <div class="field wide"><label>Contenu brut (après les ':')</label><input type="text" id="aprs_raw_content" value="!4903.50N/07201.75W-Test brut"></div>
+          </div>
+
+          <div class="field">
+            <label for="aprs_preview">Aperçu de la trame générée</label>
+            <textarea id="aprs_preview" class="frame-preview" rows="2" readonly></textarea>
+          </div>
+
+          <div class="button-row">
+            <button type="button" id="aprs_inject">Injecter (réception simulée)</button>
+            <button type="button" id="aprs_transmit" class="btn-secondary">Émettre depuis la station (TX réel)</button>
+          </div>
+          <p class="hint">"Injecter" simule la réception depuis la station "Source" ci-dessus. "Émettre" transmet réellement le contenu depuis CETTE station (son propre callsign/path configurés), ignorant Source/Destination/Chemin.</p>
+        </div>
+      </div>
+
+      <div class="section-block">
+        <h2>🌦️ Construction de trame WH65B</h2>
+        <div class="control-card wide">
+          <div class="field-row">
+            <div class="field"><label>ID station</label><input type="number" id="wh_id" value="1" min="0" max="255"></div>
+            <div class="field"><label>Vent moyen (m/s)</label><input type="number" id="wh_wind" value="4.5" step="0.1" min="0"></div>
+            <div class="field"><label>Rafale (m/s)</label><input type="number" id="wh_gust" value="7.0" step="0.1" min="0"></div>
+            <div class="field"><label>Direction (°)</label><input type="number" id="wh_dir" value="270" min="0" max="359"></div>
+            <div class="field"><label>Température (°C)</label><input type="number" id="wh_temp" value="18.5" step="0.1"></div>
+            <div class="field"><label>Humidité (%)</label><input type="number" id="wh_hum" value="60" min="0" max="99"></div>
+            <div class="field"><label>Pluie cumulée (mm)</label><input type="number" id="wh_rain" value="0" step="0.1" min="0"></div>
+            <div class="field"><label>Lumière (lux)</label><input type="number" id="wh_light" value="12000" min="0"></div>
+            <div class="field"><label>UV (brut) — indice calculé : <span id="wh_uvi_preview">0</span></label><input type="number" id="wh_uv" value="800" min="0" max="6000"></div>
+            <div class="field"><label>Batterie faible</label><select id="wh_batt_low"><option value="0">Non</option><option value="1">Oui</option></select></div>
+          </div>
+          <div class="field">
+            <label for="wh_preview">Aperçu (hex, 17 octets utiles + zéro-padding auto à 27)</label>
+            <textarea id="wh_preview" class="frame-preview" rows="2" readonly></textarea>
+          </div>
+          <button type="button" id="wh_inject">Injecter la trame WH65B</button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ============================== SYSTÈME ============================== -->
+    <section id="panel-systeme" class="panel">
+
+      <div class="section-block">
+        <h2>⏱️ Horloge (RTC)</h2>
+        <form class="control-card wide" id="form-rtc">
+          <div class="field-row">
+            <div class="field">
+              <label for="rtc_datetime">Date/heure (UTC)</label>
+              <input type="datetime-local" id="rtc_datetime" step="1">
+            </div>
+          </div>
+          <div class="button-row">
+            <button type="submit">Régler l'horloge</button>
+            <button type="button" id="rtc_now" class="btn-ghost">Maintenant (UTC)</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="section-block">
+        <h2>🔋 MPPT &amp; Victron</h2>
+        <div class="form-grid">
+          <div class="control-card">
+            <h3>Chargeur MPPT</h3>
+            <div class="field-row">
+              <label class="switch-row"><input type="checkbox" id="mppt_present" checked> Présent</label>
+              <label class="switch-row"><input type="checkbox" id="mppt_alert"> Alerte</label>
+            </div>
+            <div class="field">
+              <label for="mppt_status">État de charge</label>
+              <select id="mppt_status">
+                <option value="night">NIGHT</option>
+                <option value="idle">IDLE</option>
+                <option value="vsrcv">VSRCV</option>
+                <option value="scan">SCAN</option>
+                <option value="bulk">BULK</option>
+                <option value="absorb">ABSORB</option>
+                <option value="float">FLOAT</option>
+              </select>
+            </div>
+            <button type="button" id="mppt_apply">Appliquer</button>
+          </div>
+          <div class="control-card">
+            <h3>Victron VE.Direct</h3>
+            <div class="field-row">
+              <label class="switch-row"><input type="checkbox" id="victron_present"> Présent</label>
+            </div>
+            <div class="field">
+              <label for="victron_soc">SOC (%)</label>
+              <div class="slider-row">
+                <input type="range" id="victron_soc_r" min="0" max="100" step="1">
+                <input type="number" id="victron_soc" step="1" value="85">
+              </div>
+            </div>
+            <div class="field">
+              <label for="victron_state">État de fonctionnement</label>
+              <select id="victron_state">
+                <option value="0">Off</option>
+                <option value="2">Fault</option>
+                <option value="3">Bulk</option>
+                <option value="4">Absorption</option>
+                <option value="5">Float</option>
+                <option value="7">Equalize</option>
+              </select>
+            </div>
+            <button type="button" id="victron_apply">Appliquer</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-block">
+        <h2>⌨️ Commande brute</h2>
+        <form class="control-card wide" id="form-rawcmd">
+          <div class="field">
+            <label for="rawcmd">Ligne de commande CLI (ex: "set energy.mppt_pwr_off_mv 10500", "save", "beacon", "wx")</label>
+            <div class="payload-row">
+              <input type="text" id="rawcmd" placeholder="get|set <clé> [valeur], save, beacon, wx, send aprs <texte>, history, eventlog…">
+              <button type="submit" class="btn-ghost">Envoyer</button>
+            </div>
+          </div>
+          <p class="hint">Passe directement par la même chaîne de commande que le CLI série — toute commande "get/set/list/save/beacon/wx/..." fonctionne ici.</p>
+        </form>
+      </div>
+
+    </section>
+
+    <!-- ============================== JOURNAL ============================== -->
+    <section id="panel-journal" class="panel">
+      <div class="section-block">
+        <div class="section-head">
+          <h2>Trames radio récentes</h2>
+        </div>
+        <pre id="radiolog">…</pre>
+      </div>
+      <div class="section-block">
+        <div class="section-head">
+          <h2>Logs</h2>
+          <input type="search" id="logFilter" placeholder="filtrer les logs…" class="log-filter">
+        </div>
+        <pre id="logs">…</pre>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="toasts" id="toasts"></div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

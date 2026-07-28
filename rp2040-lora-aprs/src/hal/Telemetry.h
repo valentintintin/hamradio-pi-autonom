@@ -12,12 +12,18 @@ struct WeatherData {
   float humidity;       // 0-100 %
 };
 
-union WeatherDataBme {
+// Anciennement des `union` — bug : tous les champs sont en réalité écrits et
+// lus simultanément (cf. hal/sensors/Bme280Hal.h::query(), tasks/
+// task_weather.cpp, aprs/AprsEventHandler.cpp), pas les uns à la place des
+// autres. En union, chaque écriture écrasait les précédentes (même
+// stockage) — température intérieure et tous les champs météo extérieurs
+// (vent, pluie, direction, validité) étaient corrompus dès la 2e écriture.
+struct WeatherDataBme {
   WeatherData base;
   float pressure_hpa;
 };
 
-union WeatherDataExtended {
+struct WeatherDataExtended {
   WeatherData base;
   bool is_valid;
   float wind_avg_ms;

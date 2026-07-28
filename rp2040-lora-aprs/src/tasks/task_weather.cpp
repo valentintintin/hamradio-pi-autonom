@@ -6,18 +6,29 @@
 //   2. SX1262 433 → FSK (433.92MHz, 8.21kbps) — cf aprs/AprsRadioMode.h
 //   3. Écoute max settings.weather.wh65b_timeout → decode WH65B
 //   4. Restaure LoRa APRS → resume
+//
+// Le détail réception/relais (IRQ RadioLib réel vs file SimWorld::fsk_rx_queue
+// en environnement `native`) vit entièrement dans IAprsRadioHw (cf.
+// aprs/AprsRadioHw.h) — ce fichier ne connaît que l'interface, jamais RadioLib
+// ni SimWorld, donc aucun #ifdef NATIVE_BUILD ici.
 // ============================================================================
+
+/*
+Normal : 24015A027B372707000001F401D4C0230E00000000000000000000
+Froid hiver : 24015A015C500802000000000007D07E8B00000000000000000000
+Canicule+vent+pluie : 24015A031019C125001408980E7EF0632400000000000000000000
+Batterie faible : 24015A0A263C2707000001F401D4C09C3F00000000000000000000
+Capteurs invalides : 24015A17FF37FF070000FFFFFFFFFFF7C400000000000000000000
+*/
 
 #include "tasks.h"
 #include "target.h"
 #include "core/Log.h"
 #include "config/Settings.h"
 #include "aprs/AprsDispatcher.h"
-#include "aprs/LoRa433RadioMode.h"
 #include "hal/Telemetry.h"
 #include "task_heartbeat.h"
 #include <FineOffsetWH65B.h>
-#include <RadioLib.h>
 #include <string.h>
 
 extern AprsDispatcher aprs_dispatcher;
@@ -28,40 +39,18 @@ extern Settings settings;
 
 #define WEATHER_BOOT_DELAY_MS (120 * 1000)
 
-static volatile bool fsk_rx_flag = false;
-static void onFskRxDone() {
-  fsk_rx_flag = true;
-}
-
 // ============================================================================
-// Écoute FSK + décodage
-//
-// raw_out (optionnel) reçoit une copie des WH65B_PAYLOAD_LEN octets bruts
-// reçus, pour le relais FSK (cf. taskWeather() ci-dessous) — non rempli si la
-// fonction retourne false avant d'avoir lu un paquet.
+// Écoute + décodage — raw_out (optionnel) reçoit une copie des
+// WH65B_PAYLOAD_LEN octets bruts reçus, pour le relais FSK (cf. taskWeather()
+// ci-dessous) — non rempli si la fonction retourne false avant d'avoir lu un
+// paquet.
 // ============================================================================
 static bool listenAndDecode(uint8_t* raw_out = nullptr) {
-  fsk_rx_flag = false;
+  uint8_t buffer[WH65B_PAYLOAD_LEN] = {0};
+  float rssi = 0;
 
-  int16_t state = aprs_radio_hw.startReceive();
-  if (state != RADIOLIB_ERR_NONE) {
-    LOG_E(TAG, "startReceive FSK: %d", state);
-    return false;
-  }
-
-  unsigned long start = millis();
-  while (!fsk_rx_flag) {
-    if (millis() - start > settings.weather.wh65b_rx_timeout_ms) {
-      LOG_W(TAG, "Timeout %lums, aucun paquet WH65B", settings.weather.wh65b_rx_timeout_ms);
-      return false;
-    }
-    vTaskDelay(pdMS_TO_TICKS(10));
-  }
-
-  uint8_t buffer[WH65B_PAYLOAD_LEN];
-  state = aprs_radio_hw.readData(buffer, WH65B_PAYLOAD_LEN);
-  if (state != RADIOLIB_ERR_NONE) {
-    LOG_E(TAG, "readData: %d", state);
+  if (!aprs_radio_hw.receiveWh65bFrame(settings.weather.wh65b_rx_timeout_ms, buffer, &rssi)) {
+    LOG_W(TAG, "Timeout %lums, aucun paquet WH65B", settings.weather.wh65b_rx_timeout_ms);
     return false;
   }
 
@@ -89,7 +78,6 @@ static bool listenAndDecode(uint8_t* raw_out = nullptr) {
   telemetry.weather_outside.light_lux = data.light_lux;
   telemetry.weather_outside.uv_index = data.uvi;
 
-  float rssi = aprs_radio_hw.getRSSI();
   LOG_I(TAG, "WH65B T:%.1fC H:%d%% V:%.1fm/s D:%d R:%.1fmm UV:%d RSSI:%.0f",
     data.temperature_C, data.humidity, data.wind_avg_m_s,
     data.wind_dir_deg, data.rainfall_mm, data.uvi, rssi);
@@ -112,7 +100,7 @@ void taskWeather(void* params) {
       LOG_T(TAG, "Début cycle FSK");
 
       aprs_dispatcher.pause();
-      bool ok = LoRa433RadioMode::switchToFsk(onFskRxDone);
+      bool ok = aprs_radio_hw.switchToFsk();
       if (ok) {
         uint8_t raw[WH65B_PAYLOAD_LEN];
         if (listenAndDecode(raw) && settings.weather.resend_enabled) {
@@ -122,19 +110,17 @@ void taskWeather(void* params) {
           // quels, même fréquence, après un délai (laisse le temps à la
           // station d'origine de terminer son propre cycle TX).
           vTaskDelay(pdMS_TO_TICKS(settings.weather.resend_delay_ms));
-          aprs_radio_hw.setOutputPower(settings.weather.resend_power_dbm);
-          int16_t state = aprs_radio_hw.transmit(raw, WH65B_PAYLOAD_LEN);
-          if (state != RADIOLIB_ERR_NONE) {
-            LOG_E(TAG, "Relais FSK: %d", state);
-          } else {
+          if (aprs_radio_hw.relayWh65bFrame(raw, WH65B_PAYLOAD_LEN, settings.weather.resend_power_dbm)) {
             LOG_D(TAG, "Trame WH65B relayée (%d dBm)", settings.weather.resend_power_dbm);
+          } else {
+            LOG_E(TAG, "Relais FSK échoué");
           }
         }
       }
       // switchToLora() repart des settings (radio.aprs.*), y compris la
       // puissance normale : restaure automatiquement après le relais
       // resend_power_dbm ci-dessus, pas de reapplication manuelle nécessaire.
-      LoRa433RadioMode::switchToLora();
+      aprs_radio_hw.switchToLora();
       aprs_dispatcher.resume();
 
       LOG_T(TAG, "Fin cycle, retour APRS");

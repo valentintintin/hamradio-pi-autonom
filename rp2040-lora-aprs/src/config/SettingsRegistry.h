@@ -65,6 +65,13 @@ public:
   // Lister toutes les clés (pour "list" ou "help")
   void listAll(Print& out) const;
 
+  // Accès brut par index (0..count()-1) — utilisé pour un dump générique de
+  // tous les champs (cf. native_sim/sim/SimSettingsJson.cpp), sans avoir à
+  // connaître chaque clé à l'avance.
+  const SettingEntry* entryAt(int index) const {
+    return (index >= 0 && index < _count) ? &_entries[index] : nullptr;
+  }
+
 private:
   SettingEntry _entries[128]{};  // assez large pour tous les champs
   int _count = 0;
