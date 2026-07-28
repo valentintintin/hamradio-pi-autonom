@@ -17,13 +17,13 @@ MyBoard board;
 // LORA 868 — MeshCore (SPI1)
 // ============================================================================
 static RADIO_CLASS mesh_radio_hw = new Module(P_LORA_NSS, P_LORA_DIO_1, P_LORA_RESET, P_LORA_BUSY, SPI1);
-WRAPPER_CLASS mesh_radio_driver(mesh_radio_hw, board);
+MeshRadioWrapper mesh_radio_driver(mesh_radio_hw, board);
 
 // ============================================================================
 // LORA 433 — APRS (SPI0)
 // ============================================================================
 CustomSX1262 aprs_radio_hw_sx1262 = new Module(P_APRS_NSS, P_APRS_DIO_1, P_APRS_RESET, P_APRS_BUSY, SPI);
-CustomSX1262Wrapper aprs_radio_driver(aprs_radio_hw_sx1262, board);
+AprsRadioWrapper aprs_radio_driver(aprs_radio_hw_sx1262, board);
 
 // Bascule LoRa/FSK + réception/relais WH65B + séquence CW/SSTV — implémentations
 // réelles (cf. AprsRadioHwReal.h/AprsCarrierReal.h), liées à `aprs_radio_hw`/

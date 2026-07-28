@@ -192,8 +192,14 @@ bool AprsDispatcher::send(const uint8_t* data, uint8_t len, uint8_t priority, ui
   // Réveille la tâche APRS immédiatement (elle dort peut-être en attendant un
   // événement radio ou un paquet, cf. tasks/task_aprs.cpp) plutôt que de la
   // laisser attendre son prochain réveil planifié pour remarquer ce nouveau
-  // paquet.
-  xTaskNotifyGive(g_aprs_task_handle);
+  // paquet. Garde nulle nécessaire : send() peut être appelée avant que
+  // taskAprsLoop() ait démarré et renseigné ce handle (ex: un beacon envoyé
+  // très tôt au boot) — le vrai FreeRTOS (configASSERT sur RP2040) fait un
+  // rtosFatalError() si on l'appelle avec un handle nul, contrairement au
+  // shim natif qui l'ignore silencieusement.
+  if (g_aprs_task_handle) {
+    xTaskNotifyGive(g_aprs_task_handle);
+  }
 
   return true;
 }

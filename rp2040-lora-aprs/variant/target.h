@@ -15,18 +15,24 @@
 #include "MyBoard.h"
 #include "aprs/AprsRadioHw.h"
 #include "aprs/AprsCarrier.h"
+#include "aprs/NotifyingRadioLibWrapper.h"
 #include "hal/rtc/ExternalRtc.h"
 
 // --- MeshCore radio (868 MHz, SPI1) ----------------------------------------
-extern WRAPPER_CLASS mesh_radio_driver;
+// MeshRadioWrapper (cf. aprs/NotifyingRadioLibWrapper.h) au lieu de
+// WRAPPER_CLASS/CustomSX1262Wrapper directement : même comportement, en plus
+// de réveiller task_mesh.cpp depuis l'IRQ DIO1 (cf. ce header) au lieu de
+// laisser cette tâche faire du polling en vTaskDelay(1).
+extern MeshRadioWrapper mesh_radio_driver;
 extern AutoDiscoverRTCClock rtc_clock;
 extern SensorManager sensors;
 extern MyBoard board;
 
 // --- APRS radio (433 MHz, SPI0) --------------------------------------------
-// Utilise le meme wrapper RadioLib mais sur un autre SPI
+// Utilise le meme wrapper RadioLib mais sur un autre SPI — AprsRadioWrapper,
+// même remarque que mesh_radio_driver ci-dessus (réveille task_aprs.cpp).
 extern CustomSX1262 aprs_radio_hw_sx1262;  // handle SX1262 concret (init bas niveau, cf. aprs_radio_init())
-extern CustomSX1262Wrapper aprs_radio_driver;
+extern AprsRadioWrapper aprs_radio_driver;
 
 // Bascule LoRa/FSK + réception/relais WH65B (aprs_radio_hw) et séquence
 // CW/SSTV (aprs_carrier) : mêmes noms, deux implémentations (une par

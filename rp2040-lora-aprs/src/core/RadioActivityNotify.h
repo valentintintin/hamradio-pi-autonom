@@ -4,28 +4,25 @@
 #include <task.h>
 
 // ============================================================================
-// Réveil des tâches radio (APRS/mesh) depuis le contexte "interruption" DIO1
-// du SX1262 — cf. lib/MeshCore/src/helpers/radiolib/RadioLibWrappers.cpp,
-// fonction setFlag(), à laquelle un appel à notifyRadioActivityFromISR() a
-// été ajouté (seule modification apportée à ce fichier vendoré — cf.
-// commentaire sur place).
+// Handles des tâches APRS/mesh, à réveiller sur activité radio réelle (RX ou
+// TX terminé) au lieu du polling en vTaskDelay(1) :
+//   - matériel réel : lus directement par aprs/NotifyingRadioLibWrapper.h
+//     (sous-classe project-owned de CustomSX1262Wrapper — RadioLibWrapper
+//     lui-même, vendoré, n'est pas modifié) depuis le contexte IRQ DIO1.
+//   - natif : lus par native_sim/sim/SimCli.cpp et native_sim/web/SimWebBridge.cpp
+//     après une injection RX ("sim rx mesh|aprs ...") — pas d'IRQ réelle, mais
+//     le même réveil immédiat plutôt que d'attendre le prochain réveil
+//     périodique.
 //
-// `state` dans RadioLibWrappers.cpp est UN SEUL flag fichier-statique partagé
-// par toutes les instances RadioLibWrapper — ce projet en a deux (radio mesh
-// 868 MHz et radio APRS 433 MHz), toutes les deux passent par la même
-// setFlag(). Comme cette fonction ne reçoit aucun contexte permettant de
-// savoir laquelle des deux radios a réellement déclenché l'IRQ, on réveille
-// les DEUX tâches à chaque appel : un réveil superflu est sans conséquence
-// (la tâche revérifie son propre état et se rendort aussitôt si, de fait,
-// rien ne la concernait) — rater un réveil, en revanche, serait un vrai bug.
+// tasks/task_aprs.cpp et tasks/task_mesh.cpp renseignent ces handles au tout
+// début de leur fonction de tâche (xTaskGetCurrentTaskHandle()) ; tant qu'une
+// tâche n'est pas démarrée son handle est nullptr et un xTaskNotifyGive/
+// vTaskNotifyGiveFromISR dessus est un no-op silencieux (cf. freertos_compat.cpp
+// et le vrai FreeRTOS, tous deux tolérants à un handle nul ici).
 //
-// task_aprs.cpp et task_mesh.cpp renseignent ces handles au tout début de
-// leur fonction de tâche (xTaskGetCurrentTaskHandle()) ; tant qu'une tâche
-// n'est pas démarrée son handle est nullptr et notifyRadioActivityFromISR()
-// l'ignore silencieusement.
+// aprs/AprsDispatcher.cpp réveille aussi g_aprs_task_handle depuis send()
+// (nouveau paquet enfilé) — pas seulement l'IRQ radio.
 // ============================================================================
 
 extern TaskHandle_t g_aprs_task_handle;
 extern TaskHandle_t g_mesh_task_handle;
-
-void notifyRadioActivityFromISR();
