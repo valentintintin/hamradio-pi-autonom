@@ -42,7 +42,7 @@ void taskMeshLoop(void* params) {
     // Horloge de secours (millis()) + capteurs MeshCore (GPS, etc.) : comme
     // dans le loop() de référence des exemples MeshCore, à appeler à chaque
     // itération.
-    rtc_clock.tick();
+    rtc_clock.tick(); // Vu qu'on dort, il est fort possible que le tick ne se fasse pas correctement (pas grave on a une rtc)
     sensors.loop();
 
     ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(MESH_TASK_MAX_WAIT_MS));

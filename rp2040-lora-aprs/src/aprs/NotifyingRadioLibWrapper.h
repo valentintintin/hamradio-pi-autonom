@@ -5,6 +5,8 @@
 #include <FreeRTOS.h>
 #include <task.h>
 
+#include "core/Log.h"
+
 // ============================================================================
 // NotifyingRadioLibWrapper<Handle> — sous-classe project-owned de
 // CustomSX1262Wrapper (MeshCore vendoré, INTACT — ce fichier ne le modifie
@@ -31,46 +33,63 @@
 // projet), qui ne permet pas de savoir laquelle des deux a déclenché l'IRQ.
 // ============================================================================
 
+#define STATE_IDLE       0
+#define STATE_RX         1
+#define STATE_TX_WAIT    3
+#define STATE_TX_DONE    4
+#define STATE_INT_READY 16
+
+#define NUM_NOISE_FLOOR_SAMPLES  64
+#define SAMPLING_THRESHOLD  14
+
 template <TaskHandle_t& Handle>
 class NotifyingRadioLibWrapper : public CustomSX1262Wrapper {
 public:
   NotifyingRadioLibWrapper(CustomSX1262& hw, mesh::MainBoard& board) : CustomSX1262Wrapper(hw, board) {}
 
   void begin() override {
+    _radio->setPacketReceivedAction(setFlag);  // this is also SentComplete interrupt
     _preamble_sf = getSpreadingFactor();
-    _radio->setPreambleLength(preambleLengthForSF(_preamble_sf));
-    _radio->setPacketReceivedAction(&onIrq);  // remplace l'action posée par RadioLibWrapper::begin() (jamais appelée ici)
-    s_state = kIdle;
+    _radio->setPreambleLength(preambleLengthForSF(_preamble_sf)); // longer preamble for lower SF improves reliability
+    state = STATE_IDLE;
+
+    if (_board->getStartupReason() == BD_STARTUP_RX_PACKET) {  // received a LoRa packet (while in deep sleep)
+      setFlag(); // LoRa packet is already received
+    }
 
     _noise_floor = 0;
     _threshold = 0;
+
+    // start average out some samples
     _num_floor_samples = 0;
     _floor_sample_sum = 0;
   }
 
   int recvRaw(uint8_t* bytes, int sz) override {
     int len = 0;
-    if (s_state & kIntReady) {
+    if (state & STATE_INT_READY) {
       len = _radio->getPacketLength();
       if (len > 0) {
-        if (len > sz) {
-          len = sz;
-        }
+        if (len > sz) { len = sz; }
         int err = _radio->readData(bytes, len);
         if (err != RADIOLIB_ERR_NONE) {
+          LOG_W("RadioLibWrapper", "error: readData(%d)", err);
           len = 0;
           n_recv_errors++;
         } else {
+          //  Serial.print("  readData() -> "); Serial.println(len);
           n_recv++;
         }
       }
-      s_state = kIdle;
+      state = STATE_IDLE;   // need another startReceive()
     }
 
-    if (s_state != kRx) {
+    if (state != STATE_RX) {
       int err = _radio->startReceive();
       if (err == RADIOLIB_ERR_NONE) {
-        s_state = kRx;
+        state = STATE_RX;
+      } else {
+        LOG_W("RadioLibWrapper", "error: startReceive(%d)", err);
       }
     }
     return len;
@@ -78,20 +97,20 @@ public:
 
   bool startSendRaw(const uint8_t* bytes, int len) override {
     _board->onBeforeTransmit();
-    int err = _radio->startTransmit((uint8_t*)bytes, len);
+    int err = _radio->startTransmit((uint8_t *) bytes, len);
     if (err == RADIOLIB_ERR_NONE) {
-      s_state = kTxWait;
+      state = STATE_TX_WAIT;
       return true;
     }
-    _radio->standby();
-    s_state = kIdle;
+    LOG_W("RadioLibWrapper", "error: startTransmit(%d)", err);
+    idle();   // trigger another startRecv()
     _board->onAfterTransmit();
     return false;
   }
 
   bool isSendComplete() override {
-    if (s_state & kIntReady) {
-      s_state = kIdle;
+    if (state & STATE_INT_READY) {
+      state = STATE_IDLE;
       n_sent++;
       return true;
     }
@@ -101,25 +120,38 @@ public:
   void onSendFinished() override {
     _radio->finishTransmit();
     _board->onAfterTransmit();
-    s_state = kIdle;
+    state = STATE_IDLE;
   }
 
   bool isInRecvMode() const override {
-    return (s_state & ~kIntReady) == kRx;
+    return (state & ~STATE_INT_READY) == STATE_RX;
   }
 
-  // Calibration de seuil de bruit de RadioLibWrapper::loop() : jamais activée
-  // dans ce projet (rien n'appelle triggerNoiseFloorCalibrate()) — no-op
-  // plutôt que d'hériter une version qui lirait le `state` de RadioLibWrapper,
-  // qu'on ne met plus à jour ici.
-  void loop() override {}
+  void loop() override {
+    if (state == STATE_RX && _num_floor_samples < NUM_NOISE_FLOOR_SAMPLES) {
+      if (!isReceivingPacket()) {
+        int rssi = getCurrentRSSI();
+        if (rssi < _noise_floor + SAMPLING_THRESHOLD) {  // only consider samples below current floor + sampling THRESHOLD
+          _num_floor_samples++;
+          _floor_sample_sum += rssi;
+        }
+      }
+    } else if (_num_floor_samples >= NUM_NOISE_FLOOR_SAMPLES && _floor_sample_sum != 0) {
+      _noise_floor = _floor_sample_sum / NUM_NOISE_FLOOR_SAMPLES;
+      if (_noise_floor < -120) {
+        _noise_floor = -120;    // clamp to lower bound of -120dBi
+      }
+      _floor_sample_sum = 0;
+
+      LOG_D("RadioLibWrapper", "noise_floor = %d", (int)_noise_floor);
+    }
+  }
 
 private:
-  enum : uint8_t { kIdle = 0, kRx = 1, kTxWait = 3, kIntReady = 16 };
-  static volatile uint8_t s_state;
+  static volatile uint8_t state;
 
-  static void onIrq() {
-    s_state |= kIntReady;
+  static void setFlag() {
+    state |= STATE_INT_READY;
     if (Handle) {
       BaseType_t woken = pdFALSE;
       vTaskNotifyGiveFromISR(Handle, &woken);
@@ -129,7 +161,7 @@ private:
 };
 
 template <TaskHandle_t& Handle>
-volatile uint8_t NotifyingRadioLibWrapper<Handle>::s_state = 0;
+volatile uint8_t NotifyingRadioLibWrapper<Handle>::state = 0;
 
 using MeshRadioWrapper = NotifyingRadioLibWrapper<g_mesh_task_handle>;
 using AprsRadioWrapper = NotifyingRadioLibWrapper<g_aprs_task_handle>;

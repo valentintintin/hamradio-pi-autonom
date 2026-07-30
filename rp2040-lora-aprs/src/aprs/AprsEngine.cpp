@@ -215,7 +215,7 @@ bool AprsEngine::sendMessage(const char* destination, const char* message, const
     return false;
   }
 
-  return encodeAndSend(written, APRS_PRIO_BEACON);
+  return encodeAndSend(written, APRS_PRIO_ACK_MESSAGE);
 }
 
 // ============================================================================
@@ -235,7 +235,7 @@ bool AprsEngine::sendAck(const char* destination, const char* ackId) {
     return false;
   }
 
-  return encodeAndSend(written, APRS_PRIO_ACK);
+  return encodeAndSend(written, APRS_PRIO_ACK_MESSAGE);
 }
 
 // ============================================================================

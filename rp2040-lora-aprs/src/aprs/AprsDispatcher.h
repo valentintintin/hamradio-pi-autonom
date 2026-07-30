@@ -24,7 +24,7 @@
 #define APRS_RX_QUEUE_SIZE      8
 
 // Priorités
-#define APRS_PRIO_ACK           0   // ACKs en premier
+#define APRS_PRIO_ACK_MESSAGE           0   // ACKset messages en premier
 #define APRS_PRIO_DIGIPEAT      1   // Digipeated packets
 #define APRS_PRIO_BEACON        2   // Beacons périodiques
 #define APRS_PRIO_LOW           3   // Telemetry etc.
