@@ -286,7 +286,3 @@ bool M24M01Hal::write(uint32_t address, const uint8_t* data, size_t len) {
   }
   return writeStringToFile(path, json);
 }
-
-bool M24M01Hal::waitReady() { return true; }
-bool M24M01Hal::readChunk(uint32_t, uint8_t*, size_t) { return true; }
-bool M24M01Hal::writePage(uint32_t, const uint8_t*, size_t) { return true; }

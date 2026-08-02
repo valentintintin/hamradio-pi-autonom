@@ -9,27 +9,32 @@
 // Persistance des settings (cf. SettingsManager) et historique télémétrie
 // (cf. TelemetryHistory).
 //
-// Adressage 17 bits (128 Ko = 2^17) : les 16 bits de poids faible passent
-// dans les 2 octets d'adresse classiques ; le bit A16 (MSB) est replié dans
-// le bit 0 du code de sélection du device I2C — cf. datasheet M24M01-R,
-// "Device select code" = 1010 E2 E1 A16, avec E2/E1 câblés à la masse ici.
+// L'implémentation réelle (M24M01Hal.cpp) délègue à la lib externe M24M01
+// (github.com/valentintintin/M24M01), en ajoutant le verrouillage du bus
+// (I2CBus, mutex FreeRTOS partagé avec les autres périphériques I2C) autour
+// de chaque appel. La classe M24M01 n'est que forward-déclarée ici : la
+// variante native (native_sim/sim/M24M01HalSim.cpp, persistée dans de vrais
+// fichiers JSON, pas de bus I2C réel) ne s'en sert pas et n'a donc pas besoin
+// de cette dépendance.
 // ============================================================================
 
 #define M24M01_I2C_ADDR   0x50
 #define M24M01_PAGE_SIZE  256
 #define M24M01_SIZE_BYTES (128 * 1024)  // 1 Mbit = 128 Ko
 
+class M24M01;
+
 class M24M01Hal {
 public:
   M24M01Hal(I2CBus& bus, uint8_t addr = M24M01_I2C_ADDR)
-    : _bus(&bus), _addr(addr), _initialized(false) {}
+    : _bus(&bus), _addr(addr), _initialized(false), _dev(nullptr) {}
 
   bool begin();
 
-  // Lire un bloc (découpe en chunks selon la limite du buffer Wire)
+  // Lire un bloc (délégué à M24M01::read, cf. M24M01Hal.cpp)
   bool read(uint32_t address, uint8_t* data, size_t len);
 
-  // Écrire un bloc (découpe en pages de 256 bytes puis en chunks Wire)
+  // Écrire un bloc (délégué à M24M01::write, cf. M24M01Hal.cpp)
   bool write(uint32_t address, const uint8_t* data, size_t len);
 
   bool isInitialized() const { return _initialized; }
@@ -38,16 +43,5 @@ private:
   I2CBus* _bus;
   uint8_t _addr;
   bool _initialized;
-
-  uint8_t deviceAddrFor(uint32_t address) const {
-    return _addr | ((address >> 16) & 0x01);
-  }
-
-  bool readChunk(uint32_t address, uint8_t* data, size_t len);
-  bool writePage(uint32_t address, const uint8_t* data, size_t len);
-
-  // Attend la fin du cycle d'écriture en cours par polling ACK (cf. datasheet
-  // §"Acknowledge polling") plutôt qu'un délai fixe : plus rapide dans le cas
-  // typique, et sûr même si le cycle dépasse la durée typique (tW max = 5 ms).
-  bool waitReady();
+  M24M01* _dev;  // alloué par M24M01Hal.cpp::begin()
 };
