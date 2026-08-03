@@ -152,12 +152,12 @@ void bootInitIdentity() {
   Serial.println();
 }
 
-// Capteurs/chargeurs/historique EEPROM : partie "télémétrie" du mode complet
-// uniquement (relais + télémétrie = fonctionnement normal, cf. Settings.h).
-// L'I2C bus et l'EEPROM elle-même sont déjà initialisés par bootInitEeprom()
-// (nécessaire dans tous les modes pour le fallback settings).
+// Capteurs/chargeurs/historique EEPROM : partie "télémétrie" (MODE_FULL et
+// MODE_TELEMETRY_ONLY, cf. Settings.h). L'I2C bus et l'EEPROM elle-même sont
+// déjà initialisés par bootInitEeprom() (nécessaire dans tous les modes pour
+// le fallback settings).
 void bootInitSensors() {
-  if (!modeIsFull(settings.system.mode)) {
+  if (!modeHasTelemetry(settings.system.mode)) {
     return;
   }
 
@@ -181,9 +181,11 @@ void bootInitSensors() {
 
   if (eeprom.isInitialized()) {
     if (telemetry_history.begin()) {
+      telemetry_history.setEnabled(settings.system.telemetry_log_enabled);
       LOG_I("I2C", "Historique EEPROM: %d slots", telemetry_history.getMaxRecords());
     }
     if (event_log.begin()) {
+      event_log.setEnabled(settings.system.event_log_enabled);
       LOG_I("I2C", "Log événements EEPROM: %d slots", event_log.getMaxRecords());
     }
   }
@@ -206,7 +208,7 @@ void bootInitSensors() {
 }
 
 void bootInitRelays() {
-  if (!modeIsFull(settings.system.mode)) {
+  if (!modeHasTelemetry(settings.system.mode)) {
     return;
   }
   relay_hal.begin(settings.relay, RELAY_COUNT);
@@ -255,7 +257,7 @@ void bootCreateTasks() {
     xTaskCreate(taskSstv,       "sstv",    TASK_STACK_SSTV,    nullptr, TASK_PRIO_SSTV,      nullptr);
   }
 
-  if (modeIsFull(mode)) {
+  if (modeHasTelemetry(mode)) {
     xTaskCreate(taskSensors, "sensors", TASK_STACK_SENSORS, nullptr, TASK_PRIO_SENSORS, nullptr);
     xTaskCreate(taskEnergy,  "energy",  TASK_STACK_ENERGY,  nullptr, TASK_PRIO_ENERGY,  nullptr);
   }

@@ -81,7 +81,7 @@ struct __attribute__((packed)) EventLogHeader {
 class EventLogHistory {
 public:
   EventLogHistory(M24M01Hal& eeprom)
-    : _eeprom(&eeprom), _initialized(false), _max_records(0), _write_index(0), _count(0)
+    : _eeprom(&eeprom), _initialized(false), _enabled(true), _max_records(0), _write_index(0), _count(0)
   {
   }
 
@@ -120,12 +120,17 @@ public:
     return true;
   }
 
+  // Active/désactive la journalisation (cf. system.event_log.enabled) — ne
+  // touche pas à l'EEPROM elle-même, juste un court-circuit de log().
+  void setEnabled(bool enabled) { _enabled = enabled; }
+  bool isEnabled() const { return _enabled; }
+
   // Enregistrer un événement : code + jusqu'à cinq valeurs numériques
   // annexes (cf. EventCode ci-dessus pour la signification de data0/data1 ;
   // data2-4 réservées pour de futurs codes).
   bool log(uint16_t code, int32_t data0 = 0, int32_t data1 = 0,
            int32_t data2 = 0, int32_t data3 = 0, int32_t data4 = 0) {
-    if (!_initialized) {
+    if (!_initialized || !_enabled) {
       return false;
     }
 
@@ -191,6 +196,7 @@ public:
 private:
   M24M01Hal* _eeprom;
   bool _initialized;
+  bool _enabled;
   uint16_t _max_records;
   uint16_t _write_index;
   uint16_t _count;

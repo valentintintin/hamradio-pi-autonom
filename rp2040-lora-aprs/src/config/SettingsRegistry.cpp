@@ -85,9 +85,11 @@ void SettingsRegistry::init(Settings& s) {
   add("system.password",       ST_STRING, s.system.admin_password, sizeof(s.system.admin_password));
   add("system.watchdog",       ST_BOOL,   &s.system.watchdog_enabled);
   add("system.log_interval",   ST_UINT32, &s.system.telemetry_log_interval_ms, 10000.0f, 3600000.0f);
+  add("system.telemetry_log.enabled", ST_BOOL, &s.system.telemetry_log_enabled);
+  add("system.event_log.enabled",     ST_BOOL, &s.system.event_log_enabled);
   add("system.log_level",      &s.system.log_level, LOG_LEVEL_NAMES, sizeof(LOG_LEVEL_NAMES) / sizeof(LOG_LEVEL_NAMES[0]));
-  // OperatingMode : 0=aprs, 1=meshcore, 2=aprs+meshcore, 3=full (cf. config/Settings.h)
-  add("system.mode",           ST_UINT8,  &s.system.mode,      0.0f, 3.0f);
+  // OperatingMode : 0=aprs, 1=meshcore, 2=aprs+meshcore, 3=full, 4=telemetry (cf. config/Settings.h)
+  add("system.mode",           ST_UINT8,  &s.system.mode,      0.0f, 4.0f);
 
   // --- Relais (bistables, pilotés via TCA9555 I2C — cf. hal/relay/RelayHal.h) ----
   add("relay.1.state", ST_BOOL, &s.relay[0].state);

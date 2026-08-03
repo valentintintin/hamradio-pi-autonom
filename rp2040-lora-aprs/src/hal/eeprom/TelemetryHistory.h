@@ -62,7 +62,7 @@ struct __attribute__((packed)) TelemetryHistoryHeader {
 class TelemetryHistory {
 public:
   TelemetryHistory(M24M01Hal& eeprom)
-    : _eeprom(&eeprom), _initialized(false), _max_records(0), _write_index(0), _count(0)
+    : _eeprom(&eeprom), _initialized(false), _enabled(true), _max_records(0), _write_index(0), _count(0)
   {
   }
 
@@ -105,9 +105,14 @@ public:
     return true;
   }
 
+  // Active/désactive l'enregistrement (cf. system.telemetry_log.enabled) —
+  // ne touche pas à l'EEPROM elle-même, juste un court-circuit de record().
+  void setEnabled(bool enabled) { _enabled = enabled; }
+  bool isEnabled() const { return _enabled; }
+
   // Enregistrer un snapshot de télémétrie
   bool record(const TelemetryData& t) {
-    if (!_initialized) {
+    if (!_initialized || !_enabled) {
       return false;
     }
 
@@ -206,6 +211,7 @@ public:
 private:
   M24M01Hal* _eeprom;
   bool _initialized;
+  bool _enabled;
   uint16_t _max_records;
   uint16_t _write_index;
   uint16_t _count;

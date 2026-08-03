@@ -225,6 +225,16 @@ void CommandHandler::cmdSet(const char* key, const char* value, Print& out) {
       out.printf("Mode: %s (effectif après 'save' + 'reboot')\n", modeName(_settings->system.mode));
     }
 
+    // Activation/désactivation de la télémétrie/journalisation EEPROM :
+    // appliquer immédiatement (pas besoin de reboot, juste un court-circuit
+    // de record()/log(), cf. hal/eeprom/TelemetryHistory.h/EventLogHistory.h)
+    if (strcmp(key, "system.telemetry_log.enabled") == 0 && _history) {
+      _history->setEnabled(_settings->system.telemetry_log_enabled);
+    }
+    if (strcmp(key, "system.event_log.enabled") == 0 && _event_log) {
+      _event_log->setEnabled(_settings->system.event_log_enabled);
+    }
+
     // Relais : appliquer immédiatement l'impulsion I2C (la clé venant d'être
     // écrite dans _settings)
     int relayNum = 0;

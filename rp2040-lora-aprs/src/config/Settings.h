@@ -12,22 +12,25 @@
 // ============================================================================
 
 #define SETTINGS_MAGIC    0x34485656  // "4HVV"
-#define SETTINGS_VERSION  7
+#define SETTINGS_VERSION  8
 
 // ============================================================================
 // Mode de fonctionnement — la carte peut être déployée en standalone (juste
-// un digipeater APRS, ou juste un répéteur MeshCore) ou complète (station
-// solaire avec relais + télémétrie). Détermine quelles tâches FreeRTOS sont
-// créées et quels sous-systèmes sont initialisés (cf. core/Boot.cpp).
+// un digipeater APRS, ou juste un répéteur MeshCore), complète (station
+// solaire avec relais + télémétrie), ou en station de télémétrie seule
+// (relais + télémétrie, sans radio APRS/MeshCore). Détermine quelles tâches
+// FreeRTOS sont créées et quels sous-systèmes sont initialisés (cf.
+// core/Boot.cpp).
 // Numérique uniquement côté CLI ("set system.mode 3"), comme system.log_level
 // — modifiable à chaud dans les settings, mais ne prend effet qu'au reboot
 // (la création des tâches ne se fait qu'une fois, dans setup()).
 // ============================================================================
 enum OperatingMode : uint8_t {
-  MODE_APRS_ONLY     = 0,
-  MODE_MESHCORE_ONLY = 1,
-  MODE_APRS_MESHCORE = 2,
-  MODE_FULL          = 3,  // APRS + MeshCore + relais + télémétrie (fonctionnement normal)
+  MODE_APRS_ONLY      = 0,
+  MODE_MESHCORE_ONLY  = 1,
+  MODE_APRS_MESHCORE  = 2,
+  MODE_FULL           = 3,  // APRS + MeshCore + relais + télémétrie (fonctionnement normal)
+  MODE_TELEMETRY_ONLY = 4,  // relais + télémétrie seuls, sans APRS ni MeshCore (pas de radio)
 };
 
 inline bool modeHasAprs(uint8_t mode) {
@@ -36,16 +39,19 @@ inline bool modeHasAprs(uint8_t mode) {
 inline bool modeHasMeshcore(uint8_t mode) {
   return mode == MODE_MESHCORE_ONLY || mode == MODE_APRS_MESHCORE || mode == MODE_FULL;
 }
-inline bool modeIsFull(uint8_t mode) {
-  return mode == MODE_FULL;
+// Relais + télémétrie (capteurs/chargeurs/historique EEPROM) : MODE_FULL et
+// MODE_TELEMETRY_ONLY (qui n'en diffère que par l'absence d'APRS/MeshCore).
+inline bool modeHasTelemetry(uint8_t mode) {
+  return mode == MODE_FULL || mode == MODE_TELEMETRY_ONLY;
 }
 inline const char* modeName(uint8_t mode) {
   switch (mode) {
-    case MODE_APRS_ONLY:     return "aprs";
-    case MODE_MESHCORE_ONLY: return "meshcore";
-    case MODE_APRS_MESHCORE: return "aprs+meshcore";
-    case MODE_FULL:          return "full";
-    default:                 return "?";
+    case MODE_APRS_ONLY:      return "aprs";
+    case MODE_MESHCORE_ONLY:  return "meshcore";
+    case MODE_APRS_MESHCORE:  return "aprs+meshcore";
+    case MODE_FULL:           return "full";
+    case MODE_TELEMETRY_ONLY: return "telemetry";
+    default:                  return "?";
   }
 }
 
@@ -130,8 +136,10 @@ struct SystemSettings {
   char admin_password[16];
   bool watchdog_enabled;
   uint32_t telemetry_log_interval_ms;  // intervalle log EEPROM
+  bool telemetry_log_enabled;          // active l'enregistrement périodique de télémétrie en EEPROM (cf. TelemetryHistory)
+  bool event_log_enabled;              // active la journalisation des événements critiques en EEPROM (cf. EventLogHistory)
   uint8_t log_level;                   // LogLevel (0=none .. 5=trace)
-  uint8_t mode;                        // OperatingMode (0..3, cf. ci-dessus)
+  uint8_t mode;                        // OperatingMode (0..4, cf. ci-dessus)
 };
 
 #define RELAY_COUNT       4
@@ -258,6 +266,8 @@ inline Settings getDefaultSettings() {
   strncpy(s.system.admin_password, "hvv", sizeof(s.system.admin_password));
   s.system.watchdog_enabled = false;
   s.system.telemetry_log_interval_ms = 300000; // 5min
+  s.system.telemetry_log_enabled = true;
+  s.system.event_log_enabled = true;
   s.system.log_level = 3;                      // INFO par défaut
   s.system.mode = MODE_FULL;                   // fonctionnement normal par défaut
 
