@@ -2,10 +2,9 @@
 // Task énergie — orchestration : watchdog MPPT + coupure/reprise basse-
 // tension + réveil périodique par relais + alerte extinction MPPT.
 //
-// La logique de chaque volet vit dans src/energy/ (LowVoltageCutoffController,
-// RelayPeriodicController, MpptShutdownMonitor) ; cette tâche se contente de
-// les construire (cf. main.cpp) et de les faire tourner à chaque tick, comme
-// task_beacon.cpp le fait pour AprsEngine.
+// La logique de chaque volet vit dans src/energy/ (Relay, MpptShutdownMonitor) ;
+// cette tâche se contente de les construire (cf. main.cpp) et de les faire
+// tourner à chaque tick, comme task_beacon.cpp le fait pour AprsEngine.
 //
 // Ne lit plus les capteurs elle-même (cf. task_sensors.cpp, seul écrivain de
 // `telemetry`) : cette tâche ne fait que réagir aux valeurs déjà publiées.
@@ -14,12 +13,12 @@
 #include "tasks.h"
 #include "core/Log.h"
 #include "config/Settings.h"
+#include "energy/Relay.h"
 #include "hal/Telemetry.h"
 #include "hal/sensors/Ina3221Hal.h"
 #include "hal/chargers/MpptChargerHal.h"
 #include "hal/chargers/ChargeControllerHal.h"
-#include "energy/LowVoltageCutoffController.h"
-#include "energy/RelayPeriodicController.h"
+#include "hal/relay/RelayHal.h"
 #include "energy/MpptShutdownMonitor.h"
 #include "task_heartbeat.h"
 #include <Timer.h>
@@ -29,9 +28,9 @@ extern Settings settings;
 extern Ina3221Hal ina3221;
 extern MpptChargerHal mppt;
 extern ChargeControllerHal* active_charger; // MPPT ou Victron, un seul à la fois (cf. main.cpp)
-extern LowVoltageCutoffController low_voltage_cutoff;
-extern RelayPeriodicController relay_periodic;
 extern MpptShutdownMonitor mppt_shutdown_monitor;
+extern RelayHal relay_hal;
+extern EventLogHistory event_log;
 
 #define TAG "ENERGY"
 #define ENERGY_BOOT_DELAY_MS (10 * 1000)
@@ -78,6 +77,16 @@ void taskEnergy(void* params) {
 
   Timer wdt_feed_timer(settings.energy.mppt_wdt_interval_ms);
 
+  // Non-const : Relay::update() mute son propre état à chaque tick (timers de
+  // debounce/périodique) — une copie (ex: "for (auto relay : relays)" au lieu
+  // de "auto&") ferait tourner ces machines à états dans le vide.
+  Relay relays[RELAY_COUNT] = {
+      Relay(0, settings.relay[0], relay_hal, event_log),
+      Relay(1, settings.relay[1], relay_hal, event_log),
+      Relay(2, settings.relay[2], relay_hal, event_log),
+      Relay(3, settings.relay[3], relay_hal, event_log),
+  };
+
   for (;;) {
     heartbeat(HB_ENERGY);
 
@@ -94,8 +103,14 @@ void taskEnergy(void* params) {
     float voltage_mv = 0;
     bool have_voltage = getBatteryVoltageMv(voltage_mv);
 
-    low_voltage_cutoff.update(voltage_mv, have_voltage);
-    relay_periodic.update(voltage_mv, have_voltage);
+    if (have_voltage) {
+        if (settings.energy.low_voltage_cutoff_enabled) {
+          for (auto& relay : relays) {
+            relay.update(voltage_mv);
+          }
+      }
+    }
+
     mppt_shutdown_monitor.update();
 
     vTaskDelay(pdMS_TO_TICKS(settings.energy.poll_interval_ms));

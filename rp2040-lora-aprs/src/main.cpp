@@ -37,8 +37,6 @@
 #include "hal/eeprom/EventLogHistory.h"
 #include "hal/i2c/Tca9555Hal.h"
 #include "hal/relay/RelayHal.h"
-#include "energy/LowVoltageCutoffController.h"
-#include "energy/RelayPeriodicController.h"
 #include "energy/MpptShutdownMonitor.h"
 #include "core/Log.h"
 #include "core/Boot.h"
@@ -94,8 +92,7 @@ TelemetryHistory telemetry_history(eeprom);
 
 // Log d'événements critiques EEPROM (code + données numériques, cf.
 // hal/eeprom/EventLogHistory.h) — journalisé explicitement par ses sites d'origine
-// (task_watchdog.cpp, energy/LowVoltageCutoffController.cpp,
-// energy/MpptShutdownMonitor.cpp)
+// (task_watchdog.cpp, energy/Relay.cpp, energy/MpptShutdownMonitor.cpp)
 EventLogHistory event_log(eeprom);
 
 // Relais bistables (carte Interface F1ZIC, expandeur TCA9555 @0x20 sur I2C0)
@@ -103,8 +100,6 @@ Tca9555Hal relay_expander(i2c_bus, TCA9555_RELAY_ADDR);
 RelayHal relay_hal(relay_expander);
 
 // Supervision énergie (cf. src/energy/, orchestrée par task_energy.cpp)
-LowVoltageCutoffController low_voltage_cutoff(settings, relay_hal, event_log);
-RelayPeriodicController relay_periodic(settings, relay_hal, low_voltage_cutoff);
 MpptShutdownMonitor mppt_shutdown_monitor(mppt, aprs_engine, event_log);
 
 // Configuration (settings elle-même déclarée plus haut, cf. commentaire)

@@ -3,7 +3,7 @@
 
 #define RELAY_PULSE_MS 150
 
-bool RelayHal::begin(RelayChannel* channels, uint8_t count) {
+bool RelayHal::begin(Settings::Relay* channels, uint8_t count) {
   _channels = channels;
   _count = count;
 

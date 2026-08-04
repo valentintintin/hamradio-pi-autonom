@@ -30,6 +30,9 @@ public:
     // Essayer LittleFS
     if (settingsLoadFromLittleFS(s)) {
       LOG_I("CONFIG", "Chargée depuis LittleFS");
+      if (_eeprom && _eeprom->isInitialized()) {
+        saveToEeprom(s);
+      }
       return s;
     }
 
@@ -71,7 +74,17 @@ private:
     return isValid(s);
   }
 
+  // N'écrit que si le contenu diffère de la copie EEPROM actuelle — évite
+  // l'usure de l'EEPROM (écriture à chaque boot alors que rien n'a changé).
+  // Comparaison directe des octets bruts plutôt qu'un hash : on doit de
+  // toute façon relire sizeof(Settings) depuis l'EEPROM pour vérifier
+  // magic/version (cf. loadFromEeprom/isValid), donc même coût I/O qu'un
+  // hash, sans risque de collision.
   bool saveToEeprom(const Settings& s) {
+    Settings current{};
+    if (loadFromEeprom(current) && memcmp(&current, &s, sizeof(Settings)) == 0) {
+      return true;
+    }
     return _eeprom->write(SETTINGS_EEPROM_ADDR, (const uint8_t*)&s, sizeof(Settings));
   }
 };

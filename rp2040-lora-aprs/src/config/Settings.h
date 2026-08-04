@@ -122,7 +122,7 @@ struct EnergySettings {
   uint32_t poll_interval_ms;     // intervalle lecture capteurs
   uint32_t mppt_wdt_interval_ms; // intervalle feed watchdog MPPT
   bool mppt_wdt_enabled;
-  bool low_voltage_cutoff_enabled; // active la supervision relay_cutoff[]
+  bool low_voltage_cutoff_enabled; // active la supervision cutoff_enabled des relais (cf. Settings::Relay)
 
   // Seuils de coupure/reprise matériels de la carte MPPT elle-même (registres
   // CFG_PWR_OFF_TH / CFG_PWR_ON_TH, cf. lib/mpptChg) — indépendants de la
@@ -144,43 +144,6 @@ struct SystemSettings {
 
 #define RELAY_COUNT       4
 
-struct RelayChannel {
-  bool state;
-};
-
-// Règle de coupure basse-tension avec hystérésis réelle : si la tension
-// batterie (mini de battery_mppt/battery_ina) descend sous min_voltage_mv,
-// le relais relay_number est coupé (cf. task_energy.cpp) ; il est reconnecté
-// automatiquement une fois la tension remontée au-dessus de
-// restore_voltage_mv (doit être > min_voltage_mv). restore_voltage_mv = 0
-// désactive la reconnexion automatique (coupure seule, reconnexion manuelle
-// via CLI "relay.N.state").
-//
-// debounce_ms : la tension doit rester en continu au-delà du seuil (coupure
-// ou reprise) pendant cette durée avant que l'action ne soit prise — évite
-// qu'une chute de tension transitoire (appel de courant bref) ne déclenche
-// une coupure inutile. 0 = action immédiate (pas de confirmation).
-#define RELAY_CUTOFF_COUNT RELAY_COUNT
-
-struct RelayCutoffRule {
-  uint8_t relay_number;        // 1..RELAY_COUNT, même numérotation que "relay.N.state" ; 0 = règle désactivée
-  uint16_t min_voltage_mv;     // coupure en dessous de ce seuil
-  uint16_t restore_voltage_mv; // reconnexion automatique au-dessus ; 0 = pas de reconnexion auto
-  uint32_t debounce_ms;        // durée de confirmation avant coupure/reprise
-};
-
-// Fonction "réveil" périodique par relais : indépendamment de la coupure
-// basse-tension, allume le relais pendant on_duration_ms toutes les
-// interval_ms (cf. task_energy.cpp). override_low_voltage décide si ce
-// réveil a lieu même si la coupure basse-tension maintiendrait le relais
-// éteint (true), ou s'il est simplement sauté ce cycle-là (false).
-struct RelayPeriodicRule {
-  bool enabled;
-  uint32_t interval_ms;      // ex: 600000 = toutes les 10 min
-  uint32_t on_duration_ms;   // ex: 60000 = allumé 1 min à chaque cycle
-  bool override_low_voltage;
-};
-
 struct Settings {
   uint32_t magic;
   uint16_t version;
@@ -192,9 +155,44 @@ struct Settings {
   SystemSettings system;
   CwSstvSettings cw_sstv;
   MeshChannelSettings mesh_channels[MAX_GROUP_CHANNELS];
-  RelayChannel relay[RELAY_COUNT];
-  RelayCutoffRule relay_cutoff[RELAY_CUTOFF_COUNT];
-  RelayPeriodicRule relay_periodic[RELAY_COUNT];
+
+  // Relais bistable individuel : état ON/OFF persisté + ses deux règles de
+  // supervision automatique — cf. energy/Relay.h pour la logique qui les
+  // consomme (une instance construite avec un pointeur direct sur son
+  // Settings::Relay, cf. task_energy.cpp). Regroupées ici plutôt qu'en 3
+  // tableaux parallèles indexés par relais : un relais et ses règles ne font
+  // sens que pris ensemble.
+  struct Relay {
+    bool state;   // état ON/OFF courant (persisté, cf. hal/relay/RelayHal.h)
+
+    // Coupure basse-tension avec hystérésis réelle : si la tension batterie
+    // (mini de battery_mppt/battery_ina) descend sous min_voltage_mv, le
+    // relais est coupé (cf. energy/Relay.cpp) ; il est reconnecté
+    // automatiquement une fois la tension remontée au-dessus de
+    // restore_voltage_mv (doit être > min_voltage_mv). restore_voltage_mv = 0
+    // désactive la reconnexion automatique (coupure seule, reconnexion
+    // manuelle via CLI "relay.N.state").
+    // debounce_ms : la tension doit rester en continu au-delà du seuil
+    // (coupure ou reprise) pendant cette durée avant que l'action ne soit
+    // prise — évite qu'une chute de tension transitoire (appel de courant
+    // bref) ne déclenche une coupure inutile. 0 = action immédiate (pas de
+    // confirmation).
+    bool cutoff_enabled;
+    uint16_t min_voltage_mv;
+    uint16_t restore_voltage_mv;
+    uint32_t debounce_ms;
+
+    // Réveil périodique : indépendamment de la coupure basse-tension, allume
+    // le relais pendant on_duration_ms toutes les interval_ms.
+    // override_low_voltage décide si ce réveil a lieu même si la coupure
+    // basse-tension maintiendrait le relais éteint (true), ou s'il est
+    // simplement sauté ce cycle-là (false).
+    bool periodic_enabled;
+    uint32_t interval_ms;
+    uint32_t on_duration_ms;
+    bool override_low_voltage;
+  };
+  Relay relay[RELAY_COUNT];
 };
 
 // ============================================================================
@@ -259,8 +257,8 @@ inline Settings getDefaultSettings() {
   s.energy.mppt_wdt_interval_ms = 90000;   // 90s
   s.energy.mppt_wdt_enabled = true;
   s.energy.low_voltage_cutoff_enabled = false;
-  s.energy.mppt_pwr_off_mv = 0;
-  s.energy.mppt_pwr_on_mv = 0;
+  s.energy.mppt_pwr_off_mv = 11500;
+  s.energy.mppt_pwr_on_mv = 12500;
 
   // System
   strncpy(s.system.admin_password, "hvv", sizeof(s.system.admin_password));
@@ -271,25 +269,19 @@ inline Settings getDefaultSettings() {
   s.system.log_level = 3;                      // INFO par défaut
   s.system.mode = MODE_FULL;                   // fonctionnement normal par défaut
 
-  // Relais — tous désactivés par défaut
-  for (auto & [state] : s.relay) {
-    state = false;
-  }
+  // Relais — état et règles toutes désactivées par défaut
+  for (auto& relay : s.relay) {
+    relay.state = false;
 
-  // Coupure basse-tension — désactivée par défaut (relay_number = 0)
-  for (auto& rule : s.relay_cutoff) {
-    rule.relay_number = 0;
-    rule.min_voltage_mv = 0;
-    rule.restore_voltage_mv = 0;
-    rule.debounce_ms = 60000;
-  }
+    relay.cutoff_enabled = false;
+    relay.min_voltage_mv = 0;
+    relay.restore_voltage_mv = 0;
+    relay.debounce_ms = 60000;
 
-  // Réveil périodique — désactivé par défaut
-  for (auto& rule : s.relay_periodic) {
-    rule.enabled = false;
-    rule.interval_ms = 600000;   // 10 min (inerte tant que enabled=false)
-    rule.on_duration_ms = 60000; // 1 min
-    rule.override_low_voltage = false;
+    relay.periodic_enabled = false;
+    relay.interval_ms = 600000;   // 10 min (inerte tant que periodic_enabled=false)
+    relay.on_duration_ms = 60000; // 1 min
+    relay.override_low_voltage = false;
   }
 
   return s;

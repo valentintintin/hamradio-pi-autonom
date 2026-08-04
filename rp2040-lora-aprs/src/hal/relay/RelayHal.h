@@ -34,7 +34,7 @@ public:
     : _expander(&expander), _initialized(false) {}
 
   // `channels` doit pointer vers settings.relay (persisté), `count` = RELAY_COUNT
-  bool begin(RelayChannel* channels, uint8_t count);
+  bool begin(Settings::Relay* channels, uint8_t count);
 
   // Bascule le relais `index` (impulsion I2C) et persiste le nouvel état.
   bool setState(uint8_t index, bool on);
@@ -44,6 +44,6 @@ public:
 private:
   Tca9555Hal* _expander;
   bool _initialized;
-  RelayChannel* _channels = nullptr;
+  Settings::Relay* _channels = nullptr;
   uint8_t _count = 0;
 };
