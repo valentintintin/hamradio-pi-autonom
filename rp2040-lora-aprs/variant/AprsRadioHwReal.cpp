@@ -5,6 +5,7 @@
 #include <RadioLib.h>
 #include <FineOffsetWH65B.h>  // WH65B_PAYLOAD_LEN
 #include <task.h>
+#include <target.h>  // aprs_radio_driver, pour calcMaxPacketMillis()/setCADEnabled()
 
 extern Settings settings;
 
@@ -97,6 +98,20 @@ bool AprsRadioHwReal::switchToLora() {
   _hw.setDio2AsRfSwitch(APRS_DIO2_AS_RF_SWITCH);
   _hw.setRxBoostedGainMode(APRS_RX_BOOSTED_GAIN);
   _hw.setRfSwitchPins(APRS_RXEN, RADIOLIB_NC);
+
+  PacketMillis pm = aprs_radio_driver.calcMaxPacketMillis(
+    settings.radio.aprs_sf, settings.radio.aprs_bw, settings.radio.aprs_cr,
+    RadioLibWrapper::preambleLengthForSF(settings.radio.aprs_sf));
+  _hw.setPreambleMillis(pm.preambleMillis);
+  _hw.setMaxPayloadMillis(pm.payloadMillis);
+
+  // CAD matériel optionnel (radio.aprs.cad, off par défaut — même convention
+  // que MeshCore côté mesh, "set cad on") : en plus du seuil RSSI, fiabilise
+  // le carrier-sense avant TX. NotifyingRadioLibWrapper::begin() ne rappelle
+  // pas RadioLibWrapper::begin() (état RX/TX réimplémenté, cf. son en-tête),
+  // qui remettrait sinon _cad_enabled à false à chaque begin() — ce
+  // setCADEnabled() explicite est donc la seule source de vérité.
+  aprs_radio_driver.setCADEnabled(settings.radio.aprs_cad_enabled);
 
   LOG_D(TAG, "Retour LoRa OK");
   return true;

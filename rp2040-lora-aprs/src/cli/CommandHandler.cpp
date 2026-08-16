@@ -261,14 +261,14 @@ void CommandHandler::cmdSet(const char* key, const char* value, Print& out) {
       }
     }
 
-    // Fréquence/bande/SF/CR/Puissance : appliquer immédiatement plutôt que d'attendre
-    // le prochain retour LoRa (cycle météo, transmission CW/SSTV) ou un
-    // reboot. Un re-begin() complet du modem pouvant corrompre un paquet en
+    // Fréquence/bande/SF/CR/Puissance/CAD : appliquer immédiatement plutôt que
+    // d'attendre le prochain retour LoRa (cycle météo, transmission CW/SSTV) ou
+    // un reboot. Un re-begin() complet du modem pouvant corrompre un paquet en
     // cours, on encadre par pause()/resume() (même précaution que
     // task_weather.cpp/SstvTransmitter.cpp).
     if ((strcmp(key, "radio.aprs.freq") == 0 || strcmp(key, "radio.aprs.bw") == 0 ||
          strcmp(key, "radio.aprs.sf") == 0 || strcmp(key, "radio.aprs.cr") == 0 ||
-         strcmp(key, "radio.aprs.power") == 0) &&
+         strcmp(key, "radio.aprs.power") == 0 || strcmp(key, "radio.aprs.cad") == 0) &&
         modeHasAprs(_settings->system.mode)) {
       aprs_dispatcher.pause();
       bool ok = aprs_radio_hw.switchToLora();

@@ -1,6 +1,7 @@
 #include "SimCli.h"
 #include "SimWorld.h"
 #include "core/RadioActivityNotify.h"
+#include <target.h>  // mesh_radio_driver / aprs_radio_driver (SimRadio)
 
 #include <cstdio>
 #include <cstdlib>
@@ -10,6 +11,15 @@
 #include <mpptChg.h>
 
 namespace {
+
+// Résout "mesh"/"aprs" vers l'instance SimRadio correspondante (cf.
+// variant_native/target.h) — nullptr si le nom ne correspond à aucune des
+// deux radios simulées.
+SimRadio* radioFor(const char* which) {
+  if (strcmp(which, "mesh") == 0) return &mesh_radio_driver;
+  if (strcmp(which, "aprs") == 0) return &aprs_radio_driver;
+  return nullptr;
+}
 
 // Table nom<->code pour "sim set mppt status <nom>" (cf. MPPT_CHG_ST_* dans
 // lib/mpptChg/mpptChg.h) — noms alignés sur mpptChg::getStatusAsString().
@@ -62,8 +72,12 @@ void dumpStatus(Print& out) {
   out.printf("victron:  %s soc=%.0f%% state=%d\n",
     w.victron_present ? "présent" : "absent", w.victron_soc_pct, w.victron_state);
   out.printf("tca9555:  output=0x%04X config=0x%04X\n", w.tca9555_output, w.tca9555_config);
-  out.printf("radio mesh: %d trames loggées, %d en attente RX\n", (int)w.mesh_log.size(), (int)w.mesh_rx_queue.size());
-  out.printf("radio aprs: %d trames loggées, %d en attente RX\n", (int)w.aprs_log.size(), (int)w.aprs_rx_queue.size());
+  out.printf("radio mesh: %d trames loggées, %d en attente RX, cad=%s, bruit=%ddBm\n",
+    (int)w.mesh_log.size(), (int)w.mesh_rx_queue.size(),
+    mesh_radio_driver.getCadBusy() ? "occupé" : "libre", mesh_radio_driver.getNoiseFloor());
+  out.printf("radio aprs: %d trames loggées, %d en attente RX, cad=%s, bruit=%ddBm\n",
+    (int)w.aprs_log.size(), (int)w.aprs_rx_queue.size(),
+    aprs_radio_driver.getCadBusy() ? "occupé" : "libre", aprs_radio_driver.getNoiseFloor());
   out.printf("radio fsk:  %s, %d trames loggées, %d en attente RX\n",
     w.fsk_mode ? "écoute WH65B active" : "hors cycle (LoRa APRS)", (int)w.fsk_log.size(), (int)w.fsk_rx_queue.size());
 }
@@ -183,20 +197,78 @@ bool cmdSet(const char* args, Print& out) {
     } else {
       out.println("Usage: sim set victron present on|off  |  sim set victron soc <pct>  |  sim set victron state <code>");
     }
+  } else if (strcmp(kind, "noise") == 0) {
+    char which[8] = {0};
+    float rssi;
+    if (sscanf(rest, "%7s %f", which, &rssi) == 2) {
+      SimRadio* radio = radioFor(which);
+      if (radio) {
+        radio->setNoiseFloor((int)rssi);
+        out.printf("noise.%s = %d dBm\n", which, (int)rssi);
+      } else {
+        out.println("Radio inconnue (mesh|aprs)");
+      }
+    } else {
+      out.println("Usage: sim set noise mesh|aprs <rssi_dBm>");
+    }
   } else {
-    out.println("Clé inconnue (battery|solar|board5v|weather|mppt|victron)");
+    out.println("Clé inconnue (battery|solar|board5v|weather|mppt|victron|noise)");
   }
+  return true;
+}
+
+bool cmdCad(const char* args, Print& out) {
+  char which[8] = {0};
+  char state[8] = {0};
+  if (sscanf(args, "%7s %7s", which, state) != 2) {
+    out.println("Usage: sim cad mesh|aprs on|off");
+    return true;
+  }
+  SimRadio* radio = radioFor(which);
+  if (!radio) {
+    out.println("Radio inconnue (mesh|aprs)");
+    return true;
+  }
+  bool busy = (strcmp(state, "on") == 0);
+  radio->setCadBusy(busy);
+  out.printf("cad.%s = %s (canal %s)\n", which, busy ? "on" : "off", busy ? "occupé" : "libre");
   return true;
 }
 
 bool cmdRx(const char* args, Print& out) {
   char which[8] = {0};
   if (sscanf(args, "%7s", which) != 1) {
-    out.println("Usage: sim rx mesh|aprs|fsk <hex>  |  sim rx mesh|aprs|fsk ascii <texte>");
+    out.println("Usage: sim rx mesh|aprs|fsk [rssi <dBm>] [snr <dB>] <hex>|ascii <texte>");
     return true;
   }
   const char* rest = args + strlen(which);
   while (*rest == ' ') rest++;
+
+  // Options "rssi <val>"/"snr <val>" optionnelles, dans n'importe quel ordre,
+  // avant le payload — pas en position finale : le payload ascii (texte APRS
+  // libre) pourrait sinon se terminer par des nombres et être tronqué par
+  // erreur. Défauts = anciennes constantes globales de SimRadio (-90/8) pour
+  // mesh/aprs si non précisé ; le fsk garde son propre défaut historique
+  // (-55dBm, cf. ci-dessous) tant que rssi n'est pas explicitement donné.
+  float rssi = -90.0f, snr = 8.0f;
+  bool rssiSet = false;
+  for (;;) {
+    char kw[8] = {0};
+    int consumed = 0;
+    if (sscanf(rest, "%7s%n", kw, &consumed) != 1) break;
+    float val;
+    int consumed2 = 0;
+    if (strcmp(kw, "rssi") == 0 && sscanf(rest + consumed, " %f%n", &val, &consumed2) == 1) {
+      rssi = val;
+      rssiSet = true;
+    } else if (strcmp(kw, "snr") == 0 && sscanf(rest + consumed, " %f%n", &val, &consumed2) == 1) {
+      snr = val;
+    } else {
+      break;
+    }
+    rest += consumed + consumed2;
+    while (*rest == ' ') rest++;
+  }
 
   uint8_t buf[256];
   size_t n;
@@ -220,7 +292,7 @@ bool cmdRx(const char* args, Print& out) {
   if (strcmp(which, "mesh") == 0) {
     {
       std::lock_guard<std::mutex> lock(w.mutex);
-      w.mesh_rx_queue.push_back(std::move(pkt));
+      w.mesh_rx_queue.push_back({std::move(pkt), rssi, snr});
     }
     // Réveille immédiatement task_mesh.cpp (cf. core/RadioActivityNotify.h) —
     // sinon, depuis que cette tâche dort entre deux réveils radio au lieu de
@@ -229,7 +301,7 @@ bool cmdRx(const char* args, Print& out) {
     // la trame injectée ne serait vue qu'au prochain réveil périodique
     // (jusqu'à MESH_TASK_MAX_WAIT_MS).
     xTaskNotifyGive(g_mesh_task_handle);
-    out.printf("Trame mesh injectée (%u octets)\n", (unsigned)n);
+    out.printf("Trame mesh injectée (%u octets, rssi=%.0fdBm, snr=%.1fdB)\n", (unsigned)n, rssi, snr);
   } else if (strcmp(which, "aprs") == 0) {
     // Préfixe avec le header LoRa-APRS 3 octets ('<' 0xFF 0x01, cf.
     // src/aprs/AprsEngine.h LORA_APRS_HEADER_*) : AprsEngine::onAprsPacketReceived
@@ -245,16 +317,17 @@ bool cmdRx(const char* args, Print& out) {
 
     {
       std::lock_guard<std::mutex> lock(w.mutex);
-      w.aprs_rx_queue.push_back(std::move(framed));
+      w.aprs_rx_queue.push_back({std::move(framed), rssi, snr});
     }
     xTaskNotifyGive(g_aprs_task_handle);  // cf. commentaire équivalent ci-dessus (mesh)
-    out.printf("Trame aprs injectée (%u octets + header LoRa-APRS)\n", (unsigned)n);
+    out.printf("Trame aprs injectée (%u octets + header LoRa-APRS, rssi=%.0fdBm, snr=%.1fdB)\n", (unsigned)n, rssi, snr);
   } else if (strcmp(which, "fsk") == 0) {
+    float fskRssi = rssiSet ? rssi : -55.0f;  // défaut historique FSK, cf. AprsRadioHwSim.cpp
     std::lock_guard<std::mutex> lock(w.mutex);
-    w.fsk_rx_queue.push_back(std::move(pkt));
-    out.printf("Trame WH65B (fsk) injectée (%u octets) — consommée au prochain cycle météo (taskWeather)\n", (unsigned)n);
+    w.fsk_rx_queue.push_back({std::move(pkt), fskRssi, snr});
+    out.printf("Trame WH65B (fsk) injectée (%u octets, rssi=%.0fdBm) — consommée au prochain cycle météo (taskWeather)\n", (unsigned)n, fskRssi);
   } else {
-    out.println("Usage: sim rx mesh|aprs|fsk <hex>");
+    out.println("Usage: sim rx mesh|aprs|fsk [rssi <dBm>] [snr <dB>] <hex>");
   }
   return true;
 }
@@ -278,7 +351,10 @@ bool simHandleCommand(const char* cmd, Print& out) {
   if (strncmp(rest, "rx ", 3) == 0) {
     return cmdRx(rest + 3, out);
   }
+  if (strncmp(rest, "cad ", 4) == 0) {
+    return cmdCad(rest + 4, out);
+  }
 
-  out.println("Commandes sim: status, set battery|solar|board5v|weather|mppt|victron ..., rx mesh|aprs|fsk <hex>|ascii <texte>");
+  out.println("Commandes sim: status, set battery|solar|board5v|weather|mppt|victron|noise ..., rx mesh|aprs|fsk <hex>|ascii <texte>, cad mesh|aprs on|off");
   return true;
 }

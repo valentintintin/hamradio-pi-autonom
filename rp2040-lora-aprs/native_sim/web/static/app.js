@@ -6,7 +6,8 @@
 //   GET  /api/state   -> JSON, instantané complet (SimWorld + telemetry)
 //   POST /api/sensor  -> { temp_c, humidity, pressure_hpa, battery_mv,
 //                          battery_ma, solar_mv, solar_ma, board5v_mv, board5v_ma }
-//   POST /api/rx      -> { which: mesh|aprs|fsk, format: hex|ascii, payload }
+//   POST /api/rx      -> { which: mesh|aprs|fsk, format: hex|ascii, payload,
+//                          rssi?, snr? (dBm/dB, vides = défauts simulateur) }
 //   POST /api/relay   -> { n, on }
 // ============================================================================
 
@@ -74,6 +75,8 @@ function radioCard(title, r, cfg, showFsk) {
         <tr><td>Puissance TX</td><td>${cfg.tx_power_dbm} dBm</td></tr>
         <tr><td>Dernier RSSI/SNR</td><td>${fmt(r.last_rssi, 0)} dBm / ${fmt(r.last_snr, 1)} dB</td></tr>
         <tr><td>Paquets reçus/envoyés</td><td>${r.packets_recv} / ${r.packets_sent}</td></tr>
+        <tr><td>CAD (simulé)</td><td>${r.cad_busy ? '🔴 occupé' : '🟢 libre'}</td></tr>
+        <tr><td>Bruit de fond</td><td>${r.noise_floor_rssi} dBm</td></tr>
       </table>
     </div>`;
 }
@@ -189,6 +192,7 @@ async function refresh() {
   renderRadio(s);
   renderRelays(s.relays);
   syncMpptVictronFromState(s.sim_inputs);
+  syncRadioSimFromState(s);
   renderJournal(s);
 }
 
@@ -238,8 +242,10 @@ function initForms() {
     const which = document.getElementById('rx_which').value;
     const format = document.getElementById('rx_format').value;
     const payload = document.getElementById('rx_payload').value;
+    const rssi = v('rx_rssi');
+    const snr = v('rx_snr');
     if (!payload.trim()) { toast('Trame vide', true); return; }
-    post('/api/rx', { which, format, payload })
+    post('/api/rx', { which, format, payload, rssi, snr })
       .then(() => { toast(`Trame ${which} injectée`); refresh(); })
       .catch(err => toast(`Échec injection : ${err.message}`, true));
   });
@@ -378,6 +384,56 @@ function initMpptVictron() {
     } catch (err) {
       toast(`Échec Victron : ${err.message}`, true);
     }
+  });
+}
+
+// ------------------------------------------------------- Radio (CAD / bruit)
+
+const lastCadBusy = { mesh: false, aprs: false };
+let noiseInitialized = false;
+
+function updateCadPill(which, busy) {
+  const pill = document.getElementById(`cad_pill_${which}`);
+  pill.textContent = `CAD : ${busy ? 'occupé' : 'libre'}`;
+  pill.classList.toggle('on', busy);
+  pill.classList.toggle('off', !busy);
+}
+
+function syncRadioSimFromState(s) {
+  ['mesh', 'aprs'].forEach(which => {
+    const r = which === 'mesh' ? s.radio_mesh : s.radio_aprs;
+    lastCadBusy[which] = !!r.cad_busy;
+    updateCadPill(which, lastCadBusy[which]);
+  });
+
+  if (noiseInitialized) return;
+  noiseInitialized = true;
+  ['mesh', 'aprs'].forEach(which => {
+    const r = which === 'mesh' ? s.radio_mesh : s.radio_aprs;
+    if (typeof r.noise_floor_rssi === 'number') {
+      document.getElementById(`noise_${which}`).value = r.noise_floor_rssi;
+      document.getElementById(`noise_${which}_r`).value = r.noise_floor_rssi;
+    }
+  });
+}
+
+function initRadioSim() {
+  bindSlider('noise_mesh_r', 'noise_mesh');
+  bindSlider('noise_aprs_r', 'noise_aprs');
+
+  ['mesh', 'aprs'].forEach(which => {
+    document.getElementById(`cad_toggle_${which}`).addEventListener('click', () => {
+      const next = !lastCadBusy[which];
+      sendCmd(`sim cad ${which} ${next ? 'on' : 'off'}`)
+        .then(() => { toast(`CAD ${which} ${next ? 'activé (canal occupé)' : 'désactivé (canal libre)'}`); refresh(); })
+        .catch(err => toast(`Échec CAD ${which} : ${err.message}`, true));
+    });
+
+    document.getElementById(`noise_apply_${which}`).addEventListener('click', () => {
+      sendCmd(`sim set noise ${which} ${v(`noise_${which}`)}`)
+        .then(() => { toast(`Bruit de fond ${which} mis à jour`); refresh(); })
+        .catch(err => toast(`Échec bruit de fond ${which} : ${err.message}`, true));
+    });
   });
 }
 
@@ -555,7 +611,7 @@ function initAprsBuilder() {
 
   document.getElementById('aprs_inject').addEventListener('click', () => {
     const { frame } = updateAprsPreview();
-    post('/api/rx', { which: 'aprs', format: 'ascii', payload: frame })
+    post('/api/rx', { which: 'aprs', format: 'ascii', payload: frame, rssi: v('aprs_rssi'), snr: v('aprs_snr') })
       .then(() => { toast('Trame APRS injectée (RX simulée)'); refresh(); })
       .catch(err => toast(`Échec injection : ${err.message}`, true));
   });
@@ -659,7 +715,7 @@ function initWh65bBuilder() {
 
   document.getElementById('wh_inject').addEventListener('click', () => {
     const hex = bytesToHex(buildWh65bBytes());
-    post('/api/rx', { which: 'fsk', format: 'hex', payload: hex })
+    post('/api/rx', { which: 'fsk', format: 'hex', payload: hex, rssi: v('wh_rssi') })
       .then(() => { toast('Trame WH65B injectée'); refresh(); })
       .catch(err => toast(`Échec injection : ${err.message}`, true));
   });
@@ -672,6 +728,7 @@ initForms();
 initPresets();
 initRtc();
 initMpptVictron();
+initRadioSim();
 initRawCmd();
 initAprsBuilder();
 initWh65bBuilder();

@@ -56,6 +56,8 @@ void fillRadio(JsonObject o, SimRadio& radio, bool withFskMode) {
   o["last_snr"] = radio.getLastSNR();
   o["packets_recv"] = radio.getPacketsRecv();
   o["packets_sent"] = radio.getPacketsSent();
+  o["cad_busy"] = radio.getCadBusy();
+  o["noise_floor_rssi"] = radio.getNoiseFloor();
   if (withFskMode) {
     o["fsk_mode"] = SimWorld::instance().fsk_mode;
   }

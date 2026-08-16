@@ -95,6 +95,37 @@ public:
 
   size_t print(const char* s) { return write(s); }
   size_t print(char c) { return write((uint8_t)c); }
+
+  // Sous-ensemble d'Arduino::Print::print(nombre, base) — requis depuis la
+  // maj MeshCore qui a ajouté ConfigSerializer::def(int32_t/uint32_t/...)
+  // avec un print(valeur, 10) explicite (auparavant un simple print(valeur)
+  // suffisait, résolu par conversion implicite vers print(char), tronquant
+  // silencieusement — cf. lignes ci-dessus dans ConfigSerializer.cpp).
+  size_t print(unsigned long n, int base = 10) {
+    // glibc n'a pas ultoa/ltoa (spécifiques avr-libc) : conversion manuelle.
+    char buf[8 * sizeof(unsigned long) + 1];
+    char* p = buf + sizeof(buf) - 1;
+    *p = '\0';
+    if (base < 2) base = 10;
+    do {
+      int digit = n % base;
+      *--p = digit < 10 ? ('0' + digit) : ('a' + digit - 10);
+      n /= base;
+    } while (n != 0);
+    return write(p);
+  }
+  size_t print(long n, int base = 10) {
+    if (n < 0 && base == 10) return write('-') + print((unsigned long)(-n), base);
+    return print((unsigned long)n, base);
+  }
+  size_t print(int n, int base = 10) { return print((long)n, base); }
+  size_t print(unsigned int n, int base = 10) { return print((unsigned long)n, base); }
+  size_t print(double n, int digits = 2) {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%.*f", digits, n);
+    return write(buf);
+  }
+
   size_t println(const char* s) {
     size_t n = write(s);
     n += write((uint8_t)'\n');

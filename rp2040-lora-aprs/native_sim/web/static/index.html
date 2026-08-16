@@ -128,6 +128,43 @@
       </div>
 
       <div class="section-block">
+        <h2>📡 Radio — CAD &amp; bruit de fond</h2>
+        <div class="form-grid">
+          <div class="control-card">
+            <h3>Radio mesh (868 MHz)</h3>
+            <div class="field-row">
+              <span class="pill" id="cad_pill_mesh">CAD : —</span>
+              <button type="button" id="cad_toggle_mesh">Basculer</button>
+            </div>
+            <div class="field">
+              <label for="noise_mesh">Bruit de fond (RSSI dBm)</label>
+              <div class="slider-row">
+                <input type="range" id="noise_mesh_r" min="-140" max="0" step="1">
+                <input type="number" id="noise_mesh" step="1" value="0">
+              </div>
+            </div>
+            <button type="button" id="noise_apply_mesh">Appliquer</button>
+          </div>
+          <div class="control-card">
+            <h3>Radio APRS (433 MHz)</h3>
+            <div class="field-row">
+              <span class="pill" id="cad_pill_aprs">CAD : —</span>
+              <button type="button" id="cad_toggle_aprs">Basculer</button>
+            </div>
+            <div class="field">
+              <label for="noise_aprs">Bruit de fond (RSSI dBm)</label>
+              <div class="slider-row">
+                <input type="range" id="noise_aprs_r" min="-140" max="0" step="1">
+                <input type="number" id="noise_aprs" step="1" value="0">
+              </div>
+            </div>
+            <button type="button" id="noise_apply_aprs">Appliquer</button>
+          </div>
+        </div>
+        <p class="hint">"CAD" force isReceiving() (canal occupé) côté simulé — indépendant des trames réellement en file — pour tester le report d'émission (CSMA) sans dépendre d'une vraie collision. Le bruit de fond alimente getNoiseFloor() (visible dans les stats mesh).</p>
+      </div>
+
+      <div class="section-block">
         <h2>🌡️ Météo intérieure (BME280)</h2>
         <form class="control-card wide" id="form-weather">
           <div class="field-row">
@@ -181,6 +218,14 @@
                 <option value="ascii">ascii</option>
               </select>
             </div>
+            <div class="field">
+              <label for="rx_rssi">RSSI (dBm, vide = défaut)</label>
+              <input type="number" id="rx_rssi" placeholder="-90" step="1">
+            </div>
+            <div class="field">
+              <label for="rx_snr">SNR (dB, vide = défaut, ignoré en fsk)</label>
+              <input type="number" id="rx_snr" placeholder="8" step="0.1">
+            </div>
           </div>
           <div class="field">
             <label for="rx_payload">Trame</label>
@@ -211,6 +256,14 @@
             <div class="field">
               <label for="aprs_path">Chemin (path)</label>
               <input type="text" id="aprs_path" value="WIDE1-1,WIDE2-1">
+            </div>
+            <div class="field">
+              <label for="aprs_rssi">RSSI injection (dBm)</label>
+              <input type="number" id="aprs_rssi" placeholder="-90" step="1">
+            </div>
+            <div class="field">
+              <label for="aprs_snr">SNR injection (dB)</label>
+              <input type="number" id="aprs_snr" placeholder="8" step="0.1">
             </div>
             <div class="field">
               <label for="aprs_type">Type de trame</label>
@@ -336,6 +389,7 @@
             <div class="field"><label>Lumière (lux)</label><input type="number" id="wh_light" value="12000" min="0"></div>
             <div class="field"><label>UV (brut) — indice calculé : <span id="wh_uvi_preview">0</span></label><input type="number" id="wh_uv" value="800" min="0" max="6000"></div>
             <div class="field"><label>Batterie faible</label><select id="wh_batt_low"><option value="0">Non</option><option value="1">Oui</option></select></div>
+            <div class="field"><label>RSSI injection (dBm, vide = -55 par défaut)</label><input type="number" id="wh_rssi" placeholder="-55" step="1"></div>
           </div>
           <div class="field">
             <label for="wh_preview">Aperçu (hex, 17 octets utiles + zéro-padding auto à 27)</label>

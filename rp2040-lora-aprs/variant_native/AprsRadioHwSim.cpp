@@ -25,19 +25,21 @@ bool AprsRadioHwSim::receiveWh65bFrame(uint32_t timeoutMs, uint8_t* outBuf, floa
   unsigned long start = millis();
 
   for (;;) {
-    std::vector<uint8_t> pkt;
+    RxQueueEntry entry;
+    bool got = false;
     {
       std::lock_guard<std::mutex> lock(w.mutex);
       if (!w.fsk_rx_queue.empty()) {
-        pkt = std::move(w.fsk_rx_queue.front());
+        entry = std::move(w.fsk_rx_queue.front());
         w.fsk_rx_queue.pop_front();
+        got = true;
       }
     }
 
-    if (!pkt.empty()) {
+    if (got) {
       memset(outBuf, 0, WH65B_PAYLOAD_LEN);
-      size_t n = pkt.size() < (size_t)WH65B_PAYLOAD_LEN ? pkt.size() : (size_t)WH65B_PAYLOAD_LEN;
-      memcpy(outBuf, pkt.data(), n);
+      size_t n = entry.data.size() < (size_t)WH65B_PAYLOAD_LEN ? entry.data.size() : (size_t)WH65B_PAYLOAD_LEN;
+      memcpy(outBuf, entry.data.data(), n);
 
       {
         std::lock_guard<std::mutex> lock(w.mutex);
@@ -45,12 +47,15 @@ bool AprsRadioHwSim::receiveWh65bFrame(uint32_t timeoutMs, uint8_t* outBuf, floa
         e.tx = false;
         e.millis_ts = millis();
         e.data.assign(outBuf, outBuf + WH65B_PAYLOAD_LEN);
-        e.rssi = -55.0f;
+        // RSSI porté par la trame injectée ("sim rx fsk rssi <dBm> ...", cf.
+        // SimCli.cpp) — -55dBm par défaut si non précisé, pas de concept de
+        // SNR pour le FSK/WH65B.
+        e.rssi = entry.rssi;
         w.pushLog(w.fsk_log, std::move(e));
       }
 
       if (outRssi) {
-        *outRssi = -55.0f;
+        *outRssi = entry.rssi;
       }
       return true;
     }

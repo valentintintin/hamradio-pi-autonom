@@ -32,6 +32,16 @@ struct RadioLogEntry {
   float rssi = 0, snr = 0;
 };
 
+// Entrée d'une file d'injection RX ("sim rx ..."/POST /api/rx) : le RSSI/SNR
+// simulés sont désormais portés par la trame elle-même (plutôt qu'une
+// constante globale), pour pouvoir tester un paquet à la limite du seuil de
+// décodage (SNR faible) sans changer d'état global entre deux injections.
+struct RxQueueEntry {
+  std::vector<uint8_t> data;
+  float rssi = -90.0f;
+  float snr = 8.0f;
+};
+
 class SimWorld {
 public:
   static SimWorld& instance();
@@ -73,7 +83,7 @@ public:
   // --- Radios (mesh 868 / aprs 433) — TX loggé, RX injecté ------------------
   static constexpr size_t kRadioLogMax = 40;
   std::deque<RadioLogEntry> mesh_log, aprs_log;
-  std::deque<std::vector<uint8_t>> mesh_rx_queue, aprs_rx_queue;
+  std::deque<RxQueueEntry> mesh_rx_queue, aprs_rx_queue;
 
   // --- FSK météo WH65B (radio APRS basculée en FSK périodiquement, cf.
   // tasks/task_weather.cpp) — file séparée : format WH65B brut (27 octets),
@@ -81,7 +91,7 @@ public:
   // actuellement basculée en écoute FSK (informatif, pour le dashboard).
   bool fsk_mode = false;
   std::deque<RadioLogEntry> fsk_log;
-  std::deque<std::vector<uint8_t>> fsk_rx_queue;
+  std::deque<RxQueueEntry> fsk_rx_queue;
 
   void logTx(std::deque<RadioLogEntry>& log, const uint8_t* data, int len);
   void pushLog(std::deque<RadioLogEntry>& log, RadioLogEntry entry);

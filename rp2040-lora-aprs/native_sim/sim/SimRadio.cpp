@@ -6,21 +6,27 @@
 
 int SimRadio::recvRaw(uint8_t* bytes, int sz) {
   auto& w = SimWorld::instance();
-  std::vector<uint8_t> pkt;
+  RxQueueEntry entry;
   {
     std::lock_guard<std::mutex> lock(w.mutex);
     if (_rxQueue.empty()) {
       return 0;
     }
-    pkt = std::move(_rxQueue.front());
+    entry = std::move(_rxQueue.front());
     _rxQueue.pop_front();
   }
 
-  int n = (int)pkt.size();
+  int n = (int)entry.data.size();
   if (n > sz) {
     n = sz;
   }
-  memcpy(bytes, pkt.data(), n);
+  memcpy(bytes, entry.data.data(), n);
+
+  // RSSI/SNR portés par la trame injectée (cf. "sim rx ... rssi <dBm> snr
+  // <dB>", SimCli.cpp) plutôt qu'une constante — permet de tester un paquet
+  // à la limite du seuil de décodage sans état global partagé.
+  _last_rssi = entry.rssi;
+  _last_snr = entry.snr;
 
   {
     std::lock_guard<std::mutex> lock(w.mutex);
@@ -34,7 +40,7 @@ int SimRadio::recvRaw(uint8_t* bytes, int sz) {
   }
 
   _n_recv++;
-  LOG_D(_tag, "RX simulé (%d octets)", n);
+  LOG_D(_tag, "RX simulé (%d octets, rssi=%.0fdBm, snr=%.1fdB)", n, _last_rssi, _last_snr);
   return n;
 }
 

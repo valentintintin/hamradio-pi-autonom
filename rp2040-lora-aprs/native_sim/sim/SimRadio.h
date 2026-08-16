@@ -19,7 +19,7 @@
 
 class SimRadio : public mesh::Radio {
 public:
-  SimRadio(std::deque<RadioLogEntry>& log, std::deque<std::vector<uint8_t>>& rxQueue, const char* tag)
+  SimRadio(std::deque<RadioLogEntry>& log, std::deque<RxQueueEntry>& rxQueue, const char* tag)
     : _log(log), _rxQueue(rxQueue), _tag(tag) {}
 
   int recvRaw(uint8_t* bytes, int sz) override;
@@ -32,13 +32,32 @@ public:
   float getLastRSSI() const override { return _last_rssi; }
   float getLastSNR() const override { return _last_snr; }
 
+  // --- CAD matériel simulé / bruit de fond ----------------------------------
+  // isReceiving() (utilisé par AprsDispatcher::isReceiving() côté APRS, et
+  // par MyMesh côté mesh pour le carrier-sense avant TX) vaut toujours false
+  // par défaut ici (pas de vraie détection radio en simulateur) — ce bouton
+  // ("sim cad mesh|aprs on|off", cf. SimCli.h, ou le dashboard web) force un
+  // "canal occupé" pour tester le comportement CSMA (report d'émission) sans
+  // dépendre d'une vraie collision. getNoiseFloor() est de même figé à 0 par
+  // défaut (mesh::Radio) ; réglable ici ("sim set noise mesh|aprs <rssi>")
+  // pour que stats.noise_floor (cf. MyMesh.cpp) et le dashboard reflètent une
+  // valeur de bruit de fond réaliste.
+  bool isReceiving() override { return _cad_busy; }
+  int getNoiseFloor() const override { return _noise_floor_rssi; }
+  void setCadBusy(bool busy) { _cad_busy = busy; }
+  bool getCadBusy() const { return _cad_busy; }
+  void setNoiseFloor(int rssi) { _noise_floor_rssi = rssi; }
+
   // --- Surface étendue de RadioLibWrapper (lib/MeshCore/src/helpers/
   // radiolib/RadioLibWrappers.h) — MyMesh.cpp appelle ces méthodes
   // directement sur le type concret `radio_driver`, pas via mesh::Radio.
   // Pas de vraie config radio possible en simulateur : no-op loggué.
   void setParams(float freq, float bw, uint8_t sf, uint8_t cr);
   void setTxPower(int8_t dbm);
-  void setRxBoostedGainMode(bool) {}
+  // bool (pas void) depuis la maj MeshCore : MyMesh::setRxBoostedGain()
+  // fait `return radio_driver.setRxBoostedGainMode(enable);`. Pas de vraie
+  // config radio en simulateur : toujours "réussi".
+  bool setRxBoostedGainMode(bool) { return true; }
   uint32_t getPacketsRecv() const { return _n_recv; }
   uint32_t getPacketsRecvErrors() const { return _n_recv_errors; }
   uint32_t getPacketsSent() const { return _n_sent; }
@@ -55,7 +74,7 @@ public:
 
 private:
   std::deque<RadioLogEntry>& _log;
-  std::deque<std::vector<uint8_t>>& _rxQueue;
+  std::deque<RxQueueEntry>& _rxQueue;
   const char* _tag;
   bool _sending = false;
   unsigned long _send_done_at = 0;
@@ -65,4 +84,6 @@ private:
   float _freq = 0, _bw = 0;
   uint8_t _sf = 0, _cr = 0;
   int8_t _tx_power_dbm = 0;
+  bool _cad_busy = false;
+  int _noise_floor_rssi = 0;
 };

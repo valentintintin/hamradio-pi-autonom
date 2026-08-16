@@ -80,6 +80,7 @@ struct RadioSettings {
   uint8_t aprs_sf;
   uint8_t aprs_cr;
   int8_t aprs_tx_power;
+  bool aprs_cad_enabled;
 };
 
 struct WeatherSettings {
@@ -227,6 +228,7 @@ inline Settings getDefaultSettings() {
   s.radio.aprs_sf = 12;
   s.radio.aprs_cr = 5;
   s.radio.aprs_tx_power = 22;
+  s.radio.aprs_cad_enabled = false;
 
   // Weather
   s.weather.wh65b_enabled = true;

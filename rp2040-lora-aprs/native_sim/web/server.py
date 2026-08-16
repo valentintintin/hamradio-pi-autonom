@@ -134,7 +134,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             which = params.get("which", "aprs")
             fmt = params.get("format", "hex")
             payload = params.get("payload", "")
-            cmd = f"sim rx {which} " + (f"ascii {payload}" if fmt == "ascii" else payload)
+            opts = ""
+            if params.get("rssi", "").strip():
+                opts += f"rssi {params['rssi']} "
+            if params.get("snr", "").strip():
+                opts += f"snr {params['snr']} "
+            cmd = f"sim rx {which} {opts}" + (f"ascii {payload}" if fmt == "ascii" else payload)
             submit_command(cmd)
             self._send_json({"ok": True})
 

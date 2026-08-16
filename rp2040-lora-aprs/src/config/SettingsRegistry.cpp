@@ -44,6 +44,7 @@ void SettingsRegistry::init(Settings& s) {
   add("radio.aprs.sf",       ST_UINT8,  &s.radio.aprs_sf,       5.0f, 12.0f);
   add("radio.aprs.cr",       ST_UINT8,  &s.radio.aprs_cr,       5.0f, 8.0f);
   add("radio.aprs.power",    ST_INT8,   &s.radio.aprs_tx_power, -9.0f, 22.0f);
+  add("radio.aprs.cad",      ST_BOOL,   &s.radio.aprs_cad_enabled);
 
   // --- Weather -------------------------------------------------------------
   add("weather.wh65b.enabled",  ST_BOOL,   &s.weather.wh65b_enabled);
