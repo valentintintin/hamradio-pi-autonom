@@ -1,12 +1,5 @@
 #pragma once
 
-// ============================================================================
-// TCA9555.h — faux vendor header natif (lib RobTillaart/TCA9555, cf.
-// Adafruit_BME280.h) — hal/i2c/Tca9555Hal.h/.cpp restent inchangés. Registre
-// 16 bits simulé dans SimWorld (tca9555_output/tca9555_config), lu par
-// RelayHal/Tca9555GpioHal via cette même API régistre.
-// ============================================================================
-
 #include <Arduino.h>
 #include "SimWorld.h"
 
@@ -62,8 +55,7 @@ public:
     return true;
   }
 
-  // Reflète (comme le vrai chip) l'état électrique réel de la broche, y
-  // compris en sortie — cf. commentaire Tca9555Hal::pulsePin.
+  // Reflète l'état électrique réel de la broche même en sortie, comme le vrai chip.
   uint8_t read1(uint8_t pin) {
     auto& w = SimWorld::instance();
     std::lock_guard<std::mutex> lock(w.mutex);

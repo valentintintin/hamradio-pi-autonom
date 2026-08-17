@@ -12,12 +12,8 @@ struct WeatherData {
   float humidity;       // 0-100 %
 };
 
-// Anciennement des `union` — bug : tous les champs sont en réalité écrits et
-// lus simultanément (cf. hal/sensors/Bme280Hal.h::query(), tasks/
-// task_weather.cpp, aprs/AprsEventHandler.cpp), pas les uns à la place des
-// autres. En union, chaque écriture écrasait les précédentes (même
-// stockage) — température intérieure et tous les champs météo extérieurs
-// (vent, pluie, direction, validité) étaient corrompus dès la 2e écriture.
+// Anciennement des `union` : bug, tous les champs sont écrits/lus simultanément
+// (pas les uns à la place des autres) donc chaque écriture corrompait les précédentes.
 struct WeatherDataBme {
   WeatherData base;
   float pressure_hpa;
@@ -35,7 +31,6 @@ struct WeatherDataExtended {
 };
 
 struct TelemetryData {
-  // INA3221 — 3 canaux
   EnergyData battery_ina;
   EnergyData solar_ina;
   EnergyData board_5v;
@@ -43,15 +38,12 @@ struct TelemetryData {
   EnergyData battery_mppt;
   EnergyData solar_mppt;
 
-  // MPPT charger
   uint16_t mppt_status;
 
-  // BME280
   WeatherDataBme weather_inside;
   WeatherDataExtended weather_outside;
 
-  // Victron VE.Direct
-  float victron_soc;          // State of charge (%)
+  float victron_soc; // % (Victron VE.Direct)
 
   uint32_t uptime_s;
 

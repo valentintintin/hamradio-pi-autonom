@@ -7,31 +7,11 @@
 
 #include "core/Log.h"
 
-// ============================================================================
-// NotifyingRadioLibWrapper<Handle> — sous-classe project-owned de
-// CustomSX1262Wrapper (MeshCore vendoré, INTACT — ce fichier ne le modifie
-// pas) qui réveille une tâche FreeRTOS précise depuis l'IRQ DIO1 (paquet reçu
-// ou émission terminée), au lieu du polling en vTaskDelay(1) fait ailleurs.
-//
-// Pourquoi une sous-classe plutôt qu'un patch de RadioLibWrapper (cf.
-// lib/MeshCore/src/helpers/radiolib/RadioLibWrappers.cpp) : celui-ci garde
-// son état RX/TX ("state") dans une variable fichier-statique PRIVÉE au
-// fichier .cpp — invisible depuis l'extérieur, donc impossible de s'y
-// "brancher" sans dupliquer les quelques méthodes qui la lisent/l'écrivent.
-// Cette classe réimplémente donc ces méthodes (toutes virtuelles côté
-// RadioLibWrapper) avec son propre état, en réutilisant _radio/_board/
-// n_recv/n_sent/n_recv_errors — protégés dans RadioLibWrapper, donc
-// accessibles à une sous-classe — pour ne dupliquer que le strict nécessaire.
-// RadioLibWrapper et CustomSX1262Wrapper restent 100% upstream.
-//
-// `Handle` (référence vers un TaskHandle_t externe, cf.
-// core/RadioActivityNotify.h — g_mesh_task_handle ou g_aprs_task_handle) est
-// un paramètre de template non-type : chaque instanciation (une par radio
-// physique) obtient son propre état statique indépendant ET sait exactement
-// quelle tâche réveiller, sans ambiguïté possible — contrairement au `state`
-// partagé de RadioLibWrapper (une seule variable pour les deux radios de ce
-// projet), qui ne permet pas de savoir laquelle des deux a déclenché l'IRQ.
-// ============================================================================
+// Sous-classe de CustomSX1262Wrapper (MeshCore vendoré, non modifié) : réveille
+// une tâche FreeRTOS précise depuis l'IRQ DIO1 au lieu de faire du polling.
+// RadioLibWrapper garde son état RX/TX dans une statique privée au .cpp,
+// inaccessible depuis l'extérieur — d'où la réimplémentation ici avec un état
+// propre par instanciation de template (une par radio physique).
 
 #define STATE_IDLE       0
 #define STATE_RX         1
@@ -48,19 +28,18 @@ public:
   NotifyingRadioLibWrapper(CustomSX1262& hw, mesh::MainBoard& board) : CustomSX1262Wrapper(hw, board) {}
 
   void begin() override {
-    _radio->setPacketReceivedAction(setFlag);  // this is also SentComplete interrupt
+    _radio->setPacketReceivedAction(setFlag);  // sert aussi d'interruption SentComplete
     _preamble_sf = getSpreadingFactor();
-    _radio->setPreambleLength(preambleLengthForSF(_preamble_sf)); // longer preamble for lower SF improves reliability
+    _radio->setPreambleLength(preambleLengthForSF(_preamble_sf)); // préambule plus long en SF bas = fiabilité accrue
     state = STATE_IDLE;
 
-    if (_board->getStartupReason() == BD_STARTUP_RX_PACKET) {  // received a LoRa packet (while in deep sleep)
-      setFlag(); // LoRa packet is already received
+    if (_board->getStartupReason() == BD_STARTUP_RX_PACKET) {  // réveillé par un paquet LoRa reçu en deep sleep
+      setFlag();
     }
 
     _noise_floor = 0;
     _threshold = 0;
 
-    // start average out some samples
     _num_floor_samples = 0;
     _floor_sample_sum = 0;
   }
@@ -77,11 +56,10 @@ public:
           len = 0;
           n_recv_errors++;
         } else {
-          //  Serial.print("  readData() -> "); Serial.println(len);
           n_recv++;
         }
       }
-      state = STATE_IDLE;   // need another startReceive()
+      state = STATE_IDLE;
     }
 
     if (state != STATE_RX) {
@@ -103,7 +81,7 @@ public:
       return true;
     }
     LOG_W("RadioLibWrapper", "error: startTransmit(%d)", err);
-    idle();   // trigger another startRecv()
+    idle();
     _board->onAfterTransmit();
     return false;
   }
@@ -131,7 +109,7 @@ public:
     if (state == STATE_RX && _num_floor_samples < NUM_NOISE_FLOOR_SAMPLES) {
       if (!isReceivingPacket()) {
         int rssi = getCurrentRSSI();
-        if (rssi < _noise_floor + SAMPLING_THRESHOLD) {  // only consider samples below current floor + sampling THRESHOLD
+        if (rssi < _noise_floor + SAMPLING_THRESHOLD) {
           _num_floor_samples++;
           _floor_sample_sum += rssi;
         }
@@ -139,7 +117,7 @@ public:
     } else if (_num_floor_samples >= NUM_NOISE_FLOOR_SAMPLES && _floor_sample_sum != 0) {
       _noise_floor = _floor_sample_sum / NUM_NOISE_FLOOR_SAMPLES;
       if (_noise_floor < -120) {
-        _noise_floor = -120;    // clamp to lower bound of -120dBi
+        _noise_floor = -120;    // plancher du SX1262
       }
       _floor_sample_sum = 0;
 

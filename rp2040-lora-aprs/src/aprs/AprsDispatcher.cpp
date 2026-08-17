@@ -24,14 +24,10 @@ void AprsDispatcher::begin() {
   _radio->begin();
 }
 
-// ============================================================================
-// Pause/resume — laisser la radio à une autre tâche
-// ============================================================================
 void AprsDispatcher::pause() {
   _paused = true;
   LOG_D(TAG, "Pause demandée");
 
-  // Attendre la fin d'un éventuel TX en cours
   unsigned long timeout = _ms->getMillis() + 10000;
   while (_outbound_active && (long)(_ms->getMillis() - timeout) < 0) {
     _radio->loop();
@@ -53,9 +49,6 @@ void AprsDispatcher::resume() {
   LOG_D(TAG, "Reprise");
 }
 
-// ============================================================================
-// Loop principal — appelé depuis la task FreeRTOS
-// ============================================================================
 void AprsDispatcher::loop() {
   if (_paused) {
     return;
@@ -63,26 +56,21 @@ void AprsDispatcher::loop() {
 
   _radio->loop();
 
-  // Si un envoi est en cours, attendre qu'il finisse
   if (_outbound_active) {
     if (_radio->isSendComplete()) {
       long t = _ms->getMillis() - _outbound_start;
       _total_air_time += t;
-
-      // Pas de budget duty cycle à recharger (bande amateur, cf. AprsDispatcher.h) :
-      // le prochain envoi n'est retardé que par le CAD, il peut donc démarrer tout de suite.
       _next_tx_time = _ms->getMillis();
 
       _radio->onSendFinished();
       _outbound_active = false;
       _n_sent++;
     } else if (millisHasNowPassed(_outbound_expiry)) {
-      // Timeout envoi
       LOG_W(TAG, "TX timeout, abandon");
       _radio->onSendFinished();
       _outbound_active = false;
     } else {
-      return; // envoi en cours, on ne peut rien faire d'autre
+      return;
     }
   }
 
@@ -90,9 +78,6 @@ void AprsDispatcher::loop() {
   checkSend();
 }
 
-// ============================================================================
-// Réception
-// ============================================================================
 void AprsDispatcher::checkRecv() {
   uint8_t raw[APRS_MAX_PACKET_SIZE];
   int len = _radio->recvRaw(raw, APRS_MAX_PACKET_SIZE);
@@ -102,15 +87,12 @@ void AprsDispatcher::checkRecv() {
     float rssi = _radio->getLastRSSI();
     float snr = _radio->getLastSNR();
     uint32_t airtime = _radio->getEstAirtimeFor(len);
-    _total_air_time += airtime; // comptabiliser le RX aussi (stat informative)
+    _total_air_time += airtime;
 
     _rx_callback->onAprsPacketReceived(raw, len, rssi, snr);
   }
 }
 
-// ============================================================================
-// Émission — logique CAD (portée de MeshCore, sans plafond duty cycle)
-// ============================================================================
 void AprsDispatcher::checkSend() {
   if (getOutboundCount(_ms->getMillis()) == 0) {
     return;
@@ -120,13 +102,12 @@ void AprsDispatcher::checkSend() {
     return;
   }
 
-  // CAD — Channel Activity Detection
   if (_radio->isReceiving()) {
     if (_cad_busy_start == 0) {
       _cad_busy_start = _ms->getMillis();
     }
     if (_ms->getMillis() - _cad_busy_start > getCADFailMaxDuration()) {
-      // Channel busy trop longtemps, forcer l'envoi
+      // channel busy trop longtemps : on force l'envoi
     } else {
       _next_tx_time = futureMillis(getCADFailRetryDelay());
       return;
@@ -134,18 +115,15 @@ void AprsDispatcher::checkSend() {
   }
   _cad_busy_start = 0;
 
-  // Récupérer le prochain paquet prêt
   AprsQueuedPacket* pkt = getNextOutbound(_ms->getMillis());
   if (!pkt) {
     return;
   }
 
-  // Copier et libérer le slot
   memcpy(_outbound_data, pkt->data, pkt->len);
   _outbound_len = pkt->len;
   pkt->used = false;
 
-  // Envoyer
   uint32_t max_airtime = _radio->getEstAirtimeFor(_outbound_len) * 3 / 2;
   _outbound_start = _ms->getMillis();
 
@@ -160,16 +138,6 @@ void AprsDispatcher::checkSend() {
   _outbound_expiry = futureMillis(max_airtime);
 }
 
-// ============================================================================
-// API publique — enqueue un paquet
-//
-// Peut être appelé depuis plusieurs tâches productrices en même temps
-// (beacon, CLI, mesh, et le traitement RX du dispatcher lui-même) : le verrou
-// couvre tout le cycle allocSlot()+écriture pour qu'un seul producteur à la
-// fois puisse choisir puis remplir un slot libre (sinon deux producteurs
-// pourraient sélectionner le même slot avant que l'un des deux ne le marque
-// "used", et l'un écraserait le paquet de l'autre).
-// ============================================================================
 bool AprsDispatcher::send(const uint8_t* data, uint8_t len, uint8_t priority, uint32_t delay_ms) {
   if (len == 0 || len > APRS_MAX_PACKET_SIZE) {
     return false;
@@ -189,14 +157,9 @@ bool AprsDispatcher::send(const uint8_t* data, uint8_t len, uint8_t priority, ui
   slot->send_after = futureMillis(delay_ms);
   slot->used = true;
 
-  // Réveille la tâche APRS immédiatement (elle dort peut-être en attendant un
-  // événement radio ou un paquet, cf. tasks/task_aprs.cpp) plutôt que de la
-  // laisser attendre son prochain réveil planifié pour remarquer ce nouveau
-  // paquet. Garde nulle nécessaire : send() peut être appelée avant que
-  // taskAprsLoop() ait démarré et renseigné ce handle (ex: un beacon envoyé
-  // très tôt au boot) — le vrai FreeRTOS (configASSERT sur RP2040) fait un
-  // rtosFatalError() si on l'appelle avec un handle nul, contrairement au
-  // shim natif qui l'ignore silencieusement.
+  // Sur RP2040, xTaskNotifyGive avec handle nul déclenche un configASSERT
+  // fatal (contrairement au shim natif, qui ignore silencieusement) : send()
+  // peut être appelé avant que taskAprsLoop() ait renseigné ce handle.
   if (g_aprs_task_handle) {
     xTaskNotifyGive(g_aprs_task_handle);
   }
@@ -204,9 +167,6 @@ bool AprsDispatcher::send(const uint8_t* data, uint8_t len, uint8_t priority, ui
   return true;
 }
 
-// ============================================================================
-// Queue helpers
-// ============================================================================
 AprsQueuedPacket* AprsDispatcher::allocSlot() {
   for (int i = 0; i < APRS_TX_QUEUE_SIZE; i++) {
     if (!_tx_pool[i].used) {
@@ -244,9 +204,6 @@ int AprsDispatcher::getOutboundCount(unsigned long now) const {
   return count;
 }
 
-// ============================================================================
-// Millis helpers (gestion du rollover unsigned, copiées de MeshCore)
-// ============================================================================
 bool AprsDispatcher::millisHasNowPassed(unsigned long timestamp) const {
   return (long)(_ms->getMillis() - timestamp) > 0;
 }
@@ -255,14 +212,6 @@ unsigned long AprsDispatcher::futureMillis(int millis_from_now) const {
   return _ms->getMillis() + millis_from_now;
 }
 
-// ============================================================================
-// Combien de temps avant que ce dispatcher n'ait besoin d'être rappelé — cf.
-// commentaire dans AprsDispatcher.h. Ne verrouille pas _pool_mutex : lu depuis
-// tasks/task_aprs.cpp juste après loop() (qui l'a déjà pris/relâché), une
-// lecture legèrement périmée ici ne fait au pire dormir un peu plus/moins
-// longtemps que l'idéal, jamais rater un événement (le réveil radio ou
-// xTaskNotifyGive() dans send() couvrent toujours le cas exact).
-// ============================================================================
 uint32_t AprsDispatcher::msUntilNextAction(unsigned long now) const {
   if (_outbound_active) {
     long remaining = (long)(_outbound_expiry - now);
@@ -279,10 +228,9 @@ uint32_t AprsDispatcher::msUntilNextAction(unsigned long now) const {
   }
 
   if (!any) {
-    return 0xFFFFFFFFu;  // rien en attente : le prochain réveil viendra d'une IRQ radio ou d'un send()
+    return 0xFFFFFFFFu;
   }
 
-  // Un retry CAD retarde peut-être ce paquet au-delà de son propre send_after.
   if ((long)(_next_tx_time - earliest) > 0) {
     earliest = _next_tx_time;
   }

@@ -11,29 +11,8 @@
 #include <mutex>
 #include <string>
 
-// ============================================================================
-// M24M01Hal — implémentation native (env PlatformIO `native`, cf.
-// platformio.ini qui exclut hal/eeprom/M24M01Hal.cpp au profit de ce fichier
-// pour cet env, même principe que variant/ vs variant_native/ pour les
-// radios). Pas de bus I2C réel — chaque écriture/lecture est routée vers un
-// vrai fichier JSON sous SIM_DATA_DIR/eeprom/, un fichier par "entrée"
-// plutôt qu'un blob binaire opaque, pour rester inspectable/éditable
-// directement avec n'importe quel éditeur :
-//   eeprom/settings.json                    — copie EEPROM des settings
-//   eeprom/telemetry_history/header.json    — TelemetryHistoryHeader
-//   eeprom/telemetry_history/00000.json ...  — un TelemetryRecord par fichier
-//   eeprom/event_log/header.json            — EventLogHeader
-//   eeprom/event_log/00000.json ...          — un EventLogRecord par fichier
-//
-// Le plan mémoire (adresses/tailles) est dupliqué ici depuis hal/eeprom/
-// TelemetryHistory.h et EventLogHistory.h plutôt que d'y ajouter une
-// dépendance dans l'autre sens (ce HAL est plus bas niveau) — à garder
-// synchronisé si ce plan mémoire change (les trois zones sont vérifiées
-// non-chevauchantes dans ces deux fichiers). Les *types* de record
-// (TelemetryRecord, EventLogRecord...) sont en revanche réutilisés tels
-// quels via ces mêmes includes, pour ne jamais dupliquer un nom/type de
-// champ — seul le nom du fichier est décidé ici.
-// ============================================================================
+// Le plan mémoire (adresses/tailles) est dupliqué depuis hal/eeprom/TelemetryHistory.h
+// et EventLogHistory.h — à garder synchronisé si ce plan mémoire change.
 namespace {
 
 enum class Zone { Settings, TelemetryHeader, TelemetryRecord, EventLogHeader, EventLogRecord };
@@ -49,11 +28,6 @@ std::string eepromDir() {
   return simDataDir() + "/eeprom";
 }
 
-// address correspond toujours exactement soit à une zone (header inclus),
-// soit à un record entier (jamais un accès partiel/à cheval) — vérifié sur
-// les 3 seuls call sites de ce HAL (SettingsManager, TelemetryHistory,
-// EventLogHistory) — donc la division par la taille de record ci-dessous
-// tombe toujours juste.
 Zone locateZone(uint32_t address, std::string& path) {
   std::string dir = eepromDir();
   char buf[48];
@@ -82,9 +56,6 @@ Zone locateZone(uint32_t address, std::string& path) {
   return Zone::EventLogRecord;
 }
 
-// Header du ring buffer : même forme (magic/version/write_index/count/
-// max_records) pour TelemetryHistoryHeader et EventLogHeader — une seule
-// paire de fonctions générique pour les deux.
 template <typename Header>
 std::string headerToJson(const Header& h) {
   JsonDocument doc;
@@ -149,7 +120,7 @@ std::string eventLogRecordToJson(const EventLogRecord& r) {
   JsonDocument doc;
   doc["timestamp"] = r.timestamp;
   doc["code"] = r.code;
-  doc["code_name"] = eventCodeName(r.code);  // informatif seulement, ignoré à la lecture
+  doc["code_name"] = eventCodeName(r.code);
   doc["data0"] = r.data0;
   doc["data1"] = r.data1;
   doc["data2"] = r.data2;
@@ -202,9 +173,6 @@ bool writeStringToFile(const std::string& path, const std::string& content) {
   return n == content.size();
 }
 
-// Un seul mutex process-wide : les accès EEPROM sont déjà sérialisés côté
-// appelant par I2CBus/M24M01Hal sur cible réelle (un seul bus physique) —
-// même garantie ici pour les accès concurrents CLI/tâches/dashboard.
 std::mutex g_eeprom_mutex;
 
 }  // namespace
@@ -229,7 +197,7 @@ bool M24M01Hal::read(uint32_t address, uint8_t* data, size_t len) {
 
   std::string json;
   if (!readFileToString(path, json)) {
-    memset(data, 0xFF, len);  // jamais écrit -> EEPROM "vierge" (0xFF), comme la vraie puce
+    memset(data, 0xFF, len);  // 0xFF = état "vierge" d'une EEPROM jamais écrite, comme le vrai chip
     return true;
   }
 

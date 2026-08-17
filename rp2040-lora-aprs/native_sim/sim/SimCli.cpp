@@ -1,7 +1,7 @@
 #include "SimCli.h"
 #include "SimWorld.h"
 #include "core/RadioActivityNotify.h"
-#include <target.h>  // mesh_radio_driver / aprs_radio_driver (SimRadio)
+#include <target.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -12,17 +12,12 @@
 
 namespace {
 
-// Résout "mesh"/"aprs" vers l'instance SimRadio correspondante (cf.
-// variant_native/target.h) — nullptr si le nom ne correspond à aucune des
-// deux radios simulées.
 SimRadio* radioFor(const char* which) {
   if (strcmp(which, "mesh") == 0) return &mesh_radio_driver;
   if (strcmp(which, "aprs") == 0) return &aprs_radio_driver;
   return nullptr;
 }
 
-// Table nom<->code pour "sim set mppt status <nom>" (cf. MPPT_CHG_ST_* dans
-// lib/mpptChg/mpptChg.h) — noms alignés sur mpptChg::getStatusAsString().
 struct MpptStateName { const char* name; uint16_t code; };
 const MpptStateName kMpptStates[] = {
   {"night", MPPT_CHG_ST_NIGHT}, {"idle", MPPT_CHG_ST_IDLE}, {"vsrcv", MPPT_CHG_ST_VSRCV},
@@ -30,8 +25,6 @@ const MpptStateName kMpptStates[] = {
   {"float", MPPT_CHG_ST_FLOAT},
 };
 
-// Parse une chaîne hex ("A1B2C3"...) en octets. Espaces ignorés. Retourne le
-// nombre d'octets écrits dans `out` (capacité `max`).
 size_t parseHex(const char* s, uint8_t* out, size_t max) {
   size_t n = 0;
   int hi = -1;
@@ -45,7 +38,7 @@ size_t parseHex(const char* s, uint8_t* out, size_t max) {
     } else if (c >= 'A' && c <= 'F') {
       v = c - 'A' + 10;
     } else {
-      continue;  // espaces, séparateurs — ignorés
+      continue;
     }
     if (hi < 0) {
       hi = v;
@@ -244,12 +237,8 @@ bool cmdRx(const char* args, Print& out) {
   const char* rest = args + strlen(which);
   while (*rest == ' ') rest++;
 
-  // Options "rssi <val>"/"snr <val>" optionnelles, dans n'importe quel ordre,
-  // avant le payload — pas en position finale : le payload ascii (texte APRS
-  // libre) pourrait sinon se terminer par des nombres et être tronqué par
-  // erreur. Défauts = anciennes constantes globales de SimRadio (-90/8) pour
-  // mesh/aprs si non précisé ; le fsk garde son propre défaut historique
-  // (-55dBm, cf. ci-dessous) tant que rssi n'est pas explicitement donné.
+  // rssi/snr doivent précéder le payload, jamais le suivre : un payload ascii
+  // libre pourrait se terminer par des nombres et se faire tronquer par erreur.
   float rssi = -90.0f, snr = 8.0f;
   bool rssiSet = false;
   for (;;) {
@@ -273,8 +262,6 @@ bool cmdRx(const char* args, Print& out) {
   uint8_t buf[256];
   size_t n;
   if (strncmp(rest, "ascii ", 6) == 0) {
-    // Payload texte brut (ex: trame APRS lisible "N0CALL>APRS:!4903.50N/..."),
-    // copié tel quel — pratique pour l'APRS, qui est un protocole texte.
     const char* text = rest + 6;
     size_t len = strlen(text);
     n = len < sizeof(buf) ? len : sizeof(buf);
@@ -294,20 +281,13 @@ bool cmdRx(const char* args, Print& out) {
       std::lock_guard<std::mutex> lock(w.mutex);
       w.mesh_rx_queue.push_back({std::move(pkt), rssi, snr});
     }
-    // Réveille immédiatement task_mesh.cpp (cf. core/RadioActivityNotify.h) —
-    // sinon, depuis que cette tâche dort entre deux réveils radio au lieu de
-    // faire du polling en vTaskDelay(1) (même changement que côté matériel
-    // réel, ici juste déclenché par l'injection CLI/web plutôt qu'une IRQ),
-    // la trame injectée ne serait vue qu'au prochain réveil périodique
-    // (jusqu'à MESH_TASK_MAX_WAIT_MS).
+    // Sans ce réveil explicite, task_mesh.cpp (qui dort entre deux IRQ radio au
+    // lieu de poller) ne verrait la trame injectée qu'au prochain tick périodique.
     xTaskNotifyGive(g_mesh_task_handle);
     out.printf("Trame mesh injectée (%u octets, rssi=%.0fdBm, snr=%.1fdB)\n", (unsigned)n, rssi, snr);
   } else if (strcmp(which, "aprs") == 0) {
-    // Préfixe avec le header LoRa-APRS 3 octets ('<' 0xFF 0x01, cf.
-    // src/aprs/AprsEngine.h LORA_APRS_HEADER_*) : AprsEngine::onAprsPacketReceived
-    // le vérifie et rejette silencieusement toute trame qui ne l'a pas — sans
-    // ce préfixe la trame injectée serait juste loggée (radio_log) sans jamais
-    // être réellement décodée (digipeat, query, message...).
+    // Sans ce header 3 octets ('<' 0xFF 0x01), AprsEngine rejette la trame en
+    // silence : elle serait loggée mais jamais réellement décodée.
     std::vector<uint8_t> framed;
     framed.reserve(n + 3);
     framed.push_back(0x3C);
@@ -319,10 +299,10 @@ bool cmdRx(const char* args, Print& out) {
       std::lock_guard<std::mutex> lock(w.mutex);
       w.aprs_rx_queue.push_back({std::move(framed), rssi, snr});
     }
-    xTaskNotifyGive(g_aprs_task_handle);  // cf. commentaire équivalent ci-dessus (mesh)
+    xTaskNotifyGive(g_aprs_task_handle);
     out.printf("Trame aprs injectée (%u octets + header LoRa-APRS, rssi=%.0fdBm, snr=%.1fdB)\n", (unsigned)n, rssi, snr);
   } else if (strcmp(which, "fsk") == 0) {
-    float fskRssi = rssiSet ? rssi : -55.0f;  // défaut historique FSK, cf. AprsRadioHwSim.cpp
+    float fskRssi = rssiSet ? rssi : -55.0f;  // -55dBm : défaut historique repris d'AprsRadioHwSim.cpp
     std::lock_guard<std::mutex> lock(w.mutex);
     w.fsk_rx_queue.push_back({std::move(pkt), fskRssi, snr});
     out.printf("Trame WH65B (fsk) injectée (%u octets, rssi=%.0fdBm) — consommée au prochain cycle météo (taskWeather)\n", (unsigned)n, fskRssi);

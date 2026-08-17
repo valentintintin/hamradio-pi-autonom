@@ -5,13 +5,10 @@
 #include "ChargeControllerHal.h"
 #include <mpptChg.h>
 
-// ============================================================================
-// MakePower MPPT Charger HAL — I2C addr 0x12
-// Lecture batterie, solaire, température, watchdog
-// ============================================================================
+// MakePower MPPT Charger, I2C addr 0x12.
 
-// GPIO RP2040 câblé sur le pin d'interruption "extinction imminente" de la
-// carte MPPT (actif haut). TODO: ajuster selon le câblage réel de la carte.
+// Pin d'interruption "extinction imminente" de la carte MPPT (actif haut).
+// TODO: ajuster selon le câblage réel de la carte.
 #define MPPT_ALERT_PIN 26
 
 class MpptChargerHal : public ChargeControllerHal {
@@ -51,12 +48,6 @@ public:
       telemetry.solar_mppt.current_ma = val;
     }
 
-    // Registre STATUS complet (bits charge-state + ALERT_MASK + NIGHT_MASK,
-    // cf. mpptChg.h) : mpptChg::getStatusAsString() décode les bits charge-state
-    // à partir de cette même valeur. L'alerte "extinction imminente" n'a pas
-    // besoin d'un accès I2C séparé ici — son bit (ALERT_MASK) est déjà inclus
-    // dans ce registre, et de toute façon déjà consommée ailleurs pour de vrai
-    // par isAlertEnabled() (cf. energy/MpptShutdownMonitor.cpp).
     if (_mppt.getStatusValue(SYS_STATUS, &uval)) {
       telemetry.mppt_status = uval;
     }
@@ -65,7 +56,6 @@ public:
     return true;
   }
 
-  // Nourrir le watchdog (appeler périodiquement)
   bool feedWatchdog(uint8_t timeout_s = 120) {
     if (!_initialized) {
       return false;
@@ -90,9 +80,8 @@ public:
     return ok;
   }
 
-  // Bit d'état ALERT (registre STATUS) : lecture I2C redondante avec le
-  // GPIO MPPT_ALERT_PIN — utile si l'interruption matérielle est manquée ou
-  // si ce pin n'est pas câblé sur un build donné (cf. task_energy.cpp).
+  // Lecture I2C de l'ALERT, redondante avec le GPIO MPPT_ALERT_PIN — utile
+  // si l'interruption matérielle est manquée ou non câblée.
   bool isAlertEnabled(bool& alert) {
     if (!_initialized) {
       return false;
@@ -105,8 +94,6 @@ public:
     return ok;
   }
 
-  // Seuils de coupure/reprise matériels de la carte (registres
-  // CFG_PWR_OFF_TH / CFG_PWR_ON_TH) — cf. settings.energy.mppt_pwr_off_mv/on_mv.
   bool setPowerOffThreshold(uint16_t mv) {
     if (!_initialized) {
       return false;

@@ -2,14 +2,6 @@
 
 #include "aprs/AprsRadioHw.h"
 
-// ============================================================================
-// AprsRadioHwSim — implémentation native d'IAprsRadioHw (cf. aprs/AprsRadioHw.h) :
-// pas de SX1262 réel, la bascule LoRa/FSK est purement logique
-// (SimWorld::fsk_mode, informatif pour le dashboard) et la réception WH65B
-// dépile SimWorld::fsk_rx_queue (remplie par "sim rx fsk <hex>" ou
-// POST /api/rx). Contrepartie réelle : variant/AprsRadioHwReal.h.
-// ============================================================================
-
 class AprsRadioHwSim : public IAprsRadioHw {
 public:
   bool switchToFsk() override;

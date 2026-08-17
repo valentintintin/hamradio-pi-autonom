@@ -47,10 +47,7 @@ bool AprsRadioHwSim::receiveWh65bFrame(uint32_t timeoutMs, uint8_t* outBuf, floa
         e.tx = false;
         e.millis_ts = millis();
         e.data.assign(outBuf, outBuf + WH65B_PAYLOAD_LEN);
-        // RSSI porté par la trame injectée ("sim rx fsk rssi <dBm> ...", cf.
-        // SimCli.cpp) — -55dBm par défaut si non précisé, pas de concept de
-        // SNR pour le FSK/WH65B.
-        e.rssi = entry.rssi;
+        e.rssi = entry.rssi; // -55dBm par défaut si non précisé via "sim rx fsk rssi <dBm> ..."
         w.pushLog(w.fsk_log, std::move(e));
       }
 

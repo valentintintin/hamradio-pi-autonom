@@ -8,7 +8,10 @@
 //                          battery_ma, solar_mv, solar_ma, board5v_mv, board5v_ma }
 //   POST /api/rx      -> { which: mesh|aprs|fsk, format: hex|ascii, payload,
 //                          rssi?, snr? (dBm/dB, vides = défauts simulateur) }
-//   POST /api/relay   -> { n, on }
+//   POST /api/relay   -> { n, on } (bascule + arme l'override manuel, cf.
+//                          CommandHandler::cmdRelay "relay N on|off")
+//   "relay N auto" (rend la main à l'automatisme) passe par le canal
+//   générique POST /api/cmd -> { cmd } (cf. sendCmd()), pas /api/relay.
 // ============================================================================
 
 // ------------------------------------------------------------------ utils
@@ -141,15 +144,23 @@ function renderRadio(s) {
 
 function relayToggle(n, on) {
   post('/api/relay', { n, on: on ? 1 : 0 })
-    .then(() => { toast(`Relais ${n} ${on ? 'allumé' : 'éteint'}`); refresh(); })
+    .then(() => { toast(`Relais ${n} ${on ? 'allumé' : 'éteint'} (mode manuel)`); refresh(); })
     .catch(e => toast(`Échec relais ${n} : ${e.message}`, true));
 }
 
+function relayAuto(n) {
+  sendCmd(`relay ${n} auto`)
+    .then(() => { toast(`Relais ${n} rendu à l'automatisme`); refresh(); })
+    .catch(e => toast(`Échec relais ${n} auto : ${e.message}`, true));
+}
+
 function renderRelays(relays) {
-  document.getElementById('relays').innerHTML = relays.map((on, i) => `
+  document.getElementById('relays').innerHTML = relays.map((r, i) => `
     <div class="relay-row">
-      <span class="pill ${on ? 'on' : 'off'}">relais ${i + 1} · ${on ? 'ON' : 'off'}</span>
-      <button onclick="relayToggle(${i + 1},${on ? 0 : 1})">${on ? 'Éteindre' : 'Allumer'}</button>
+      <span class="pill ${r.on ? 'on' : 'off'}">relais ${i + 1} · ${r.on ? 'ON' : 'off'}</span>
+      ${r.manual ? '<span class="pill off">manuel</span>' : ''}
+      <button onclick="relayToggle(${i + 1},${r.on ? 0 : 1})">${r.on ? 'Éteindre' : 'Allumer'}</button>
+      ${r.manual ? `<button onclick="relayAuto(${i + 1})" class="btn-ghost">Auto</button>` : ''}
     </div>`).join('');
 }
 

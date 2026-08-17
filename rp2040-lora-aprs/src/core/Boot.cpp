@@ -6,7 +6,6 @@
 #include "target.h"
 #include "tasks/tasks.h"
 
-// MeshCore core
 #include <helpers/ArduinoHelpers.h>
 #include <helpers/IdentityStore.h>
 
@@ -34,10 +33,6 @@
 #include "SimWebBridge.h"
 #endif
 
-// ============================================================================
-// Objets globaux déclarés dans main.cpp (racine de composition) — mêmes
-// externs que ceux utilisés par tasks/task_*.cpp.
-// ============================================================================
 extern LogLevel g_log_level;
 extern StdRNG fast_rng;
 extern Settings settings;
@@ -59,13 +54,9 @@ extern SettingsManager settings_manager;
 extern SettingsRegistry settings_registry;
 extern SstvTransmitter sstv_transmitter;
 
-// ============================================================================
-// Étapes de boot
-// ============================================================================
-
 void bootInitCore() {
   Serial.begin(115200);
-  delay(2000); // attendre USB serial
+  delay(2000); // laisse le temps à l'USB CDC de s'énumérer avant les premiers logs
 
   board.begin();
   LittleFS.begin();
@@ -75,9 +66,7 @@ void bootInitCore() {
 #endif
 }
 
-// I2C bus + EEPROM seuls : nécessaire dans TOUS les modes pour que
-// bootLoadConfig() puisse retomber sur l'EEPROM si LittleFS est vide/corrompu
-// — à cet instant settings.system.mode n'est pas encore connu.
+// Toujours exécuté avant que le mode soit connu : bootLoadConfig() peut retomber sur l'EEPROM si LittleFS est vide/corrompu.
 void bootInitEeprom() {
   i2c_bus.begin();
   LOG_I("I2C", "Bus initialisé");
@@ -87,6 +76,23 @@ void bootInitEeprom() {
   } else {
     LOG_W("I2C", "EEPROM non détectée");
   }
+}
+
+bool bootInitRtc() {
+  if (!externalRtc.begin()) {
+    LOG_W("RTC", "Puce RX8025T non détectée sur le bus I2C");
+    return false;
+  }
+
+  uint32_t chipTime;
+  if (!externalRtc.readTime(&chipTime)) {
+    LOG_W("RTC", "Puce RX8025T présente mais heure non fiable (VLF) — horloge RP2040 non synchronisée");
+    return false;
+  }
+
+  rtc_clock.setCurrentTime(chipTime);
+  LOG_I("RTC", "Horloge RP2040 synchronisée depuis la puce RX8025T");
+  return true;
 }
 
 void bootLoadConfig() {
@@ -118,9 +124,7 @@ void bootInitRadios() {
   }
 }
 
-// RNG et identité MeshCore utilisent le bruit de la radio 868 (cf.
-// variant/target.cpp: radio_get_rng_seed/radio_new_identity) — inutiles (et
-// la radio non initialisée) si MeshCore n'est pas actif dans ce mode.
+// RNG initialisé depuis le bruit RF de la radio 868 (cf. variant/target.cpp: radio_get_rng_seed).
 void bootSeedRng() {
   if (!modeHasMeshcore(settings.system.mode)) {
     return;
@@ -138,9 +142,9 @@ void bootInitIdentity() {
 
   if (!store.load("_main", the_mesh.self_id)) {
     LOG_W("MESH", "Génération nouvelle identité");
-    the_mesh.self_id = radio_new_identity(); // create new random identity
+    the_mesh.self_id = radio_new_identity();
     int count = 0;
-    while (count < 10 && (the_mesh.self_id.pub_key[0] == 0x00 || the_mesh.self_id.pub_key[0] == 0xFF)) {  // reserved id hashes
+    while (count < 10 && (the_mesh.self_id.pub_key[0] == 0x00 || the_mesh.self_id.pub_key[0] == 0xFF)) {  // 0x00/0xFF réservés par le protocole MeshCore, à éviter
       the_mesh.self_id = radio_new_identity();
       count++;
     }
@@ -152,10 +156,6 @@ void bootInitIdentity() {
   Serial.println();
 }
 
-// Capteurs/chargeurs/historique EEPROM : partie "télémétrie" (MODE_FULL et
-// MODE_TELEMETRY_ONLY, cf. Settings.h). L'I2C bus et l'EEPROM elle-même sont
-// déjà initialisés par bootInitEeprom() (nécessaire dans tous les modes pour
-// le fallback settings).
 void bootInitSensors() {
   if (!modeHasTelemetry(settings.system.mode)) {
     return;
@@ -196,8 +196,7 @@ void bootInitSensors() {
     LOG_W("VICTRON", "VE.Direct non détecté");
   }
 
-  // Un seul chargeur solaire à la fois selon la carte : MPPT prioritaire
-  // s'il répond, sinon Victron.
+  // Un seul chargeur actif à la fois : MPPT prioritaire sur Victron.
   if (mppt.isInitialized()) {
     active_charger = &mppt;
   } else if (victron.isInitialized()) {
@@ -220,20 +219,12 @@ void bootInitMeshAndAprs() {
   if (modeHasMeshcore(mode)) {
     sensors.begin();
     the_mesh.begin(&LittleFS);
-    // Canaux de groupe (nom/région, cf. config/Settings.h: MeshChannelSettings)
-    // depuis les settings — après begin() pour ne pas être écrasés par lui.
-    the_mesh.loadChannelsFromSettings(settings);
+    the_mesh.loadChannelsFromSettings(settings); // après begin() pour ne pas être écrasé par lui
     the_mesh.sendSelfAdvertisement(16000, false);
   }
 
   if (modeHasAprs(mode)) {
-    // Reconfigure la radio APRS depuis les vrais settings (radio.aprs.freq/
-    // bw/sf/cr/power) : bootInitRadios() l'a initialisée plus tôt avec les
-    // defines de compile-time (APRS_FREQ/...), settings pas encore chargés à
-    // cet instant (cf. main.cpp:setup(), cette étape-ci s'exécute après
-    // bootLoadConfig()). switchToLora() fait exactement ce re-begin() à
-    // partir des settings — même fonction que celle utilisée au retour d'un
-    // cycle FSK/CW/SSTV, donc garantie cohérente avec eux.
+    // Re-init radio depuis les settings réels : bootInitRadios() l'a démarrée avec les defines de compile-time.
     aprs_radio_hw.switchToLora();
 
     aprs_dispatcher.begin();
@@ -262,8 +253,6 @@ void bootCreateTasks() {
     xTaskCreate(taskEnergy,  "energy",  TASK_STACK_ENERGY,  nullptr, TASK_PRIO_ENERGY,  nullptr);
   }
 
-  // Toujours créées, quel que soit le mode : configuration/diagnostic
-  // (série) et watchdog matériel restent utiles en standalone.
   xTaskCreate(taskCli,      "cli", TASK_STACK_CLI,      nullptr, TASK_PRIO_CLI,      nullptr);
   xTaskCreate(taskWatchdog, "wdt", TASK_STACK_WATCHDOG, nullptr, TASK_PRIO_WATCHDOG, nullptr);
 

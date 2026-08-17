@@ -1,18 +1,7 @@
 #pragma once
 
-#include "Arduino.h"  // Stream
+#include "Arduino.h"
 #include <cstdio>
-
-// ============================================================================
-// FS.h — shim natif du système de fichiers générique arduino-pico (fs::FS /
-// File), dont LittleFS.h fournit l'implémentation concrète. Nécessaire pour
-// lib/MeshCore/src/helpers/{IdentityStore,ClientACL,RegionMap,CommonCLI} qui
-// manipulent un `FILESYSTEM*` (= fs::FS* sur la branche RP2040_PLATFORM,
-// définie pour l'env natif) sans connaître LittleFS directement.
-//
-// File s'appuie sur un vrai fichier POSIX (FILE*) — cf. native/compat/
-// littlefs_compat.cpp pour la résolution des chemins sous SIM_DATA_DIR.
-// ============================================================================
 
 class File : public Stream {
 public:

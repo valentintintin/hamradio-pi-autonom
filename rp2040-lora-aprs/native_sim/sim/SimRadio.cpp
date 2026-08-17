@@ -22,9 +22,6 @@ int SimRadio::recvRaw(uint8_t* bytes, int sz) {
   }
   memcpy(bytes, entry.data.data(), n);
 
-  // RSSI/SNR portés par la trame injectée (cf. "sim rx ... rssi <dBm> snr
-  // <dB>", SimCli.cpp) plutôt qu'une constante — permet de tester un paquet
-  // à la limite du seuil de décodage sans état global partagé.
   _last_rssi = entry.rssi;
   _last_snr = entry.snr;
 
@@ -45,9 +42,7 @@ int SimRadio::recvRaw(uint8_t* bytes, int sz) {
 }
 
 uint32_t SimRadio::getEstAirtimeFor(int len_bytes) {
-  // Approximation grossière (pas de vrai calcul LoRa SF/BW) — suffisante pour
-  // le scheduling CAD/dispatcher, qui n'a besoin que d'un ordre de grandeur.
-  return 50 + (uint32_t)len_bytes * 2;
+  return 50 + (uint32_t)len_bytes * 2;  // approximation grossière, pas de vrai calcul LoRa SF/BW
 }
 
 float SimRadio::packetScore(float snr, int /*packet_len*/) {

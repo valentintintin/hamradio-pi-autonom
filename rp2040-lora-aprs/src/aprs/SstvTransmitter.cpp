@@ -7,32 +7,18 @@ extern AprsDispatcher aprs_dispatcher;
 
 #define TAG "SSTV"
 
-// ============================================================================
-// Dimensions d'un mode SSTV (le mode RadioLib lui-même n'est plus nécessaire
-// ici, cf. commentaire sur SSTV_MODES ci-dessous).
-// ============================================================================
 struct SstvModeInfo {
   const char* name;
   uint16_t width;
   uint16_t height;
 };
 
-// ============================================================================
-// Table nom<->index (SettingsRegistry, ST_ENUM8, "sstv.mode")
-// ============================================================================
 #define SSTV_MODE_NAME_ENTRY(idx, name, mode, w, h) { name, idx },
 const EnumNameEntry SSTV_MODE_NAMES[SSTV_MODE_COUNT] = {
   SSTV_MODE_LIST(SSTV_MODE_NAME_ENTRY)
 };
 #undef SSTV_MODE_NAME_ENTRY
 
-// ============================================================================
-// Table index->dimensions (upload/affichage) — le mode RadioLib (SSTVMode_t)
-// lui-même n'est nécessaire qu'à l'émission réelle : IAprsCarrier (cf.
-// aprs/AprsCarrier.h) reçoit juste `modeIndex` et retrouve ce mode dans SA
-// propre implémentation (variant/AprsCarrierReal, seule à connaître RadioLib)
-// — ce fichier n'a donc plus besoin de RadioLib du tout.
-// ============================================================================
 #define SSTV_MODE_INFO_ENTRY(idx, name, mode, w, h) { name, w, h },
 static const SstvModeInfo SSTV_MODES[SSTV_MODE_COUNT] = {
   SSTV_MODE_LIST(SSTV_MODE_INFO_ENTRY)
@@ -48,17 +34,11 @@ static const SstvModeInfo& currentModeInfo(const Settings* settings) {
   return SSTV_MODES[currentModeIndex(settings)];
 }
 
-// ============================================================================
-// Taille attendue pour le mode courant
-// ============================================================================
 uint32_t SstvTransmitter::expectedImageBytes() const {
   const SstvModeInfo& info = currentModeInfo(_settings);
   return (uint32_t)info.width * (uint32_t)info.height * 3;
 }
 
-// ============================================================================
-// Upload (thread CLI, série uniquement)
-// ============================================================================
 bool SstvTransmitter::beginImageUpload(uint32_t announced_bytes, Print* out) {
   uint32_t expected = expectedImageBytes();
   if (announced_bytes != expected) {
@@ -125,13 +105,10 @@ void SstvTransmitter::cancelUpload() {
   LittleFS.remove(SSTV_IMAGE_PATH);
 }
 
-// ============================================================================
-// Requête/exécution transmission
-// ============================================================================
 bool SstvTransmitter::requestTransmit(Print* out) {
   if (!_upload_complete) {
     if (out) {
-      out->println("Aucune image complète en attente ('image <n>' d'abord)");
+      out->println("Aucune image en attente");
     }
     return false;
   }
@@ -150,12 +127,6 @@ bool SstvTransmitter::consumeTransmitRequest() {
   return true;
 }
 
-// ============================================================================
-// Séquence CW + SSTV + CW (appelée uniquement par taskSstv) — déléguée à
-// IAprsCarrier (cf. aprs/AprsCarrier.h) : sa vraie émission RadioLib
-// (variant/AprsCarrierReal) ou sa version journalisée sans RF
-// (variant_native/AprsCarrierSim) ; ce fichier ne connaît que l'interface.
-// ============================================================================
 void SstvTransmitter::transmit() {
   const SstvModeInfo& info = currentModeInfo(_settings);
   LOG_I(TAG, "Début transmission (mode=%s, %dx%d)", info.name, info.width, info.height);

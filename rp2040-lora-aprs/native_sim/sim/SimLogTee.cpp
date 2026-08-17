@@ -4,8 +4,6 @@
 #include <cstdio>
 #include <string>
 
-// Implémente nativeLogTee() déclarée par core/Log.h sous NATIVE_BUILD —
-// duplique chaque ligne de log dans SimWorld::log_ring pour le dashboard web.
 void nativeLogTee(const char* prefix, const char* uptime, const char* tag, const char* fmt, ...) {
   char msg[256];
   va_list args;

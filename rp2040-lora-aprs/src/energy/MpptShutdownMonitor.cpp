@@ -4,9 +4,7 @@
 
 #define TAG "ENERGY"
 
-// attachInterrupt exige un pointeur de fonction libre (pas de méthode liée à
-// une instance) ; un seul MpptShutdownMonitor existe dans ce firmware (une
-// seule carte MPPT), donc un flag global suffit.
+// attachInterrupt exige une fonction libre ; une seule carte MPPT dans ce firmware, donc un flag global suffit.
 static volatile bool g_mppt_isr_flag = false;
 
 void MpptShutdownMonitor::onShutdownAlert() {
@@ -20,7 +18,7 @@ void MpptShutdownMonitor::begin() {
 
 void MpptShutdownMonitor::update() {
   bool isr_fired = g_mppt_isr_flag;
-  g_mppt_isr_flag = false; // consommé, prêt pour la prochaine interruption
+  g_mppt_isr_flag = false;
 
   bool alert = false;
   bool have_status = _mppt->isInitialized() && _mppt->isAlertEnabled(alert);
@@ -32,6 +30,6 @@ void MpptShutdownMonitor::update() {
     _aprs->sendStatus("ALERTE MPPT: extinction imminente");
     _alert_sent = true;
   } else if (!isr_fired && !i2c_says_alert) {
-    _alert_sent = false; // condition retombée : réarme pour la prochaine fois
+    _alert_sent = false;
   }
 }

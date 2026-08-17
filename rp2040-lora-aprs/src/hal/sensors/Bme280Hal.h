@@ -4,11 +4,6 @@
 #include "hal/Telemetry.h"
 #include <Adafruit_BME280.h>
 
-// ============================================================================
-// BME280 HAL — température, humidité, pression
-// Forced mode, low power
-// ============================================================================
-
 class Bme280Hal {
 public:
   Bme280Hal(I2CBus& bus, uint8_t addr = 0x76)

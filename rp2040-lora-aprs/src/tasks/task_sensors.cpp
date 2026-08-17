@@ -1,8 +1,3 @@
-// ============================================================================
-// Task capteurs — polling périodique INA3221 + MPPT + BME280 + Victron
-//                 + enregistrement historique EEPROM
-// ============================================================================
-
 #include "tasks.h"
 #include "core/Log.h"
 #include "config/Settings.h"
@@ -19,7 +14,7 @@ extern Settings settings;
 extern Ina3221Hal ina3221;
 extern Bme280Hal bme280;
 extern TelemetryHistory telemetry_history;
-extern ChargeControllerHal* active_charger; // MPPT ou Victron, un seul à la fois (cf. main.cpp)
+extern ChargeControllerHal* active_charger;
 
 #define TAG "SENSORS"
 #define SENSORS_BOOT_DELAY_MS (10 * 1000)
@@ -38,7 +33,6 @@ void taskSensors(void* params) {
       LOG_W(TAG, "Erreur lecture INA3221");
     }
 
-    // Un seul chargeur solaire à la fois (MPPT ou Victron, cf. main.cpp).
     if (active_charger && !active_charger->query(telemetry)) {
       LOG_W(TAG, "Erreur lecture chargeur solaire");
     }
@@ -50,7 +44,6 @@ void taskSensors(void* params) {
     telemetry.uptime_s = millis() / 1000;
     telemetry.last_update_ms = millis();
 
-    // Enregistrement EEPROM périodique
     history_timer.setInterval(settings.system.telemetry_log_interval_ms, false);
     if (telemetry_history.isInitialized() && history_timer.hasExpired()) {
       telemetry_history.record(telemetry);

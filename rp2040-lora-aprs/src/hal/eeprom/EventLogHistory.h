@@ -7,35 +7,16 @@
 
 #include "target.h"
 
-// ============================================================================
-// EventLogHistory — Ring buffer sur EEPROM M24M01, dédié aux événements
-// critiques (reboot watchdog, alerte MPPT, coupure/reprise basse-tension...),
-// journalisés explicitement par leurs sites d'origine (cf. task_watchdog.cpp,
-// energy/MpptShutdownMonitor.cpp, energy/LowVoltageCutoffController.cpp) —
-// pour une analyse post-mortem après un reboot inattendu.
-//
-// Record code+data plutôt que texte libre : compact (26 bytes, ~629 records
-// dans les 16KB réservés), pas de coût de formatage, et directement
-// exploitable par un outil côté PC sans avoir à parser une chaîne. Distinct
-// de TelemetryHistory (télémétrie périodique, valeurs physiques).
-//
-// Vit dans les 16KB réservés en fin d'EEPROM par TelemetryHistory (cf.
-// TELEMETRY_HISTORY_RESERVED_TAIL_BYTES) — les deux constantes de taille
-// doivent rester cohérentes entre les deux fichiers.
-//
-// Plan mémoire EEPROM (128KB, cf. M24M01_SIZE_BYTES), vérifié non chevauchant :
-//   [0                                , 1024)              Settings (sizeof(Settings) = 304, marge 720)
-//   [1024                             , 114688)             TelemetryHistory (~5411 records × 21 bytes)
-//   [114688 = EVENT_LOG_ADDR          , 131072)              EventLogHistory (~629 records × 26 bytes)
-// ============================================================================
+// Plan mémoire EEPROM (128KB) : [0,1024) Settings · [1024,114688) TelemetryHistory
+// · [114688=EVENT_LOG_ADDR, 131072) EventLogHistory. Les tailles réservées
+// doivent rester cohérentes avec TELEMETRY_HISTORY_RESERVED_TAIL_BYTES.
 
-#define EVENT_LOG_MAGIC            0x45564C33  // "EVL3" (v3 : 3 champs data supplémentaires)
+#define EVENT_LOG_MAGIC            0x45564C33  // "EVL3"
 #define EVENT_LOG_VERSION          3
 #define EVENT_LOG_RESERVED_BYTES   (16 * 1024)
 #define EVENT_LOG_ADDR             (M24M01_SIZE_BYTES - EVENT_LOG_RESERVED_BYTES)
 
-// Codes d'événement — ajouter en fin de liste (ne pas renuméroter, les
-// records déjà en EEPROM référencent ces valeurs).
+// Ne pas renuméroter : les records déjà en EEPROM référencent ces valeurs.
 enum EventCode : uint16_t {
   EVENT_NONE = 0,
   EVENT_WATCHDOG_REBOOT,           // data0 = nb de reboots watchdog consécutifs
@@ -60,9 +41,6 @@ inline const char* eventCodeName(uint16_t code) {
   }
 }
 
-// Record compact (26 bytes). data2/data3/data4 : réservées ("au cas où"),
-// inutilisées par les codes actuels (cf. EventCode) — libres pour de futurs
-// événements sans avoir à changer le format une nouvelle fois.
 struct __attribute__((packed)) EventLogRecord {
   uint32_t timestamp;
   uint16_t code;   // EventCode
@@ -73,7 +51,6 @@ struct __attribute__((packed)) EventLogRecord {
   int32_t data4;
 };
 
-// Header du ring buffer (12 bytes)
 struct __attribute__((packed)) EventLogHeader {
   uint32_t magic;
   uint16_t version;
@@ -124,14 +101,9 @@ public:
     return true;
   }
 
-  // Active/désactive la journalisation (cf. system.event_log.enabled) — ne
-  // touche pas à l'EEPROM elle-même, juste un court-circuit de log().
   void setEnabled(bool enabled) { _enabled = enabled; }
   bool isEnabled() const { return _enabled; }
 
-  // Enregistrer un événement : code + jusqu'à cinq valeurs numériques
-  // annexes (cf. EventCode ci-dessus pour la signification de data0/data1 ;
-  // data2-4 réservées pour de futurs codes).
   bool log(uint16_t code, int32_t data0 = 0, int32_t data1 = 0,
            int32_t data2 = 0, int32_t data3 = 0, int32_t data4 = 0) {
     if (!_initialized || !_enabled) {
@@ -160,7 +132,7 @@ public:
     return saveHeader();
   }
 
-  // Lire un record par index (0 = plus ancien)
+  // index 0 = record le plus ancien
   bool readRecord(uint16_t index, EventLogRecord& rec) const {
     if (!_initialized || index >= _count) {
       return false;
@@ -170,8 +142,6 @@ public:
     return _eeprom->read(recordAddr(actual), (uint8_t*)&rec, sizeof(rec));
   }
 
-  // Dump binaire brut (EepromDumpHeader + records packed), cf.
-  // TelemetryHistory::dumpBinary — CLI "eventlog dump".
   void dumpBinary(Print& out, uint16_t last_n = 0) const {
     uint16_t n = (last_n > 0 && last_n < _count) ? last_n : _count;
     uint16_t start = _count - n;

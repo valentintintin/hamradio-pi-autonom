@@ -6,31 +6,14 @@
 #include "config/SettingsRegistry.h"  // EnumNameEntry
 #include "config/Settings.h"
 
-// ============================================================================
-// SstvTransmitter — upload d'image (streaming LittleFS) + émission CW+SSTV
-//
-// Un PC uploade une image en binaire par le CLI série ("image <n>", cf.
-// tasks/task_cli.cpp), écrite en streaming sur LittleFS (aucun mode SSTV ne
-// tient en RAM libre du RP2040). "image send" (local OU distant APRS/mesh,
-// cf. cli/CommandHandler.cpp) ne fait qu'armer une demande via
-// requestTransmit() et rend la main immédiatement : la séquence bloquante
-// (pause dispatcher APRS, CW indicatif, SSTV, CW indicatif, retour LoRa,
-// 1-2 minutes selon le mode) tourne exclusivement dans tasks/task_sstv.cpp,
-// hors du mutex partagé CommandHandler/AprsEngine (cf. plan).
-//
-// Table des modes SSTV exposés : seule celles qui tiennent dans la partition
-// LittleFS actuelle (board_build.filesystem_size = 0.5m, cf. platformio.ini)
-// en RGB888 brut — Pasokon (640x496, ~930 Ko) est exclu.
-// ============================================================================
+// La séquence de transmission (pause dispatcher, CW, SSTV, CW, ~1-2 min)
+// tourne exclusivement dans tasks/task_sstv.cpp, jamais dans le mutex
+// partagé CommandHandler/AprsEngine, pour ne pas bloquer CLI/APRS.
 
 #define SSTV_IMAGE_PATH "/sstv_image.bin"
 
-// index, nom CLI, mode RadioLib (variable extern de RadioLib/protocols/SSTV/SSTV.h),
-// largeur, hauteur — source unique, réutilisée pour construire la table
-// noms<->index consommée par SettingsRegistry ("sstv.mode"), la table
-// index->dimensions utilisée par SstvTransmitter.cpp, et la table
-// index->SSTVMode_t* utilisée par variant/AprsCarrierReal (seule à avoir
-// besoin du mode RadioLib lui-même, cf. aprs/AprsCarrier.h).
+// Pasokon (640x496, ~930 Ko) exclu : ne tient pas dans la partition LittleFS
+// actuelle (board_build.filesystem_size = 0.5m).
 #define SSTV_MODE_LIST(X) \
   X(0, "robot36",   Robot36,   320, 240) \
   X(1, "robot72",   Robot72,   320, 240) \
@@ -43,36 +26,27 @@
 
 #define SSTV_MODE_COUNT 8
 
-// Table nom<->index consommée par SettingsRegistry (ST_ENUM8, "sstv.mode")
 extern const EnumNameEntry SSTV_MODE_NAMES[SSTV_MODE_COUNT];
 
 class SstvTransmitter {
 public:
   void init(Settings& settings) { _settings = &settings; }
 
-  // Taille attendue (octets RGB888, sans en-tête) pour le mode actuellement
-  // configuré (settings.cw_sstv.sstv_mode).
   uint32_t expectedImageBytes() const;
 
-  // --- Upload (appelé depuis tasks/task_cli.cpp, thread CLI, série uniquement) ---
   bool beginImageUpload(uint32_t announced_bytes, Print* out);
   bool writeImageChunk(const uint8_t* data, size_t len);
   bool isUploadComplete() const { return _upload_complete; }
   uint32_t uploadWrittenBytes() const { return _upload_written_bytes; }
   void cancelUpload();
 
-  // --- Requête/exécution transmission ---------------------------------------
-  // Appelée depuis CommandHandler ("image send", local ET distant APRS/mesh) :
-  // arme un flag et rend la main immédiatement, ne bloque JAMAIS.
+  // Arme un flag et rend la main immédiatement, ne bloque jamais.
   bool requestTransmit(Print* out);
 
-  // Appelée uniquement par taskSstv : consomme (et efface) le flag armé par
-  // requestTransmit().
+  // Consomme (et efface) le flag armé par requestTransmit() ; appelée uniquement par taskSstv.
   bool consumeTransmitRequest();
 
-  // Séquence bloquante CW+SSTV+CW (1-2 minutes selon le mode) — appelée
-  // uniquement par taskSstv, jamais par CommandHandler (cf. commentaire de
-  // fichier).
+  // Séquence bloquante CW+SSTV+CW (~1-2 min) ; appelée uniquement par taskSstv.
   void transmit();
 
 private:

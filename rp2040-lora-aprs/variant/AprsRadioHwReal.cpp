@@ -3,9 +3,9 @@
 #include "core/Log.h"
 #include <Arduino.h>
 #include <RadioLib.h>
-#include <FineOffsetWH65B.h>  // WH65B_PAYLOAD_LEN
+#include <FineOffsetWH65B.h>
 #include <task.h>
-#include <target.h>  // aprs_radio_driver, pour calcMaxPacketMillis()/setCADEnabled()
+#include <target.h>
 
 extern Settings settings;
 
@@ -18,12 +18,9 @@ extern Settings settings;
 #define WH65B_SYNC_WORD_0 0xAA
 #define WH65B_SYNC_WORD_1 0x2D
 
-// RadioLib exige un pointeur de fonction C (pas de méthode/lambda capturante)
-// pour setPacketReceivedAction() — un seul SX1262 APRS existe jamais qu'en un
-// seul exemplaire (cf. variant/target.cpp), donc un handle fichier-statique
-// est aussi correct qu'un membre. Réveille directement la tâche météo
-// (task_weather.cpp) bloquée dans receiveWh65bFrame() ci-dessous, au lieu de
-// poser un flag relu par polling.
+// RadioLib exige un pointeur de fonction C brut pour setPacketReceivedAction()
+// (pas de méthode/lambda capturante) : on réveille directement la tâche météo
+// bloquée dans receiveWh65bFrame() via ce handle statique.
 static TaskHandle_t fsk_waiting_task = nullptr;
 static void onFskRxDone() {
   if (fsk_waiting_task) {
@@ -105,12 +102,9 @@ bool AprsRadioHwReal::switchToLora() {
   _hw.setPreambleMillis(pm.preambleMillis);
   _hw.setMaxPayloadMillis(pm.payloadMillis);
 
-  // CAD matériel optionnel (radio.aprs.cad, off par défaut — même convention
-  // que MeshCore côté mesh, "set cad on") : en plus du seuil RSSI, fiabilise
-  // le carrier-sense avant TX. NotifyingRadioLibWrapper::begin() ne rappelle
-  // pas RadioLibWrapper::begin() (état RX/TX réimplémenté, cf. son en-tête),
-  // qui remettrait sinon _cad_enabled à false à chaque begin() — ce
-  // setCADEnabled() explicite est donc la seule source de vérité.
+  // NotifyingRadioLibWrapper::begin() ne rappelle pas RadioLibWrapper::begin()
+  // (qui remettrait sinon _cad_enabled à false) : cet appel explicite est donc
+  // la seule source de vérité pour l'état CAD.
   aprs_radio_driver.setCADEnabled(settings.radio.aprs_cad_enabled);
 
   LOG_D(TAG, "Retour LoRa OK");
@@ -118,9 +112,8 @@ bool AprsRadioHwReal::switchToLora() {
 }
 
 bool AprsRadioHwReal::receiveWh65bFrame(uint32_t timeoutMs, uint8_t* outBuf, float* outRssi) {
-  // Renseigné avant startReceive() : l'IRQ ne peut matériellement pas se
-  // déclencher avant que le module soit effectivement mis en écoute, donc pas
-  // de course possible avec onFskRxDone() ci-dessus.
+  // Renseigné avant startReceive() : l'IRQ ne peut pas se déclencher avant que
+  // le module soit effectivement mis en écoute, donc pas de race possible.
   fsk_waiting_task = xTaskGetCurrentTaskHandle();
 
   int16_t state = _hw.startReceive();
@@ -133,7 +126,7 @@ bool AprsRadioHwReal::receiveWh65bFrame(uint32_t timeoutMs, uint8_t* outBuf, flo
   uint32_t got = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(timeoutMs));
   fsk_waiting_task = nullptr;
   if (!got) {
-    return false;  // timeout, aucune trame WH65B
+    return false;
   }
 
   state = _hw.readData(outBuf, WH65B_PAYLOAD_LEN);

@@ -1,4 +1,4 @@
-#include "Tca9555Hal.h"
+#include "hal/gpio/Tca9555Hal.h"
 #include <Arduino.h>
 
 bool Tca9555Hal::isConnected() {
@@ -64,8 +64,8 @@ bool Tca9555Hal::pulsePin(uint8_t pin, bool level, uint16_t ms) {
     return false;
   }
 
-  // read1() lit le registre d'entrée, qui reflète l'état électrique réel de
-  // la broche même en sortie — c'est l'état "avant impulsion" à restaurer.
+  // read1() lit le registre d'entrée, qui reflète l'état électrique réel
+  // même en sortie — donne l'état "avant impulsion" à restaurer.
   bool rest_level = (_tca.read1(pin) == HIGH);
   bool ok = (_tca.lastError() == TCA9555_OK);
   if (ok) {

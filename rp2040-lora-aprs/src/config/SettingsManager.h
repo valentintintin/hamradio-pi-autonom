@@ -5,29 +5,17 @@
 #include "core/Log.h"
 #include "hal/eeprom/M24M01Hal.h"
 
-// ============================================================================
-// SettingsManager — charge/sauvegarde de la config
-//
-// Priorité : LittleFS → EEPROM → défauts
-// Format : struct binaire brute (pas de JSON, pas d'allocations) — sauf en
-// natif, où le fichier LittleFS est en JSON lisible/éditable ; cf.
-// SettingsCodec.h pour les deux implémentations (une par environnement,
-// sélectionnées par platformio.ini — la copie EEPROM suit le même principe
-// côté hal/eeprom/M24M01Hal.cpp / native_sim/sim/M24M01HalSim.cpp).
-// ============================================================================
-
-#define SETTINGS_EEPROM_ADDR 0  // début EEPROM pour la config
+// Priorité de chargement : LittleFS → EEPROM → défauts.
+#define SETTINGS_EEPROM_ADDR 0
 
 class SettingsManager {
 public:
   SettingsManager(M24M01Hal* eeprom = nullptr)
     : _eeprom(eeprom) {}
 
-  // Charger la config (LittleFS > EEPROM > défauts)
   Settings load() {
     Settings s{};
 
-    // Essayer LittleFS
     if (settingsLoadFromLittleFS(s)) {
       LOG_I("CONFIG", "Chargée depuis LittleFS");
       if (_eeprom && _eeprom->isInitialized()) {
@@ -36,21 +24,18 @@ public:
       return s;
     }
 
-    // Essayer EEPROM
     if (_eeprom && _eeprom->isInitialized() && loadFromEeprom(s)) {
       LOG_I("CONFIG", "Chargée depuis EEPROM (copie vers LittleFS)");
       settingsSaveToLittleFS(s);
       return s;
     }
 
-    // Défauts
     LOG_W("CONFIG", "Aucune config trouvée, défauts chargés");
     s = getDefaultSettings();
     save(s);
     return s;
   }
 
-  // Sauvegarder sur les deux supports
   bool save(const Settings& s) {
     bool ok = settingsSaveToLittleFS(s);
     if (_eeprom && _eeprom->isInitialized()) {
@@ -74,12 +59,8 @@ private:
     return isValid(s);
   }
 
-  // N'écrit que si le contenu diffère de la copie EEPROM actuelle — évite
-  // l'usure de l'EEPROM (écriture à chaque boot alors que rien n'a changé).
-  // Comparaison directe des octets bruts plutôt qu'un hash : on doit de
-  // toute façon relire sizeof(Settings) depuis l'EEPROM pour vérifier
-  // magic/version (cf. loadFromEeprom/isValid), donc même coût I/O qu'un
-  // hash, sans risque de collision.
+  // Comparaison octet à octet plutôt qu'un hash : la lecture de vérification magic/version est déjà nécessaire,
+  // donc même coût I/O sans risque de collision. Évite l'usure EEPROM si rien n'a changé.
   bool saveToEeprom(const Settings& s) {
     Settings current{};
     if (loadFromEeprom(current) && memcmp(&current, &s, sizeof(Settings)) == 0) {

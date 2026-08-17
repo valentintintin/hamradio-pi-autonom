@@ -4,25 +4,14 @@
 #include "../aprs/AprsDispatcher.h"
 #include "task_heartbeat.h"
 
-// ============================================================================
-// Task APRS — appelle le dispatcher APRS, puis dort jusqu'au prochain
-// événement radio réel (RX ou TX terminé, réveillé depuis l'IRQ DIO1 — cf.
-// core/RadioActivityNotify.h) ou jusqu'à ce qu'une action planifiée devienne
-// due (retry CAD, paquet en attente — cf. AprsDispatcher::msUntilNextAction()),
-// au lieu d'un polling fixe en vTaskDelay(1).
-// ============================================================================
-
 extern AprsDispatcher aprs_dispatcher;
 
 #define TAG "APRS-TSK"
 
-// Plafond de sécurité — juste de quoi garantir un heartbeat() de temps en
-// temps même quand msUntilNextAction() ne retourne rien de proche (queue
-// vide, pas de paquet radio) ; nettement en dessous du seuil "tâche bloquée"
-// du watchdog (HB_RADIO_STALE_MS = 90s, cf. tasks/task_watchdog.cpp) pour
-// laisser de la marge. Sans ce plafond (silence radio prolongé, ce qui est la
-// norme et non l'exception), la tâche dormirait indéfiniment et le watchdog
-// finirait par la croire bloquée à tort.
+// Plafond de sommeil : garantit un heartbeat() régulier même sans activité
+// radio, bien en dessous du seuil "bloquée" du watchdog (90s, cf.
+// task_watchdog.cpp) — sinon un silence radio prolongé (normal en LoRa)
+// ferait croire à tort la tâche figée.
 #define APRS_TASK_MAX_WAIT_MS 60000
 
 void taskAprsLoop(void* params) {

@@ -4,11 +4,6 @@
 #include <FreeRTOS.h>
 #include <semphr.h>
 
-// ============================================================================
-// I2CBus — wrapper thread-safe autour de TwoWire
-// Mutex FreeRTOS pour sérialiser les accès I2C en multi-tâche
-// ============================================================================
-
 class I2CBus {
 public:
   I2CBus(TwoWire& wire, int sda, int scl)

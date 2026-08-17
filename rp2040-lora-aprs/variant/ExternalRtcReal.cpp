@@ -1,21 +1,37 @@
 #include "ExternalRtcReal.h"
-#include <RTClib.h>  // DateTime (adafruit/RTClib) — conversion epoch <-> tm uniquement
+#include <RTClib.h>
 #include <time.h>
 
 bool ExternalRtcReal::begin() {
+  if (!_bus->lock()) {
+    return false;
+  }
   _present = _rtc.begin();
+  _bus->unlock();
   return _present;
 }
 
 bool ExternalRtcReal::readTime(uint32_t* outUnixTime) {
-  if (!_present || _rtc.getVLF()) {
-    // VLF levé = alimentation coupée assez longtemps pour perdre l'heure :
-    // ne pas faire confiance à cette lecture pour synchroniser autre chose.
+  if (!_present) {
+    return false;
+  }
+  if (!_bus->lock()) {
     return false;
   }
 
+  bool vlf = _rtc.getVLF();
   tm t{};
-  _rtc.getTime(&t);
+  if (!vlf) {
+    _rtc.getTime(&t);
+  }
+  _bus->unlock();
+
+  if (vlf) {
+    // VLF levé = coupure d'alimentation assez longue pour perdre l'heure :
+    // lecture non fiable, à ignorer.
+    return false;
+  }
+
   DateTime dt(t.tm_year + 1900, t.tm_mon + 1, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec);
   *outUnixTime = dt.unixtime();
   return true;
@@ -35,7 +51,12 @@ bool ExternalRtcReal::writeTime(uint32_t unixTime) {
   t.tm_min = dt.minute();
   t.tm_sec = dt.second();
   t.tm_wday = dt.dayOfTheWeek();
+
+  if (!_bus->lock()) {
+    return false;
+  }
   _rtc.setTime(&t);
   _rtc.clearVLF();
+  _bus->unlock();
   return true;
 }

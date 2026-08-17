@@ -1,30 +1,19 @@
 #pragma once
 
-// ============================================================================
-// AprsEventHandler — relie AprsEngine à la télémétrie et au CLI
-//
-// - fillTelemetryData / fillWeatherData : alimentent les beacons périodiques
-//   avec les données courantes (INA3221, MPPT, BME280, WH65B, Victron).
-// - fillStatusText : résume l'état courant de la station (batterie, MPPT...)
-//   pour un statut APRS qui reflète l'état réel plutôt qu'un texte figé.
-// - onAprsMessageReceived : un message APRS adressé à nous est exécuté comme
-//   une commande CLI (CommandHandler) et la réponse est renvoyée en message.
-//   Contrairement au port série, une trame APRS RF n'authentifie pas son
-//   callsign source (trivialement usurpable) : les commandes qui modifient
-//   l'état (set/save/reboot/defaults) exigent donc le mot de passe admin en
-//   premier mot du message.
-// ============================================================================
+// Une trame APRS RF n'authentifie pas son callsign source (trivialement
+// usurpable) : les commandes qui modifient l'état exigent le mot de passe
+// admin en premier mot du message (cf. onAprsMessageReceived).
 
 #include "AprsEngine.h"
 #include "hal/Telemetry.h"
 #include "cli/CommandHandler.h"
 #include "config/Settings.h"
-#include "hal/relay/RelayHal.h"
+#include "hal/relay/Relay.h"
 
 class AprsEventHandler : public AprsEventCallback {
 public:
   AprsEventHandler(AprsEngine& engine, CommandHandler& commandHandler,
-                   TelemetryData& telemetry, Settings& settings, RelayHal& relay);
+                   TelemetryData& telemetry, Settings& settings, Relay* relays);
 
   void onAprsMessageReceived(const char* from, const char* message) override;
   void fillTelemetryData(aprs::Telemetry& telemetry) override;
@@ -36,5 +25,5 @@ private:
   CommandHandler* _cmd;
   TelemetryData* _telemetry;
   Settings* _settings;
-  RelayHal* _relay;
+  Relay* _relays;
 };

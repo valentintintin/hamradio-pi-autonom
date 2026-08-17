@@ -14,11 +14,11 @@ MeshcoreRepeater::MeshcoreRepeater(mesh::MainBoard& board, mesh::Radio& radio,
 
 void MeshcoreRepeater::handleCommand(const uint32_t sender_timestamp, char* command, char* reply) {
   while (*command == ' ') {
-    command++; // skip leading spaces
+    command++;
   }
 
   if (strcmp(command, "my ") == 0) {
-    command_handler.execute(command + 3, reply, 160, sender_timestamp == 0);
+    command_handler.execute(command + 3, reply, CLI_RADIO_REPLY_MAX_LEN, sender_timestamp == 0);
     return;
   }
 
@@ -28,9 +28,8 @@ void MeshcoreRepeater::handleCommand(const uint32_t sender_timestamp, char* comm
 int MeshcoreRepeater::searchChannelsByHash(const uint8_t* hash, mesh::GroupChannel dest[], int max_matches) {
   int n = 0;
   for (int i = 0; i < MAX_GROUP_CHANNELS && n < max_matches; i++) {
-    // Slot inutilisé (cf. loadChannelsFromSettings) : name vide == jamais
-    // candidat, même si hash[0] vaut 0 par coïncidence (PATH_HASH_SIZE == 1,
-    // donc 1 chance sur 256 qu'un hash entrant réel tombe sur 0).
+    // name vide = slot inutilisé, à ignorer même si hash[0]==0 par coïncidence
+    // (PATH_HASH_SIZE == 1, donc 1 chance sur 256 de collision).
     if (channels[i].channel_details.name[0] == '\0') {
       continue;
     }
@@ -45,7 +44,7 @@ void MeshcoreRepeater::loadChannelsFromSettings(const Settings& settings) {
   for (int i = 0; i < MAX_GROUP_CHANNELS; i++) {
     const MeshChannelSettings& cfg = settings.mesh_channels[i];
     if (cfg.name[0] == '\0') {
-      channels[i] = MeshcoreChannelRegion{};  // slot vide : ignoré par searchChannelsByHash
+      channels[i] = MeshcoreChannelRegion{};
       continue;
     }
     addChannel(i, cfg.name, cfg.region);
@@ -57,12 +56,12 @@ void MeshcoreRepeater::onGroupDataRecv(mesh::Packet *packet, uint8_t type,
                                                  size_t len) {
   const uint8_t txt_type = data[4];
   if (type == PAYLOAD_TYPE_GRP_TXT && len > 5 && (txt_type >> 2) == 0) {
-    // 0 = plain text msg
     uint32_t timestamp;
     memcpy(&timestamp, data, 4);
 
-    // len can be > original length, but 'text' will be padded with zeroes
-    data[len] = 0; // need to make a C string again, with null terminator
+    // len peut dépasser la longueur d'origine (padding zéro) : on retermine
+    // la chaîne nous-mêmes.
+    data[len] = 0;
     const auto text = (const char *)&data[5];
 
     LOG_D("MESH", "Received TXT '%s' for channel %d", text, channel);

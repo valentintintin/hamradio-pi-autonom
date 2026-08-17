@@ -4,12 +4,7 @@
 #include "ChargeControllerHal.h"
 #include <VEDirect.h>
 
-// ============================================================================
-// Victron VE.Direct HAL — lecture batterie via protocole texte VE.Direct
-// Connecté sur un UART (Serial1/Serial2) à 19200 baud
-// https://www.victronenergy.com/upload/documents/VE.Direct-Protocol-3.34.pdf
-// ============================================================================
-
+// Protocole texte VE.Direct sur UART à 19200 baud (fixe, imposé par Victron).
 class VictronHal : public ChargeControllerHal {
 public:
   VictronHal(HardwareSerial& serial) : _ved(serial), _initialized(false) {}
@@ -30,7 +25,7 @@ public:
       return false;
     }
 
-    // Tension batterie (mV → mV, la lib retourne directement en mV)
+    // VE_VOLTAGE est déjà en mV (pas besoin de conversion).
     int32_t v = _ved.read(VE_VOLTAGE);
     if (v > 0) {
       telemetry.battery_mppt.voltage_mv = (float)v;
@@ -48,7 +43,7 @@ public:
     i = _ved.read(VE_STATE_OF_OPERATION);
     telemetry.mppt_status = i;
 
-    // State of charge (0.1% → %)
+    // VE_SOC est en dixièmes de %.
     int32_t soc = _ved.read(VE_SOC);
     if (soc >= 0) {
       telemetry.victron_soc = soc / 10.0f;

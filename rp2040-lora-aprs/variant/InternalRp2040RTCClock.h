@@ -5,22 +5,15 @@
 #include <hardware/rtc.h>
 #include <pico/util/datetime.h>
 
-// ============================================================================
-// Horloge RTC interne du RP2040 (hardware/rtc.h) — utilisée en secours par
-// AutoDiscoverRTCClock quand aucune puce RTC I2C n'est détectée.
-//
-// Ne survit pas à un reboot (le RP2040 n'a pas de domaine d'alimentation
-// séparé type "RTC battery-backed" — tout l'état est perdu à chaque reset,
-// watchdog compris), donc pas mieux qu'un compteur logiciel de ce point de
-// vue. L'intérêt reste réel : compteur matériel dédié (pas de dérive liée à
-// la charge FreeRTOS sur millis()), et c'est une ressource déjà présente sur
-// la puce, sans coût supplémentaire.
-// ============================================================================
+// Le RP2040 n'a pas de domaine d'alimentation RTC séparé battery-backed :
+// cette horloge ne survit pas à un reset/watchdog, tout comme un compteur
+// logiciel — mais reste un compteur matériel dédié, sans dérive liée à la
+// charge FreeRTOS sur millis().
 class InternalRp2040RTCClock : public mesh::RTCClock {
 public:
   InternalRp2040RTCClock() {
     rtc_init();
-    setCurrentTime(1715770351); // 15 mai 2024, 20:50 UTC — écrasé dès qu'une heure valide est connue
+    setCurrentTime(1715770351); // 15 mai 2024 20:50 UTC, écrasée dès qu'une heure valide est connue
   }
 
   uint32_t getCurrentTime() override {
@@ -44,5 +37,5 @@ public:
     rtc_set_datetime(&dt);
   }
 
-  void tick() override {} // horloge matérielle, pas de mise à jour logicielle nécessaire
+  void tick() override {}
 };

@@ -13,10 +13,7 @@ bool Tca9555GpioHal::read(bool& level) {
 }
 
 bool Tca9555GpioHal::pulse(bool level, uint16_t ms) {
-  // Redéfinie (plutôt que d'utiliser l'implémentation par défaut set/delay/set
-  // de GpioHal) car le verrou I2C doit couvrir toute la séquence lue-modifiée-
-  // écrite-attendue-réécrite : sinon une autre broche du même port, ou une
-  // impulsion concurrente sur une autre broche, pourrait s'intercaler et
-  // raccourcir l'impulsion en cours sous le temps de bascule minimal.
+  // Redéfinie car le verrou I2C doit couvrir toute la séquence : sinon une
+  // transaction concurrente sur le même port pourrait raccourcir l'impulsion.
   return _expander->pulsePin(_pin, level, ms);
 }

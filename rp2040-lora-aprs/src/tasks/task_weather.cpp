@@ -1,26 +1,3 @@
-// ============================================================================
-// Task météo — switch FSK SX1262 pour réception WH65B
-//
-// Périodiquement (settings.weather.wh65b_interval) :
-//   1. Pause le dispatcher APRS
-//   2. SX1262 433 → FSK (433.92MHz, 8.21kbps) — cf aprs/AprsRadioMode.h
-//   3. Écoute max settings.weather.wh65b_timeout → decode WH65B
-//   4. Restaure LoRa APRS → resume
-//
-// Le détail réception/relais (IRQ RadioLib réel vs file SimWorld::fsk_rx_queue
-// en environnement `native`) vit entièrement dans IAprsRadioHw (cf.
-// aprs/AprsRadioHw.h) — ce fichier ne connaît que l'interface, jamais RadioLib
-// ni SimWorld, donc aucun #ifdef NATIVE_BUILD ici.
-// ============================================================================
-
-/*
-Normal : 24015A027B372707000001F401D4C0230E00000000000000000000
-Froid hiver : 24015A015C500802000000000007D07E8B00000000000000000000
-Canicule+vent+pluie : 24015A031019C125001408980E7EF0632400000000000000000000
-Batterie faible : 24015A0A263C2707000001F401D4C09C3F00000000000000000000
-Capteurs invalides : 24015A17FF37FF070000FFFFFFFFFFF7C400000000000000000000
-*/
-
 #include "tasks.h"
 #include "target.h"
 #include "core/Log.h"
@@ -39,12 +16,8 @@ extern Settings settings;
 
 #define WEATHER_BOOT_DELAY_MS (120 * 1000)
 
-// ============================================================================
-// Écoute + décodage — raw_out (optionnel) reçoit une copie des
-// WH65B_PAYLOAD_LEN octets bruts reçus, pour le relais FSK (cf. taskWeather()
-// ci-dessous) — non rempli si la fonction retourne false avant d'avoir lu un
-// paquet.
-// ============================================================================
+// raw_out (optionnel) reçoit une copie des octets bruts pour le relais FSK ;
+// non rempli si retour false avant lecture d'un paquet.
 static bool listenAndDecode(uint8_t* raw_out = nullptr) {
   uint8_t buffer[WH65B_PAYLOAD_LEN] = {0};
   float rssi = 0;
@@ -69,7 +42,6 @@ static bool listenAndDecode(uint8_t* raw_out = nullptr) {
     return false;
   }
 
-  // Stocker
   telemetry.weather_outside.is_valid = true;
   telemetry.weather_outside.wind_avg_ms = data.wind_avg_m_s;
   telemetry.weather_outside.wind_max_ms = data.wind_max_m_s;
@@ -85,9 +57,6 @@ static bool listenAndDecode(uint8_t* raw_out = nullptr) {
   return true;
 }
 
-// ============================================================================
-// Task FreeRTOS
-// ============================================================================
 void taskWeather(void* params) {
   (void)params;
   vTaskDelay(pdMS_TO_TICKS(WEATHER_BOOT_DELAY_MS));
@@ -104,11 +73,8 @@ void taskWeather(void* params) {
       if (ok) {
         uint8_t raw[WH65B_PAYLOAD_LEN];
         if (listenAndDecode(raw) && settings.weather.resend_enabled) {
-          // Relais RF protocole (pas une conversion APRS) : d'autres stations
-          // WH65B à portée (dont celle de l'utilisateur, ~1km) écoutent
-          // directement ce format — on retransmet les octets bruts tels
-          // quels, même fréquence, après un délai (laisse le temps à la
-          // station d'origine de terminer son propre cycle TX).
+          // Relais RF protocole brut (pas une conversion APRS) : le délai
+          // laisse le temps à la station d'origine de finir son propre TX.
           vTaskDelay(pdMS_TO_TICKS(settings.weather.resend_delay_ms));
           if (aprs_radio_hw.relayWh65bFrame(raw, WH65B_PAYLOAD_LEN, settings.weather.resend_power_dbm)) {
             LOG_D(TAG, "Trame WH65B relayée (%d dBm)", settings.weather.resend_power_dbm);
@@ -117,9 +83,8 @@ void taskWeather(void* params) {
           }
         }
       }
-      // switchToLora() repart des settings (radio.aprs.*), y compris la
-      // puissance normale : restaure automatiquement après le relais
-      // resend_power_dbm ci-dessus, pas de reapplication manuelle nécessaire.
+      // Repart des settings radio.aprs.* : restaure automatiquement la
+      // puissance normale après le resend_power_dbm ci-dessus.
       aprs_radio_hw.switchToLora();
       aprs_dispatcher.resume();
 

@@ -1,12 +1,3 @@
-// ============================================================================
-// Task CLI — commandes série
-//
-// Dispatch : commandes "mesh ..." vers MeshCore (MeshcoreRepeater retombe
-//            elle-même sur notre CommandHandler si elle ne reconnaît pas la
-//            commande — cf MeshcoreRepeater::handleCommand),
-//            le reste directement vers notre CommandHandler (get/set/list/...)
-// ============================================================================
-
 #include "tasks.h"
 #include "core/Log.h"
 #include "mesh/MeshcoreRepeater.h"
@@ -29,12 +20,8 @@ extern SstvTransmitter sstv_transmitter;
 #define CLI_LINE_MAX 160
 #define IMAGE_UPLOAD_INACTIVITY_TIMEOUT_MS 10000
 
-// ============================================================================
-// Upload binaire d'une image SSTV ("image <n>", série uniquement) — lecture
-// par blocs sans le délai de 20ms de la boucle CLI normale (bien trop lent
-// pour ~230 Ko), en gardant les heartbeats CLI à jour (watchdog) et un
-// timeout d'inactivité pour ne pas rester bloqué si le PC s'arrête en cours.
-// ============================================================================
+// Lecture par blocs sans le délai de 20ms de la boucle CLI normale (trop lent
+// pour ~230 Ko) ; heartbeat() maintenu pour le watchdog.
 static void receiveImageBinary(uint32_t expected_bytes) {
   static uint8_t buf[256];
   uint32_t received = 0;
@@ -83,12 +70,11 @@ void taskCli(void* params) {
     while (Serial.available()) {
       char c = (char)Serial.read();
       if (c == '\r') {
-        continue; // ignoré, on ne coupe la ligne que sur '\n'
+        continue;
       }
       if (c == '\n') {
         line[line_len] = '\0';
 
-        // Trim des espaces de tête
         char* cmd = line;
         while (*cmd == ' ') {
           cmd++;
@@ -103,10 +89,8 @@ void taskCli(void* params) {
             }
             LOG_D(TAG, "MeshCore: %s", cmd + 5);
           } else if (strncmp(cmd, "image ", 6) == 0 && isdigit((unsigned char)cmd[6])) {
-            // "image <n>" : upload binaire, série uniquement — intercepté ici
-            // (avant CommandHandler) pour basculer la lecture en mode binaire
-            // (cf. aprs/SstvTransmitter.h). "image send"/"image cancel" (pas
-            // numériques) continuent vers CommandHandler normalement.
+            // Intercepté avant CommandHandler pour basculer en lecture binaire ;
+            // "image send"/"cancel" (non numériques) continuent normalement.
             uint32_t announced = (uint32_t)strtoul(cmd + 6, nullptr, 10);
             if (sstv_transmitter.beginImageUpload(announced, &Serial)) {
               LOG_I("CLI IMAGE", "OK, RGB888...");
@@ -114,7 +98,6 @@ void taskCli(void* params) {
             }
 #ifdef NATIVE_BUILD
           } else if (simHandleCommand(cmd, Serial)) {
-            // traité par le simulateur (commandes "sim ...")
 #endif
           } else if (!command_handler.execute(cmd, Serial)) {
             LOG_W("CLI", "Commande inconnue: %s (tapez 'help')\n", cmd);
@@ -125,8 +108,7 @@ void taskCli(void* params) {
       } else if (line_len < sizeof(line) - 1) {
         line[line_len++] = c;
       }
-      // au-delà de CLI_LINE_MAX, les caractères en trop sont silencieusement
-      // ignorés jusqu'au prochain '\n' (évite un buffer overflow)
+      // au-delà de CLI_LINE_MAX, excédent ignoré jusqu'au prochain '\n'
     }
     vTaskDelay(pdMS_TO_TICKS(20));
   }

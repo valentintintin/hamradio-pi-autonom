@@ -3,16 +3,7 @@
 #include <FreeRTOS.h>
 #include <semphr.h>
 
-// ============================================================================
-// LockGuard / RecursiveLockGuard — verrous RAII génériques.
-//
-// RecursiveLockGuard est utilisé par AprsEngine et CommandHandler, qui
-// partagent le même mutex récursif (cf. AprsEngine::getMutex()) pour éviter
-// un interblocage AB-BA entre les deux classes.
-// LockGuard (non récursif) est utilisé par AprsDispatcher pour protéger sa
-// file d'émission.
-// ============================================================================
-
+// Mutex récursif partagé par AprsEngine et CommandHandler pour éviter un interblocage AB-BA entre les deux.
 class RecursiveLockGuard {
 public:
   explicit RecursiveLockGuard(SemaphoreHandle_t sem) : _sem(sem) {

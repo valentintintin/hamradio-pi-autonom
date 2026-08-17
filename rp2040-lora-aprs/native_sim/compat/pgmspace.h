@@ -1,11 +1,5 @@
 #pragma once
 
-// ============================================================================
-// pgmspace.h — shim natif. Sur AVR, PROGMEM place des données en flash et
-// PSTR/pgm_read_* servent à les relire ; sur un hôte Linux tout vit en RAM,
-// donc ce sont des no-ops.
-// ============================================================================
-
 #define PROGMEM
 #define PSTR(s) (s)
 

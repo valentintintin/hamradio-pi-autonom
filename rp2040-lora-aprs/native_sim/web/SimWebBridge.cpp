@@ -5,11 +5,11 @@
 #include "core/Log.h"
 #include "core/StringPrint.h"
 #include "hal/Telemetry.h"
-#include "hal/relay/RelayHal.h"
+#include "hal/relay/Relay.h"
 #include "cli/CommandHandler.h"
 #include "config/Settings.h"
-#include "target.h"  // mesh_radio_driver / aprs_radio_driver (SimRadio, cf. variant_native/target.h)
-#include <mpptChg.h>  // mpptChg::getStatusAsString()
+#include "target.h"
+#include <mpptChg.h>
 #include <ArduinoJson.h>
 
 #include <dirent.h>
@@ -24,7 +24,7 @@
 extern TelemetryData telemetry;
 extern CommandHandler command_handler;
 extern Settings settings;
-extern RelayHal relay_hal;
+extern Relay relays[RELAY_COUNT];
 
 namespace {
 
@@ -65,19 +65,9 @@ void fillRadio(JsonObject o, SimRadio& radio, bool withFskMode) {
   }
 }
 
-// ============================================================================
-// État complet : tout ce que SimWorld sait simuler (entrées capteurs/
-// alimentation), plus TelemetryData réel (sortie effectivement mesurée par
-// les HAL — vérifie que la chaîne HAL -> telemetry fonctionne), plus l'état
-// des deux radios SX1262 (paramètres appliqués, stats, dernier RSSI/SNR).
-//
-// Sérialisé via ArduinoJson plutôt qu'à la main (ostringstream) : gère
-// correctement l'échappement (les lignes de logs peuvent contenir guillemets/
-// caractères de contrôle) et les flottants non finis (NaN/Inf possibles côté
-// météo WH65B invalide, cf. FineOffsetWH65B) — sérialisés en `null`, JSON
-// valide, là où un "<<" les aurait écrits "nan"/"inf" (invalide, ferait
-// planter json.loads() côté serveur Python).
-// ============================================================================
+// ArduinoJson plutôt qu'un ostringstream à la main : sérialise les NaN/Inf
+// (météo WH65B invalide) en `null` JSON valide, là où "<<" écrirait "nan"/"inf"
+// et ferait planter json.loads() côté serveur Python.
 std::string buildStateJson() {
   auto& w = SimWorld::instance();
   JsonDocument doc;
@@ -136,9 +126,11 @@ std::string buildStateJson() {
     aprsCfg["cr"] = settings.radio.aprs_cr;
     aprsCfg["tx_power_dbm"] = settings.radio.aprs_tx_power;
 
-    JsonArray relays = doc["relays"].to<JsonArray>();
+    JsonArray relaysJson = doc["relays"].to<JsonArray>();
     for (int i = 0; i < RELAY_COUNT; i++) {
-      relays.add(relay_hal.getState(i));
+      JsonObject r = relaysJson.add<JsonObject>();
+      r["on"] = relays[i].getState();
+      r["manual"] = relays[i].isManualOverride();
     }
 
     JsonArray radioLog = doc["radio_log"].to<JsonArray>();
@@ -166,8 +158,6 @@ std::string buildStateJson() {
   return out;
 }
 
-// Écriture atomique (temp + rename) : le serveur Python ne doit jamais lire
-// un fichier à moitié écrit.
 void writeStateFileAtomic() {
   std::string content = buildStateJson();
   std::string path = stateFile();
@@ -189,10 +179,6 @@ void exportLoop() {
   }
 }
 
-// Consomme les fichiers *.cmd déposés par server.py, dans l'ordre
-// alphabétique (server.py les nomme par timestamp croissant) — réutilise
-// exactement le même pipeline que tasks/task_cli.cpp (simHandleCommand puis
-// CommandHandler::execute).
 void processCommandFile(const std::string& path) {
   std::string cmd;
   FILE* f = fopen(path.c_str(), "rb");
@@ -203,7 +189,7 @@ void processCommandFile(const std::string& path) {
     cmd = buf;
     fclose(f);
   }
-  ::remove(path.c_str());  // consommé, valide ou non
+  ::remove(path.c_str());
 
   while (!cmd.empty() && (cmd.back() == '\n' || cmd.back() == '\r')) {
     cmd.pop_back();
@@ -241,10 +227,8 @@ void commandLoop() {
       processCommandFile(dir + "/" + name);
     }
     if (!names.empty()) {
-      // Reflète l'effet de la commande sans attendre le prochain tick
-      // périodique de exportLoop() (jusqu'à 300ms) — important pour
-      // server.py, qui attend la disparition du fichier de commande comme
-      // signal "c'est fait" avant de répondre à la requête HTTP.
+      // Sans cet appel, server.py (qui attend la disparition du fichier de commande
+      // comme signal "fait") répondrait avant que state.json ne reflète l'effet.
       writeStateFileAtomic();
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(50));

@@ -6,20 +6,12 @@
 
 #define TAG "APRS-ENG"
 
-// ============================================================================
-// Construction
-// ============================================================================
-
 AprsEngine::AprsEngine(AprsDispatcher& dispatcher, AprsSettings& settings)
   : _dispatcher(&dispatcher), _settings(&settings), _event_cb(nullptr)
 {
   _mutex = xSemaphoreCreateRecursiveMutex();
 }
 
-// ============================================================================
-// Encode un frame déjà écrit dans _text_buf (taille `size`) et l'enqueue
-// via le dispatcher, avec le header LoRa-APRS 3 octets.
-// ============================================================================
 bool AprsEngine::encodeAndSend(size_t size, uint8_t priority, uint32_t delay_ms) {
   if (size == 0) {
     return false;
@@ -39,9 +31,6 @@ bool AprsEngine::encodeAndSend(size_t size, uint8_t priority, uint32_t delay_ms)
   return _dispatcher->send(_raw_buf, size + LORA_APRS_HEADER_SIZE, priority, delay_ms);
 }
 
-// ============================================================================
-// Position (compressée, sans météo)
-// ============================================================================
 bool AprsEngine::sendPosition(const char* comment) {
   RecursiveLockGuard lock(_mutex);
 
@@ -64,10 +53,6 @@ bool AprsEngine::sendPosition(const char* comment) {
   return encodeAndSend(written, APRS_PRIO_BEACON);
 }
 
-// ============================================================================
-// Météo — position report avec le payload Weather (symbole '_' forcé par
-// l'encodeur dès qu'un Weather est fourni, APRS101 ch.12)
-// ============================================================================
 bool AprsEngine::sendWeather() {
   RecursiveLockGuard lock(_mutex);
 
@@ -92,9 +77,6 @@ bool AprsEngine::sendWeather() {
   return encodeAndSend(written, APRS_PRIO_BEACON);
 }
 
-// ============================================================================
-// Status
-// ============================================================================
 bool AprsEngine::sendStatus(const char* text) {
   RecursiveLockGuard lock(_mutex);
 
@@ -137,9 +119,6 @@ bool AprsEngine::sendStatusIfChanged(uint32_t max_interval_ms) {
   return sendStatus(text);
 }
 
-// ============================================================================
-// Telemetry
-// ============================================================================
 bool AprsEngine::sendTelemetry() {
   RecursiveLockGuard lock(_mutex);
 
@@ -195,9 +174,6 @@ bool AprsEngine::sendTelemetryParams() {
   return ok;
 }
 
-// ============================================================================
-// Message sortant (avec demande d'accusé de réception optionnelle)
-// ============================================================================
 bool AprsEngine::sendMessage(const char* destination, const char* message, const char* ackToAsk) {
   RecursiveLockGuard lock(_mutex);
 
@@ -218,9 +194,6 @@ bool AprsEngine::sendMessage(const char* destination, const char* message, const
   return encodeAndSend(written, APRS_PRIO_ACK_MESSAGE);
 }
 
-// ============================================================================
-// Accusé de réception standalone (répond à une demande "{nn" reçue)
-// ============================================================================
 bool AprsEngine::sendAck(const char* destination, const char* ackId) {
   RecursiveLockGuard lock(_mutex);
 
@@ -238,9 +211,6 @@ bool AprsEngine::sendAck(const char* destination, const char* ackId) {
   return encodeAndSend(written, APRS_PRIO_ACK_MESSAGE);
 }
 
-// ============================================================================
-// Item
-// ============================================================================
 bool AprsEngine::sendItem(const char* name, char symbol, char symbolTable,
                           const char* comment, double latitude, double longitude,
                           uint16_t altitude, bool alive) {
@@ -269,9 +239,6 @@ bool AprsEngine::sendItem(const char* name, char symbol, char symbolTable,
   return encodeAndSend(written, APRS_PRIO_BEACON);
 }
 
-// ============================================================================
-// Envoi manuel d'un contenu brut (debug/test) sous notre callsign/path
-// ============================================================================
 bool AprsEngine::sendRaw(const char* content) {
   RecursiveLockGuard lock(_mutex);
 
@@ -289,33 +256,25 @@ bool AprsEngine::sendRaw(const char* content) {
   return encodeAndSend(written, APRS_PRIO_BEACON);
 }
 
-// ============================================================================
-// Digipeat — APRS Digipeater Algorithm (WB2OSZ, APRS Foundation, 2024-2025)
-// ============================================================================
 void AprsEngine::handleDigipeat(aprs::PacketLite& pkt) {
   if (!_settings->digipeaterEnabled) {
     return;
   }
 
-  // §4.2b : ne jamais relayer nos propres trames
   if (strcasecmp(pkt.source, _settings->callsign) == 0) {
     return;
   }
 
-  // §4.1 + §4.3 : sommes-nous le premier hop non utilisé du path ? Si oui,
-  // canBeDigipeated réécrit pkt.path en place.
   if (!aprs::canBeDigipeated(pkt.path, sizeof(pkt.path), _settings->callsign)) {
     return;
   }
 
-  // §4.2a : suppression des doublons entendus dans les ~30 dernières secondes
   uint32_t now = millis();
   uint32_t hash = _dedup.hash(pkt);
   if (_dedup.isDuplicate(hash, now)) {
     return;
   }
 
-  // Reconstruit la trame "SOURCE>DEST[,PATH]:CONTENU" avec le path réécrit
   size_t written = 0;
   aprs::Result r = aprs::encodeRaw(pkt.source, pkt.destination, pkt.path[0] ? pkt.path : nullptr,
                                    pkt.content, _text_buf, sizeof(_text_buf), &written);
@@ -325,19 +284,13 @@ void AprsEngine::handleDigipeat(aprs::PacketLite& pkt) {
 
   _dedup.remember(hash, now);
 
-  // Petit délai aléatoire pour limiter les collisions entre digipeaters qui
+  // Délai aléatoire pour limiter les collisions entre digipeaters qui
   // reçoivent tous la même trame en même temps.
   uint32_t delay = random(100, 500);
   LOG_I(TAG, "Digipeat %s via %s", pkt.source, _settings->callsign);
   encodeAndSend(written, APRS_PRIO_DIGIPEAT, delay);
 }
 
-// ============================================================================
-// Query — répond aux requêtes "?type?" (générales) ou ":CALL:?type?" (dirigées)
-//
-// Décider s'il faut répondre et comment est de la responsabilité de
-// l'application (la lib ne fait que décoder) — cf APRS101 ch.15.
-// ============================================================================
 void AprsEngine::handleQuery(const aprs::PacketLite& pkt) {
   aprs::Query query;
   if (!aprs::decodeQuery(pkt, query)) {
@@ -346,12 +299,10 @@ void AprsEngine::handleQuery(const aprs::PacketLite& pkt) {
 
   bool directed = query.destination[0] != '\0';
   if (directed && strcasecmp(query.destination, _settings->callsign) != 0) {
-    return; // adressée à une autre station
+    return;
   }
 
   if (!directed) {
-    // Requête générale (broadcast) : anti-flood pour éviter qu'un "?APRS?"
-    // entendu par plusieurs stations ne déclenche une salve de réponses.
     unsigned long now = millis();
     if (_last_general_query_reply_ms != 0 &&
         (now - _last_general_query_reply_ms) < APRS_GENERAL_QUERY_MIN_INTERVAL_MS) {
@@ -376,22 +327,18 @@ void AprsEngine::handleQuery(const aprs::PacketLite& pkt) {
   }
 }
 
-// ============================================================================
-// Réception APRS — callback depuis AprsDispatcher
-// ============================================================================
 void AprsEngine::onAprsPacketReceived(const uint8_t* data, uint8_t len, float rssi, float snr) {
   RecursiveLockGuard lock(_mutex);
 
-  // Vérifier le header LoRa-APRS
   if (len < LORA_APRS_HEADER_SIZE + 1) {
     return;
   }
   if (data[0] != LORA_APRS_HEADER_0 || data[1] != LORA_APRS_HEADER_1 || data[2] != LORA_APRS_HEADER_2) {
-    return; // pas un paquet LoRa-APRS
+    return;
   }
 
-  // Copier le payload dans un buffer local NUL-terminé : `data` ne l'est pas
-  // garanti (bytes bruts radio), et aprs::decode attend un C-string.
+  // `data` n'est pas garanti NUL-terminé (bytes bruts radio) ; aprs::decode
+  // attend un C-string.
   char payload[APRS_TEXT_BUFFER_SIZE];
   size_t payload_len = (size_t)len - LORA_APRS_HEADER_SIZE;
   if (payload_len >= sizeof(payload)) {
@@ -401,17 +348,15 @@ void AprsEngine::onAprsPacketReceived(const uint8_t* data, uint8_t len, float rs
   payload[payload_len] = '\0';
 
   if (!aprs::decode(payload, _rx_pkt)) {
-    return; // décodage échoué
+    return;
   }
 
   LOG_D(TAG, "RX de %s RSSI:%.0f SNR:%.1f", _rx_pkt.source, rssi, snr);
 
-  // Ignorer nos propres trames
   if (strcasecmp(_rx_pkt.source, _settings->callsign) == 0) {
     return;
   }
 
-  // Notifier le callback générique
   if (_event_cb) {
     _event_cb->onAprsFrameReceived(_rx_pkt, rssi, snr);
   }
@@ -421,24 +366,21 @@ void AprsEngine::onAprsPacketReceived(const uint8_t* data, uint8_t len, float rs
     if (aprs::decodeMessage(_rx_pkt, message) &&
         strcasecmp(message.destination, _settings->callsign) == 0) {
 
-      // Le correspondant demande un accusé de réception ("{nn")
       if (message.ackToConfirm[0]) {
         sendAck(_rx_pkt.source, message.ackToConfirm);
       }
 
-      // Message réel (pas juste un ACK/REJ pour un de nos envois)
       if (message.message[0] && !message.ackConfirmed[0] && !message.ackRejected[0]) {
         LOG_I(TAG, "MSG de %s: %s", _rx_pkt.source, message.message);
         if (_event_cb) {
           _event_cb->onAprsMessageReceived(_rx_pkt.source, message.message);
         }
       }
-      return; // message pour nous : pas de digipeat plus loin
+      return;
     }
   } else if (_rx_pkt.type == aprs::PacketType::Query) {
     handleQuery(_rx_pkt);
   }
 
-  // Digipeat (path-based, indépendant du type de contenu)
   handleDigipeat(_rx_pkt);
 }

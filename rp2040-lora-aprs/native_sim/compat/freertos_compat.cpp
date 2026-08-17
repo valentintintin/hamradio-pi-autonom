@@ -7,24 +7,12 @@
 #include <mutex>
 #include <thread>
 
-// ============================================================================
-// vTaskDelete(nullptr) — seul task_watchdog.cpp l'utilise, toujours en
-// auto-suppression (jamais avec le handle d'une AUTRE tâche). On simule ça en
-// déroulant la pile du thread via une exception dédiée, attrapée juste ici
-// dans le wrapper de xTaskCreate — la tâche sort proprement sans tuer le
-// process.
-// ============================================================================
 namespace {
+// vTaskDelete(nullptr) = auto-suppression uniquement (jamais le handle d'une
+// autre tâche) : simulée en déroulant la pile via cette exception, attrapée
+// dans le wrapper de xTaskCreate, pour sortir sans tuer le process.
 struct TaskSelfDelete {};
 
-// ============================================================================
-// Notification de tâche — un compteur protégé par mutex/condition_variable,
-// équivalent à "un réveil binaire" (seul usage fait par ce projet : voir
-// ulTaskNotifyTake ci-dessous). thread_local pointe vers le NativeTask du
-// thread courant, posé au tout début du thread créé par xTaskCreate — c'est
-// ce qui permet à xTaskGetCurrentTaskHandle() de répondre correctement même
-// appelé tout en haut de la fonction de tâche.
-// ============================================================================
 struct NativeTask {
   std::mutex m;
   std::condition_variable cv;
@@ -42,7 +30,6 @@ BaseType_t xTaskCreate(TaskFunction_t fn, const char* /*name*/, uint32_t /*stack
     try {
       fn(params);
     } catch (const TaskSelfDelete&) {
-      // sortie propre demandée par vTaskDelete(nullptr)
     }
   });
   if (handle) {
@@ -69,7 +56,7 @@ TaskHandle_t xTaskGetCurrentTaskHandle() {
 uint32_t ulTaskNotifyTake(BaseType_t xClearCountOnExit, TickType_t xTicksToWait) {
   auto* task = tls_current_task;
   if (!task) {
-    return 0;  // appelée hors d'une tâche créée par xTaskCreate — ne devrait pas arriver
+    return 0;
   }
 
   std::unique_lock<std::mutex> lock(task->m);
@@ -93,7 +80,7 @@ uint32_t ulTaskNotifyTake(BaseType_t xClearCountOnExit, TickType_t xTicksToWait)
 
 void vTaskNotifyGiveFromISR(TaskHandle_t xTaskToNotify, BaseType_t* pxHigherPriorityTaskWoken) {
   if (pxHigherPriorityTaskWoken) {
-    *pxHigherPriorityTaskWoken = pdFALSE;  // jamais utilisé en natif, cf. FreeRTOS.h
+    *pxHigherPriorityTaskWoken = pdFALSE;
   }
   if (!xTaskToNotify) {
     return;
@@ -111,12 +98,9 @@ BaseType_t xTaskNotifyGive(TaskHandle_t xTaskToNotify) {
   return pdTRUE;
 }
 
-// ============================================================================
-// Sémaphores — un seul type de mutex récursif+temporisé sous-jacent sert pour
-// mutex normal ET récursif : plus permissif qu'un vrai mutex non-récursif,
-// jamais moins sûr (un thread ne se bloque jamais lui-même).
-// ============================================================================
 namespace {
+// Un seul type de mutex récursif+temporisé sert pour mutex normal ET
+// récursif: plus permissif qu'un vrai mutex non-récursif, jamais moins sûr.
 struct NativeSem {
   std::recursive_timed_mutex m;
 };

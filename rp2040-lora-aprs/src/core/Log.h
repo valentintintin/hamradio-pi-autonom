@@ -2,18 +2,6 @@
 
 #include <Arduino.h>
 
-// ============================================================================
-// Logger minimaliste avec niveaux
-//
-// Niveau configurable à runtime via g_log_level (lié aux Settings).
-// Format : [TAG] message
-//
-// Usage :
-//   LOG_E("RADIO", "Init fail: %d", state);
-//   LOG_I("APRS", "Beacon envoyé");
-//   LOG_D("WEATHER", "Cycle FSK terminé");
-// ============================================================================
-
 enum LogLevel : uint8_t {
   LOG_NONE  = 0,
   LOG_ERROR = 1,
@@ -25,7 +13,6 @@ enum LogLevel : uint8_t {
 
 extern LogLevel g_log_level;
 
-// Prefixes par niveau
 inline const char* logLevelPrefix(LogLevel lvl) {
   switch (lvl) {
     case LOG_ERROR: return "E";
@@ -37,10 +24,7 @@ inline const char* logLevelPrefix(LogLevel lvl) {
   }
 }
 
-// Uptime "hh:mm:ss.mmm" depuis millis() — pas l'heure RTC : Log.h est inclus
-// quasiment partout (y compris par le code RTC lui-même), donc dépendre de
-// rtc_clock créerait un cycle d'include, et l'uptime reste dispo avant même
-// que l'horloge soit synchronisée au boot.
+// Basé sur millis() et non l'heure RTC : dépendre de rtc_clock créerait un cycle d'include (Log.h est inclus partout, y compris par le code RTC).
 inline const char* logUptime() {
   static char buf[16];
   unsigned long ms = millis();
@@ -52,9 +36,6 @@ inline const char* logUptime() {
   return buf;
 }
 
-// Natif : en plus de Serial (stdout), les lignes sont dupliquées dans un
-// buffer circulaire (SimWorld::log_ring) affiché par le dashboard web — cf.
-// native/sim/SimLogTee.cpp.
 #ifdef NATIVE_BUILD
 void nativeLogTee(const char* prefix, const char* uptime, const char* tag, const char* fmt, ...);
 #define NATIVE_LOG_TEE(lvl, tag, fmt, ...) nativeLogTee(logLevelPrefix(lvl), logUptime(), tag, fmt, ##__VA_ARGS__);
@@ -62,7 +43,6 @@ void nativeLogTee(const char* prefix, const char* uptime, const char* tag, const
 #define NATIVE_LOG_TEE(lvl, tag, fmt, ...)
 #endif
 
-// Macro principale — compile le check de niveau avant le printf
 #define LOG_MSG(lvl, tag, fmt, ...) \
   do { \
     if ((lvl) <= g_log_level) { \
@@ -77,7 +57,6 @@ void nativeLogTee(const char* prefix, const char* uptime, const char* tag, const
 #define LOG_D(tag, fmt, ...) LOG_MSG(LOG_DEBUG, tag, fmt, ##__VA_ARGS__)
 #define LOG_T(tag, fmt, ...) LOG_MSG(LOG_TRACE, tag, fmt, ##__VA_ARGS__)
 
-// Helper pour parser un niveau depuis un string (pour CLI "set system.log_level debug")
 inline LogLevel parseLogLevel(const char* s) {
   if (strcmp(s, "error") == 0 || strcmp(s, "1") == 0) {
     return LOG_ERROR;
@@ -97,7 +76,7 @@ inline LogLevel parseLogLevel(const char* s) {
   if (strcmp(s, "none") == 0 || strcmp(s, "0") == 0) {
     return LOG_NONE;
   }
-  return LOG_INFO; // défaut
+  return LOG_INFO;
 }
 
 inline const char* logLevelName(LogLevel lvl) {

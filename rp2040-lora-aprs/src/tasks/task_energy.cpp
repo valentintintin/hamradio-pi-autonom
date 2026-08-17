@@ -1,15 +1,3 @@
-// ============================================================================
-// Task énergie — orchestration : watchdog MPPT + coupure/reprise basse-
-// tension + réveil périodique par relais + alerte extinction MPPT.
-//
-// La logique de chaque volet vit dans src/energy/ (Relay, MpptShutdownMonitor) ;
-// cette tâche se contente de les construire (cf. main.cpp) et de les faire
-// tourner à chaque tick, comme task_beacon.cpp le fait pour AprsEngine.
-//
-// Ne lit plus les capteurs elle-même (cf. task_sensors.cpp, seul écrivain de
-// `telemetry`) : cette tâche ne fait que réagir aux valeurs déjà publiées.
-// ============================================================================
-
 #include "tasks.h"
 #include "core/Log.h"
 #include "config/Settings.h"
@@ -27,20 +15,16 @@ extern TelemetryData telemetry;
 extern Settings settings;
 extern Ina3221Hal ina3221;
 extern MpptChargerHal mppt;
-extern ChargeControllerHal* active_charger; // MPPT ou Victron, un seul à la fois (cf. main.cpp)
+extern ChargeControllerHal* active_charger;
 extern MpptShutdownMonitor mppt_shutdown_monitor;
-extern RelayHal relay_hal;
-extern EventLogHistory event_log;
+extern Relay relays[RELAY_COUNT];
 
 #define TAG "ENERGY"
 #define ENERGY_BOOT_DELAY_MS (10 * 1000)
 
-// Tension batterie à surveiller : le mini des sources disponibles (chargeur
-// solaire actif et/ou INA3221), pour couper si l'une des deux indique une
-// tension basse — plus prudent que de dépendre d'une seule source. Une
-// source non initialisée est ignorée plutôt que de faire chuter le mini à 0
-// (ce qui déclencherait la coupure en permanence). Retourne false si aucune
-// source n'est disponible.
+// Prend le mini des sources dispo (plus prudent qu'une seule) ; une source
+// non initialisée est ignorée plutôt que de faire chuter le mini à 0, ce qui
+// couperait en permanence.
 static bool getBatteryVoltageMv(float& voltage_mv) {
   bool have_reading = false;
 
@@ -64,8 +48,7 @@ void taskEnergy(void* params) {
 
   mppt_shutdown_monitor.begin();
 
-  // Pousser les seuils de coupure/reprise matériels au chip s'ils sont
-  // configurés (0 = laisser le réglage usine, cf. Settings.h)
+  // 0 = laisser le réglage usine
   if (mppt.isInitialized()) {
     if (settings.energy.mppt_pwr_off_mv > 0) {
       mppt.setPowerOffThreshold(settings.energy.mppt_pwr_off_mv);
@@ -77,21 +60,10 @@ void taskEnergy(void* params) {
 
   Timer wdt_feed_timer(settings.energy.mppt_wdt_interval_ms);
 
-  // Non-const : Relay::update() mute son propre état à chaque tick (timers de
-  // debounce/périodique) — une copie (ex: "for (auto relay : relays)" au lieu
-  // de "auto&") ferait tourner ces machines à états dans le vide.
-  Relay relays[RELAY_COUNT] = {
-      Relay(0, settings.relay[0], relay_hal, event_log),
-      Relay(1, settings.relay[1], relay_hal, event_log),
-      Relay(2, settings.relay[2], relay_hal, event_log),
-      Relay(3, settings.relay[3], relay_hal, event_log),
-  };
-
   for (;;) {
     heartbeat(HB_ENERGY);
 
     if (mppt.isInitialized() && settings.energy.mppt_wdt_enabled) {
-      // Resynchroniser l'intervalle si modifié à chaud
       wdt_feed_timer.setInterval(settings.energy.mppt_wdt_interval_ms, false);
       if (wdt_feed_timer.hasExpired()) {
         mppt.feedWatchdog(120);
@@ -101,14 +73,10 @@ void taskEnergy(void* params) {
     }
 
     float voltage_mv = 0;
-    bool have_voltage = getBatteryVoltageMv(voltage_mv);
+    getBatteryVoltageMv(voltage_mv);
 
-    if (have_voltage) {
-        if (settings.energy.low_voltage_cutoff_enabled) {
-          for (auto& relay : relays) {
-            relay.update(voltage_mv);
-          }
-      }
+    for (auto& relay : relays) {
+      relay.update(voltage_mv);
     }
 
     mppt_shutdown_monitor.update();

@@ -11,7 +11,6 @@ SerialClass Serial;
 SerialClass Serial1;
 RP2040 rp2040;
 
-// ---- Temps ------------------------------------------------------------------
 static const std::chrono::steady_clock::time_point g_boot_time = std::chrono::steady_clock::now();
 
 unsigned long millis() {
@@ -41,7 +40,6 @@ void delayMicroseconds(unsigned int us) {
   nanosleep(&ts, nullptr);
 }
 
-// ---- RNG ----------------------------------------------------------------
 void randomSeed(unsigned long seed) {
   if (seed != 0) {
     srandom((unsigned int)seed);
@@ -62,11 +60,7 @@ long random(long min, long max) {
   return min + (long)(::random() % (max - min));
 }
 
-// ---- Serial (stdin non bloquant) -------------------------------------------
 namespace {
-// FIFO interne : available()/read() sont appelés très fréquemment (boucle
-// CLI toutes les 20ms) — on draine stdin par gros paquets dans ce buffer
-// plutôt qu'un read() syscall par octet.
 constexpr size_t kSerialBufCap = 4096;
 uint8_t g_buf[kSerialBufCap];
 size_t g_buf_head = 0;
@@ -86,8 +80,6 @@ void fillFromStdin() {
     return;
   }
 
-  // Compacter si le buffer déborde côté tête (rare : lecture octet par octet
-  // par l'appelant, donc head avance en continu).
   if (g_buf_head > 0 && g_buf_tail == kSerialBufCap) {
     size_t remaining = bufAvailable();
     memmove(g_buf, g_buf + g_buf_head, remaining);
@@ -95,7 +87,7 @@ void fillFromStdin() {
     g_buf_tail = remaining;
   }
   if (g_buf_tail >= kSerialBufCap) {
-    return; // buffer plein, on relira au prochain appel
+    return;
   }
 
   ssize_t n = ::read(STDIN_FILENO, g_buf + g_buf_tail, kSerialBufCap - g_buf_tail);
@@ -139,7 +131,6 @@ size_t SerialClass::readBytes(uint8_t* buf, size_t len) {
   return n;
 }
 
-// ---- GPIO (table de pins fake) ---------------------------------------------
 namespace {
 constexpr uint8_t kMaxPins = 64;
 uint8_t g_pin_mode[kMaxPins] = {0};
@@ -177,12 +168,11 @@ void detachInterrupt(uint8_t pin) {
 
 uint8_t digitalPinToInterrupt(uint8_t pin) { return pin; }
 
-// ---- Pseudo-SDK RP2040 ------------------------------------------------------
 void RP2040::wdt_begin(uint32_t) {}
 void RP2040::wdt_reset() {}
 
 uint32_t RP2040::getFreeHeap() {
-  return 128UL * 1024UL * 1024UL;  // valeur plausible fixe : pas de contrainte mémoire côté hôte
+  return 128UL * 1024UL * 1024UL;
 }
 
 void RP2040::reboot() {

@@ -2,17 +2,8 @@
 #include <Arduino.h>
 #include <M24M01.h>
 
-// ============================================================================
-// M24M01Hal — implémentation matérielle réelle : délègue à la lib externe
-// M24M01 (bus I2C via Wire), en ajoutant le verrouillage du bus (I2CBus,
-// mutex partagé avec les autres périphériques I2C) autour de chaque appel.
-// La variante native (env PlatformIO `native`, pas de bus I2C réel —
-// persistée dans de vrais fichiers JSON sous SIM_DATA_DIR/eeprom/) vit dans
-// native_sim/sim/M24M01HalSim.cpp ; platformio.ini exclut ce fichier-ci pour
-// cet env et compile l'autre à la place (même principe que variant/ vs
-// variant_native/ pour les radios) — aucun #ifdef NATIVE_BUILD nécessaire
-// ici.
-// ============================================================================
+// Variante native (pas de bus I2C réel) : native_sim/sim/M24M01HalSim.cpp,
+// exclu/inclus par platformio.ini selon l'env — pas de #ifdef ici.
 
 bool M24M01Hal::begin() {
   if (!_bus->lock()) {

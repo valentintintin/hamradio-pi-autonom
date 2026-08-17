@@ -4,10 +4,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-// ============================================================================
-// StringPrint — adapte l'API Print d'Arduino pour écrire dans un buffer fixe
-// (utilisé pour renvoyer la réponse d'une commande CLI en message APRS/mesh).
-// ============================================================================
 class StringPrint : public Print {
 public:
   StringPrint(char* buf, size_t len) : _buf(buf), _len(len), _pos(0) {

@@ -6,14 +6,11 @@
 #define TAG "APRS-EVT"
 
 AprsEventHandler::AprsEventHandler(AprsEngine& engine, CommandHandler& commandHandler,
-                                   TelemetryData& telemetry, Settings& settings, RelayHal& relay)
-  : _engine(&engine), _cmd(&commandHandler), _telemetry(&telemetry), _settings(&settings), _relay(&relay)
+                                   TelemetryData& telemetry, Settings& settings, Relay* relays)
+  : _engine(&engine), _cmd(&commandHandler), _telemetry(&telemetry), _settings(&settings), _relays(relays)
 {
 }
 
-// ============================================================================
-// Message adressé à nous → exécuté comme une commande CLI, réponse par message
-// ============================================================================
 void AprsEventHandler::onAprsMessageReceived(const char* from, const char* message) {
   char cmd_buf[128];
   strncpy(cmd_buf, message, sizeof(cmd_buf) - 1);
@@ -40,7 +37,7 @@ void AprsEventHandler::onAprsMessageReceived(const char* from, const char* messa
     return;
   }
 
-  char reply[100];
+  char reply[CLI_RADIO_REPLY_MAX_LEN];
   reply[0] = '\0';
   bool recognized = _cmd->execute(cmd, reply, sizeof(reply));
   if (!recognized) {
@@ -52,9 +49,6 @@ void AprsEventHandler::onAprsMessageReceived(const char* from, const char* messa
   }
 }
 
-// ============================================================================
-// Télémétrie — 5 canaux analogiques + quelques flags d'état
-// ============================================================================
 void AprsEventHandler::fillTelemetryData(aprs::Telemetry& telemetry) {
   auto setAnalog = [](aprs::AnalogChannel& ch, const char* name, const char* unit, double value) {
     strncpy(ch.name, name, sizeof(ch.name) - 1);
@@ -71,18 +65,13 @@ void AprsEventHandler::fillTelemetryData(aprs::Telemetry& telemetry) {
   setAnalog(telemetry.analog[2], "BattI", "mA", _telemetry->battery_mppt.current_ma);
   setAnalog(telemetry.analog[3], "SolI",  "mA", _telemetry->solar_mppt.current_ma);
 
-  setBool(telemetry.boolean[0], "WiFi", _relay->getState(0));
-  setBool(telemetry.boolean[1], "Cam", _relay->getState(1));
-  setBool(telemetry.boolean[2], "Pi", _relay->getState(2));
-  // setBool(telemetry.boolean[3], "", _relay->getState(3));
+  setBool(telemetry.boolean[0], "WiFi", _relays[0].getState());
+  setBool(telemetry.boolean[1], "Cam", _relays[1].getState());
+  setBool(telemetry.boolean[2], "Pi", _relays[2].getState());
 
   strncpy(telemetry.projectName, "LoRa APRS + Meshcore", sizeof(telemetry.projectName) - 1);
 }
 
-// ============================================================================
-// Météo — BME280 (toujours dispo si initialisé) + WH65B (station extérieure,
-// si entendue récemment)
-// ============================================================================
 void AprsEventHandler::fillWeatherData(aprs::Weather& weather) {
   weather.useTemperature = true;
   weather.temperatureFahrenheit = (int16_t)(_telemetry->weather_outside.base.temperature_c * 9.0 / 5.0 + 32.0);
@@ -103,16 +92,12 @@ void AprsEventHandler::fillWeatherData(aprs::Weather& weather) {
     weather.useGustSpeed = true;
     weather.gustSpeedMph = (uint16_t)(_telemetry->weather_outside.wind_max_ms * 2.23694f);
 
-    // Le WH65B ne fournit qu'un cumul de pluie, pas de fenêtre glissante 24h ;
-    // on le reporte tel quel dans le champ "rain 24h" faute de mieux.
+    // WH65B : cumul brut, pas de fenêtre glissante 24h ; reporté tel quel faute de mieux.
     weather.useRain24Hour = true;
     weather.rain24HourHundredthsOfAnInch = (uint16_t)(_telemetry->weather_outside.rain_mm * 3.93701f);
   }
 }
 
-// ============================================================================
-// Statut — reflète l'état réel de la station plutôt qu'un texte figé
-// ============================================================================
 void AprsEventHandler::fillStatusText(char* buf, size_t len) {
   const char* state = "OK";
 

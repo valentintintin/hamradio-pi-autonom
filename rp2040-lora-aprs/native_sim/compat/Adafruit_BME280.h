@@ -1,12 +1,5 @@
 #pragma once
 
-// ============================================================================
-// Adafruit_BME280.h — faux vendor header natif. Remplace la vraie lib
-// Adafruit (non incluse dans l'env `native`, cf. platformio.ini) par une
-// implémentation lisant SimWorld — hal/sensors/Bme280Hal.h reste ainsi
-// inchangé, qu'on compile pour la cible réelle ou pour `native`.
-// ============================================================================
-
 #include <Arduino.h>
 #include "SimWorld.h"
 
@@ -18,7 +11,7 @@ public:
   enum standby_duration { STANDBY_MS_0_5 = 0, STANDBY_MS_1000 = 5 };
 
   bool begin(uint8_t /*addr*/, TwoWire* /*wire*/) {
-    return SimWorld::instance().temperature_c > -273.0f;  // "présent" par défaut
+    return SimWorld::instance().temperature_c > -273.0f;
   }
 
   void setSampling(sensor_mode, sensor_sampling, sensor_sampling, sensor_sampling,
@@ -38,7 +31,7 @@ public:
     return w.humidity_pct;
   }
 
-  // En Pa (Bme280Hal divise par 100 pour obtenir des hPa, comme la vraie lib)
+  // Retourne des Pa: Bme280Hal divise par 100 pour obtenir des hPa, comme la vraie lib.
   float readPressure() {
     auto& w = SimWorld::instance();
     std::lock_guard<std::mutex> lock(w.mutex);

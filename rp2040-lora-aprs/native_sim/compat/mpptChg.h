@@ -1,26 +1,10 @@
 #pragma once
 
-// ============================================================================
-// mpptChg.h — faux vendor header natif (même principe que Adafruit_BME280.h,
-// Adafruit_INA3221.h, TCA9555.h, VEDirect.h dans ce dossier) : remplace
-// entièrement lib/mpptChg/ pour l'env PlatformIO `native` (cf. lib_ignore
-// dans platformio.ini) — pas de bus I2C réel, chaque registre lu/écrit ici
-// est mappé vers SimWorld (télémétrie solaire/batterie, ALERT, état de
-// charge) ou, pour les registres de config watchdog/seuils sans équivalent
-// dans SimWorld, vers de simples membres locaux (juste de quoi faire un
-// round-trip get/set cohérent depuis le CLI/CommandHandler).
-//
-// Même contrat public que lib/mpptChg/mpptChg.h (mêmes noms de
-// méthodes/constantes/enums) : hal/chargers/MpptChargerHal.h, SimCli.cpp et
-// SimWebBridge.cpp ne savent pas laquelle des deux ils utilisent.
-// ============================================================================
-
 #include <cstdint>
 #include "SimWorld.h"
 
 #define MPPT_CHG_I2C_ADDR 0x12
 
-// RO values (16-bits)
 #define MPPT_CHG_REG_ID   0
 #define MPPT_CHG_STATUS   2
 #define MPPT_CHG_BUCK     4
@@ -33,17 +17,14 @@
 #define MPPT_CHG_EXT_T    18
 #define MPPT_CHG_VM       20
 #define MPPT_CHG_TH       22
-// RW Parameters (16-bits)
 #define MPPT_CHG_BUCK_TH  24
 #define MPPT_CHG_FLOAT_TH 26
 #define MPPT_CHG_PWROFF   28
 #define MPPT_CHG_PWRON    30
-// Watchdog registers (8-bits)
 #define MPPT_WD_EN        33
 #define MPPT_WD_COUNT     35
 #define MPPT_WD_PWROFF    36
 
-// Status Register bit masks
 #define MPPT_CHG_STATUS_HW_WD_MASK    0x8000
 #define MPPT_CHG_STATUS_SW_WD_MASK    0x4000
 #define MPPT_CHG_STATUS_BAD_BATT_MASK 0x2000
@@ -56,7 +37,6 @@
 #define MPPT_CHG_STATUS_NIGHT_MASK    0x0008
 #define MPPT_CHG_STATUS_CHG_ST_MASK   0x0007
 
-// Charge States
 #define MPPT_CHG_ST_NIGHT  0
 #define MPPT_CHG_ST_IDLE   1
 #define MPPT_CHG_ST_VSRCV  2
@@ -65,8 +45,7 @@
 #define MPPT_CHG_ST_ABSORB 5
 #define MPPT_CHG_ST_FLOAT  6
 
-// Watchdog enable register value
-#define MPPT_CHG_WD_ENABLE 0xEA
+#define MPPT_CHG_WD_ENABLE 0xEA  // valeur d'activation attendue par le vrai registre
 
 typedef enum { SYS_ID = 0, SYS_STATUS, SYS_BUCK } mpptChg_sys_t;
 
@@ -91,7 +70,7 @@ public:
 
   bool getStatusValue(mpptChg_sys_t index, uint16_t* val) {
     switch (index) {
-      case SYS_ID:     *val = 0x0042; return true;  // != 0 -> begin() réussit
+      case SYS_ID:     *val = 0x0042; return true;
       case SYS_STATUS: *val = statusRegister(); return true;
       case SYS_BUCK:   *val = _cfg[reg(MPPT_CHG_BUCK)]; return true;
     }
@@ -161,9 +140,6 @@ public:
   }
 
 private:
-  // Registres de config/watchdog sans équivalent SimWorld — juste de quoi
-  // faire un round-trip get/set cohérent (mêmes index que le vrai registre
-  // I2C, cf. mpptChg_cfg_t/MPPT_WD_*).
   uint16_t _cfg[40] = {0};
 
   static int reg(uint8_t r) { return r < 40 ? r : 0; }
@@ -178,9 +154,7 @@ private:
     return 0;
   }
 
-  // Composé depuis SimWorld : l'état de charge (bits CHG_ST) est piloté par
-  // "sim set mppt status <nom>" (défaut NIGHT, cf. SimWorld::mppt_charge_state),
-  // le bit NIGHT_MASK suit le même champ, ALERT_MASK suit mppt_alert.
+  // État de charge piloté par la CLI "sim set mppt status <nom>".
   uint16_t statusRegister() {
     auto& w = SimWorld::instance();
     std::lock_guard<std::mutex> lock(w.mutex);

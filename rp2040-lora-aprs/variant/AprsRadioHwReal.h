@@ -3,12 +3,6 @@
 #include "aprs/AprsRadioHw.h"
 #include <helpers/radiolib/CustomSX1262Wrapper.h>
 
-// ============================================================================
-// AprsRadioHwReal — implémentation matérielle d'IAprsRadioHw (cf.
-// aprs/AprsRadioHw.h), vrai SX1262 433 MHz via RadioLib. Contrepartie
-// native : variant_native/AprsRadioHwSim.h.
-// ============================================================================
-
 class AprsRadioHwReal : public IAprsRadioHw {
 public:
   explicit AprsRadioHwReal(CustomSX1262& hw) : _hw(hw) {}

@@ -3,155 +3,123 @@
 
 #define TAG "RELAY"
 
-bool Relay::wouldBeCut(float voltage_mv) const {
-  return _config->cutoff_enabled && voltage_mv < _config->min_voltage_mv;
-}
-
 void Relay::update(float voltage_mv) {
-  if (_relay->isManualOverride(_index)) {
-    // Contrôle total utilisateur (cf. Relay.h) : cutoff et périodique
-    // suspendus tant que "relay N auto" n'a pas explicitement rendu la main.
-    // _cutoff_state/_periodic_state (et leurs Timer) restent simplement
-    // gelés tels quels — rien ne les modifie tant qu'on ne rappelle pas
-    // updateCutoff/updatePeriodic, donc pas besoin de mémoriser qu'on était
-    // overridden pour "réinitialiser" à la sortie : ils reprennent d'eux-
-    // mêmes là où ils en étaient (si un timer a expiré entre-temps, l'action
-    // qu'il représente se rattrape immédiatement, ce qui est correct).
-    return;
+  if (_manual_override) {
+    if (_manual_override_timeout_ms != 0 && _manual_override_timer.hasExpired()) {
+      LOG_W(TAG, "Relais %u : override manuel expiré après %lums, retour à l'automatisme",
+        _index + 1, (unsigned long)_manual_override_timeout_ms);
+      _event_log->log(EVENT_RELAY_MANUAL_CLEARED, _index + 1, 1 /* data1=1 : expiration auto, pas "relay N auto" */);
+      setManualOverride(false);
+      // Pas de "return" : on continue vers les règles ci-dessous sans attendre le tick suivant.
+    } else {
+      return;
+    }
   }
 
-  // Cutoff avant periodic (comme historiquement) : periodic peut décider
-  // cette tick de passer en Overridden, ce que cutoff ne verra qu'au tick
-  // suivant — un tick de latence sans conséquence (cf. Relay.h).
-  updateCutoff(voltage_mv);
-  updatePeriodic(voltage_mv);
+  bool relayState = getState();
+  bool cutoff = updateCutoff(voltage_mv, relayState);
+  bool periodic = updatePeriodic(relayState);
+
+  const Settings::Relay& cfg = *_config;
+  bool newState;
+  if (cfg.periodic_enabled && cfg.override_low_voltage) {
+    newState = periodic;
+  } else if (cfg.cutoff_enabled && cfg.periodic_enabled) {
+    newState = cutoff && periodic; // règle 1 = garde-fou, coupe même pendant une fenêtre de règle périodiques
+  } else if (cfg.cutoff_enabled) {
+    newState = cutoff;
+  } else if (cfg.periodic_enabled) {
+    newState = periodic;
+  } else {
+    newState = relayState;
+  }
+
+  if (newState != relayState) {
+    _relay_hal->setState(_index, newState);
+  }
 }
 
-void Relay::updateCutoff(float voltage_mv) {
+bool Relay::setManualState(bool on, uint32_t timeout_ms) {
+  bool ok = _relay_hal->setState(_index, on);
+  setManualOverride(true, timeout_ms);
+  return ok;
+}
+
+void Relay::setManualOverride(bool override, uint32_t timeout_ms) {
+  _manual_override = override;
+  _manual_override_timeout_ms = override ? timeout_ms : 0;
+  if (override && timeout_ms != 0) {
+    _manual_override_timer.setInterval(timeout_ms, true);
+  }
+}
+
+bool Relay::updateCutoff(float voltage_mv, bool relayState) {
   const Settings::Relay& cfg = *_config;
-  CutoffState& state = _cutoff_state;
 
   if (!cfg.cutoff_enabled) {
-    state = CutoffState::Idle;
-    return;
+    _cutoff_pending_valid = false;
+    return relayState;
   }
 
-  if (state == CutoffState::Overridden) {
-    // Reste suspendu tant que le réveil périodique n'a pas explicitement
-    // levé l'override (cf. updatePeriodic, seul endroit qui en sort).
-    return;
+  // Tension à 0 = pas encore de relevé capteur valide, ne pas agir dessus.
+  if (voltage_mv <= 0) {
+    return relayState;
   }
 
-  // restore_voltage_mv == 0 est une valeur documentée ("pas de reconnexion
-  // auto"), pas une erreur de config : ne doit pas empêcher la coupure.
-  bool auto_restore = cfg.restore_voltage_mv != 0;
-  if (auto_restore && cfg.restore_voltage_mv <= cfg.min_voltage_mv) {
-    LOG_W(TAG, "Relais %u: restore_voltage_mv <= min_voltage_mv (%u <= %u), reprise auto ignorée",
-      _index + 1, cfg.restore_voltage_mv, cfg.min_voltage_mv);
-    auto_restore = false;
+  bool desired = (voltage_mv >= cfg.min_voltage_mv) && (voltage_mv <= cfg.restore_voltage_mv);
+
+  if (desired == relayState) {
+    if (_cutoff_pending_valid) {
+      LOG_T(TAG, "Relais %u : tension revenue du bon côté, confirmation annulée", _index + 1);
+    }
+    _cutoff_pending_valid = false;
+    return relayState;
   }
 
-  if (_relay->getState(_index)) {
-    bool under_voltage = voltage_mv < cfg.min_voltage_mv;
-    if (!under_voltage) {
-      if (state == CutoffState::ConfirmingCutoff) {
-        LOG_T(TAG, "La tension est OK pour %u (%.0fmV >= %umV)", _index + 1, voltage_mv, cfg.min_voltage_mv);
-      }
-      state = CutoffState::Idle;
-      return;
-    }
-    if (state != CutoffState::ConfirmingCutoff) {
-      LOG_D(TAG, "Sous tension pour %u. Début timer tension basse pour %lums", _index + 1, (unsigned long)cfg.debounce_ms);
-      _cutoff_timer.setInterval(cfg.debounce_ms, true);
-      state = CutoffState::ConfirmingCutoff;
-      return;
-    }
-    if (_cutoff_timer.hasExpired()) {
-      LOG_W(TAG, "Sous-tension confirmée (%.0fmV < %umV depuis %lums) : coupure relais %u",
-        voltage_mv, cfg.min_voltage_mv, (unsigned long)cfg.debounce_ms, _index + 1);
-      _event_log->log(EVENT_LOW_VOLTAGE_CUTOFF, _index + 1, (int32_t)voltage_mv);
-      _relay->setState(_index, false);
-      state = CutoffState::Idle;
-    }
-    return;
-  }
-
-  // Relais OFF
-  bool restore_ready = auto_restore && voltage_mv >= cfg.restore_voltage_mv;
-  if (!restore_ready) {
-    if (state == CutoffState::ConfirmingRestore) {
-      LOG_T(TAG, "Relais %u: tension pas encore rétablie, confirmation annulée", _index + 1);
-    }
-    state = CutoffState::Idle;
-    return;
-  }
-  if (state != CutoffState::ConfirmingRestore) {
-    LOG_T(TAG, "Sur tension pour %u. Début timer tension haute pour %lums", _index + 1, (unsigned long)cfg.debounce_ms);
+  if (!_cutoff_pending_valid || _cutoff_pending_state != desired) {
+    LOG_D(TAG, "Relais %u : tension %.0fmV hors bande souhaitée (%s), début debounce %lums",
+      _index + 1, voltage_mv, desired ? "veut ON" : "veut OFF", (unsigned long)cfg.debounce_ms);
+    _cutoff_pending_valid = true;
+    _cutoff_pending_state = desired;
     _cutoff_timer.setInterval(cfg.debounce_ms, true);
-    state = CutoffState::ConfirmingRestore;
-    return;
+    return relayState;
   }
-  if (_cutoff_timer.hasExpired()) {
-    LOG_I(TAG, "Tension rétablie confirmée (%.0fmV >= %umV depuis %lums) : reconnexion relais %u",
-      voltage_mv, cfg.restore_voltage_mv, (unsigned long)cfg.debounce_ms, _index + 1);
+
+  if (!_cutoff_timer.hasExpired()) {
+    return relayState;
+  }
+
+  _cutoff_pending_valid = false;
+  if (desired) {
+    LOG_I(TAG, "Tension rétablie confirmée (%.0fmV dans [%u, %u]mV depuis %lums) : reconnexion relais %u",
+      voltage_mv, cfg.min_voltage_mv, cfg.restore_voltage_mv, (unsigned long)cfg.debounce_ms, _index + 1);
     _event_log->log(EVENT_LOW_VOLTAGE_RESTORE, _index + 1, (int32_t)voltage_mv);
-    _relay->setState(_index, true);
-    state = CutoffState::Idle;
+  } else {
+    LOG_W(TAG, "Sous/sur-tension confirmée (%.0fmV hors [%u, %u]mV depuis %lums) : coupure relais %u",
+      voltage_mv, cfg.min_voltage_mv, cfg.restore_voltage_mv, (unsigned long)cfg.debounce_ms, _index + 1);
+    _event_log->log(EVENT_LOW_VOLTAGE_CUTOFF, _index + 1, (int32_t)voltage_mv);
   }
+  return desired;
 }
 
-void Relay::updatePeriodic(float voltage_mv) {
+bool Relay::updatePeriodic(bool relayState) {
   const Settings::Relay& cfg = *_config;
-  PeriodicState& state = _periodic_state;
 
   if (!cfg.periodic_enabled) {
-    if (state == PeriodicState::Active && _cutoff_state == CutoffState::Overridden) {
-      _cutoff_state = CutoffState::Idle; // ne pas laisser cutoff bloqué en Overridden
-      LOG_T(TAG, "Relais %u : désactivation", _index + 1);
-    }
-    state = PeriodicState::Disabled;
-    return;
+    return relayState;
   }
 
-  if (state == PeriodicState::Disabled) {
-    // Règle tout juste (ré)activée : démarre l'attente
-    _periodic_timer.setInterval(cfg.interval_ms, true);
-    state = PeriodicState::Waiting;
-    LOG_I(TAG, "Relais %u : début timer pour réveil périodique", _index + 1, (unsigned long)cfg.interval_ms);
+  if (!_periodic_initialized) {
+    _periodic_initialized = true;
+    _periodic_phase_on = true;
+    _periodic_timer.setInterval(cfg.on_duration_ms, true);
+    LOG_I(TAG, "Relais %u : cycle périodique démarré (ON %lums / OFF %lums)",
+      _index + 1, (unsigned long)cfg.on_duration_ms, (unsigned long)cfg.interval_ms);
+  } else if (_periodic_timer.hasExpired()) {
+    _periodic_phase_on = !_periodic_phase_on;
+    _periodic_timer.setInterval(_periodic_phase_on ? cfg.on_duration_ms : cfg.interval_ms, true);
+    LOG_T(TAG, "Relais %u : cycle périodique -> %s", _index + 1, _periodic_phase_on ? "ON" : "OFF");
   }
 
-  if (!_periodic_timer.hasExpired()) {
-    return;
-  }
-
-  if (state == PeriodicState::Active) {
-    // Fin de fenêtre ON
-    if (_cutoff_state == CutoffState::Overridden) {
-      _cutoff_state = CutoffState::Idle;
-      LOG_W(TAG, "Relais %u : fin fenêtre réveil périodique met surchargé donc on laisse à allumé", _index + 1);
-    }
-    _relay->setState(_index, false);
-    _periodic_timer.setInterval(cfg.interval_ms, true);
-    state = PeriodicState::Waiting;
-    LOG_I(TAG, "Relais %u : fin fenêtre réveil périodique (%lums)%s", _index + 1, (unsigned long)cfg.interval_ms);
-    return;
-  }
-
-  // Attente expirée : c'est l'heure de la fenêtre ON
-  bool would_be_cut = wouldBeCut(voltage_mv);
-
-  if (would_be_cut && !cfg.override_low_voltage) {
-    LOG_T(TAG, "Relais %u : réveil périodique sauté (sous-tension)", _index + 1);
-    _periodic_timer.setInterval(cfg.interval_ms, true); // retente au prochain cycle
-    return;
-  }
-
-  if (would_be_cut) {
-    _cutoff_state = CutoffState::Overridden; // outrepasse une coupure active
-  }
-  _relay->setState(_index, true);
-  _periodic_timer.setInterval(cfg.on_duration_ms, true);
-  state = PeriodicState::Active;
-  LOG_I(TAG, "Relais %u : début fenêtre réveil périodique (%lums)%s",
-    _index + 1, (unsigned long)cfg.on_duration_ms, would_be_cut ? " [override sous-tension]" : "");
+  return _periodic_phase_on;
 }
