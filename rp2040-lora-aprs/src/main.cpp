@@ -115,7 +115,7 @@ CommandHandler command_handler(settings, settings_registry, settings_manager, te
                                &sstv_transmitter, &the_mesh);
 
 // Relie AprsEngine à la télémétrie et au CLI (query météo, telemetry, CLI par message)
-AprsEventHandler aprs_event_handler(aprs_engine, command_handler, telemetry, settings);
+AprsEventHandler aprs_event_handler(aprs_engine, command_handler, telemetry, settings, relay_hal);
 
 // ============================================================================
 // Setup — la séquence détaillée vit dans core/Boot.cpp, une fonction par

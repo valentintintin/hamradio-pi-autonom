@@ -3,4 +3,4 @@
 # Données persistées par le simulateur natif (env PlatformIO `native`) —
 # settings/identité/image SSTV, régénérées à chaque run (cf. native_sim/
 # compat/LittleFS.h, variable SIM_DATA_DIR).
-native-data/
+native-data*

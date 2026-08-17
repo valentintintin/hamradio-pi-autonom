@@ -93,12 +93,11 @@ void SettingsRegistry::init(Settings& s) {
   add("system.mode",           ST_UINT8,  &s.system.mode,      0.0f, 4.0f);
 
   // --- Relais (bistables, pilotés via TCA9555 I2C — cf. hal/relay/RelayHal.h) ----
-  add("relay.1.state", ST_BOOL, &s.relay[0].state);
-  add("relay.2.state", ST_BOOL, &s.relay[1].state);
-  add("relay.3.state", ST_BOOL, &s.relay[2].state);
-  add("relay.4.state", ST_BOOL, &s.relay[3].state);
+  // Pas de clé "relay.N.state" ici : l'état ON/OFF n'est pas une settings
+  // persistée (cf. Settings::Relay) — pilotage exclusivement via la commande
+  // CLI "relay N on|off|auto" (cf. CommandHandler::cmdRelay).
 
-  // --- Coupure basse-tension (cf. energy/Relay.cpp) -------------------------
+  // --- Coupure basse-tension (cf. hal/relay/Relay.cpp) -----------------------
   // Clés CLI inchangées ("relay_cutoff.N.*") bien que la donnée soit
   // désormais dans s.relay[N] (cf. Settings::Relay) — pas de raison de casser
   // la compatibilité CLI/scripts pour un détail de layout interne.

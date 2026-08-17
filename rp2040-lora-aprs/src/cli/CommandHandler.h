@@ -77,4 +77,5 @@ private:
   void cmdEventLog(const char* args, Print& out, bool isLocal);
   void cmdSendAprs(const char* content, Print& out);
   void cmdImage(const char* args, Print& out, bool isLocal);
+  void cmdRelay(const char* args, Print& out);
 };

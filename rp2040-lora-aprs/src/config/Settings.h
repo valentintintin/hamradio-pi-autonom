@@ -12,7 +12,7 @@
 // ============================================================================
 
 #define SETTINGS_MAGIC    0x34485656  // "4HVV"
-#define SETTINGS_VERSION  8
+#define SETTINGS_VERSION  9  // v9 : Settings::Relay::state retiré (déplacé vers RelayHal, non persisté)
 
 // ============================================================================
 // Mode de fonctionnement — la carte peut être déployée en standalone (juste
@@ -157,22 +157,25 @@ struct Settings {
   CwSstvSettings cw_sstv;
   MeshChannelSettings mesh_channels[MAX_GROUP_CHANNELS];
 
-  // Relais bistable individuel : état ON/OFF persisté + ses deux règles de
-  // supervision automatique — cf. energy/Relay.h pour la logique qui les
-  // consomme (une instance construite avec un pointeur direct sur son
-  // Settings::Relay, cf. task_energy.cpp). Regroupées ici plutôt qu'en 3
-  // tableaux parallèles indexés par relais : un relais et ses règles ne font
-  // sens que pris ensemble.
+  // Règles de supervision automatique d'UN relais bistable — cf. hal/relay/
+  // Relay.h pour la logique qui les consomme (une instance construite avec un
+  // pointeur direct sur son Settings::Relay, cf. task_energy.cpp).
+  //
+  // L'état ON/OFF courant n'est PAS ici : il n'est pas persisté en settings
+  // (ni flash ni RAM des settings), il vit uniquement dans RelayHal (RAM +
+  // mirroir dans un registre watchdog scratch — cf. hal/relay/RelayHal.h/.cpp)
+  // — au boot, seul un reset "à chaud" (watchdog/reboot()) le restaure ; une
+  // vraie coupure d'alimentation repart simplement à "éteint" (le relais
+  // physique bistable, lui, n'a pas bougé — sans conséquence, l'automatisme
+  // ci-dessous reprend son cours dès la prochaine mesure de tension).
   struct Relay {
-    bool state;   // état ON/OFF courant (persisté, cf. hal/relay/RelayHal.h)
-
     // Coupure basse-tension avec hystérésis réelle : si la tension batterie
     // (mini de battery_mppt/battery_ina) descend sous min_voltage_mv, le
-    // relais est coupé (cf. energy/Relay.cpp) ; il est reconnecté
+    // relais est coupé (cf. hal/relay/Relay.cpp) ; il est reconnecté
     // automatiquement une fois la tension remontée au-dessus de
     // restore_voltage_mv (doit être > min_voltage_mv). restore_voltage_mv = 0
     // désactive la reconnexion automatique (coupure seule, reconnexion
-    // manuelle via CLI "relay.N.state").
+    // manuelle via CLI "relay N on").
     // debounce_ms : la tension doit rester en continu au-delà du seuil
     // (coupure ou reprise) pendant cette durée avant que l'action ne soit
     // prise — évite qu'une chute de tension transitoire (appel de courant
@@ -271,10 +274,9 @@ inline Settings getDefaultSettings() {
   s.system.log_level = 3;                      // INFO par défaut
   s.system.mode = MODE_FULL;                   // fonctionnement normal par défaut
 
-  // Relais — état et règles toutes désactivées par défaut
+  // Relais — règles toutes désactivées par défaut (l'état ON/OFF n'est pas
+  // ici, cf. Settings::Relay)
   for (auto& relay : s.relay) {
-    relay.state = false;
-
     relay.cutoff_enabled = false;
     relay.min_voltage_mv = 0;
     relay.restore_voltage_mv = 0;

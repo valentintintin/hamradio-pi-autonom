@@ -17,6 +17,12 @@
 // un réveil périodique peut outrepasser une coupure basse-tension active
 // (Settings::Relay::override_low_voltage), cf. updatePeriodic().
 //
+// Un troisième acteur, hors de cette classe, peut aussi outrepasser les deux :
+// une commande utilisateur (CLI "relay N on/off", cf. CommandHandler::cmdRelay)
+// arme RelayHal::isManualOverride() pour ce relais — update() suspend alors
+// entièrement cutoff ET périodique jusqu'à "relay N auto" (contrôle total,
+// décision produit ; volatile, reset au reboot).
+//
 // Ne connaît que son propre Settings::Relay (passé par référence à la
 // construction), pas la Settings globale ni les autres relais — cf.
 // task_energy.cpp, qui construit une instance par relais avec

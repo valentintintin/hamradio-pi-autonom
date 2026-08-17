@@ -8,6 +8,18 @@ bool Relay::wouldBeCut(float voltage_mv) const {
 }
 
 void Relay::update(float voltage_mv) {
+  if (_relay->isManualOverride(_index)) {
+    // Contrôle total utilisateur (cf. Relay.h) : cutoff et périodique
+    // suspendus tant que "relay N auto" n'a pas explicitement rendu la main.
+    // _cutoff_state/_periodic_state (et leurs Timer) restent simplement
+    // gelés tels quels — rien ne les modifie tant qu'on ne rappelle pas
+    // updateCutoff/updatePeriodic, donc pas besoin de mémoriser qu'on était
+    // overridden pour "réinitialiser" à la sortie : ils reprennent d'eux-
+    // mêmes là où ils en étaient (si un timer a expiré entre-temps, l'action
+    // qu'il représente se rattrape immédiatement, ce qui est correct).
+    return;
+  }
+
   // Cutoff avant periodic (comme historiquement) : periodic peut décider
   // cette tick de passer en Overridden, ce que cutoff ne verra qu'au tick
   // suivant — un tick de latence sans conséquence (cf. Relay.h).

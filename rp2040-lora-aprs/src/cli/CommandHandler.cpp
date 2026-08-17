@@ -134,6 +134,11 @@ bool CommandHandler::execute(const char* input, Print& out, bool isLocal) {
     return true;
   }
 
+  if (strncmp(cmd, "relay ", 6) == 0) {
+    cmdRelay(cmd + 6, out);
+    return true;
+  }
+
   if (strcmp(cmd, "reboot") == 0) {
     out.println("Redémarrage...");
     out.flush();
@@ -162,7 +167,7 @@ bool CommandHandler::execute(const char* input, Print& out, bool isLocal) {
       out.println("Commandes: get <key>, set <key> <value>, clockdate JJ/MM/AA HH:MM:SS,");
       out.println("  list, save, status, version, uptime, freemem, beacon, wx,");
       out.println("  send aprs <texte>, history [n]/clear/dump [n], eventlog [n]/clear/dump [n],");
-      out.println("  image <n> (upload binaire série)/send/cancel, defaults, reboot, dfu, help");
+      out.println("  image <n> (upload binaire série)/send/cancel, relay <n> on/off/auto, defaults, reboot, dfu, help");
     }
     return true;
   }
@@ -192,7 +197,8 @@ bool CommandHandler::isPrivilegedCommand(const char* cmd)
          strncmp(cmd, "send aprs ", 10) == 0 ||
          strcmp(cmd, "beacon") == 0 ||
          strcmp(cmd, "wx") == 0 ||
-         strcmp(cmd, "image send") == 0;
+         strcmp(cmd, "image send") == 0 ||
+         strncmp(cmd, "relay ", 6) == 0;
 }
 
 // ============================================================================
@@ -233,19 +239,6 @@ void CommandHandler::cmdSet(const char* key, const char* value, Print& out) {
     }
     if (strcmp(key, "system.event_log.enabled") == 0 && _event_log) {
       _event_log->setEnabled(_settings->system.event_log_enabled);
-    }
-
-    // Relais : appliquer immédiatement l'impulsion I2C (la clé venant d'être
-    // écrite dans _settings)
-    int relayNum = 0;
-    char relayField[16] = {0};
-    if (sscanf(key, "relay.%d.%15s", &relayNum, relayField) == 2 &&
-        strcmp(relayField, "state") == 0 &&
-        relayNum >= 1 && relayNum <= RELAY_COUNT) {
-      uint8_t idx = relayNum - 1;
-      if (!_relay->setState(idx, _settings->relay[idx].state)) {
-        out.printf("Attention: expandeur relais (TCA9555) non détecté, pas d'action matérielle\n");
-      }
     }
 
     // MPPT : pousser immédiatement les seuils de coupure/reprise matériels
@@ -291,6 +284,51 @@ void CommandHandler::cmdSet(const char* key, const char* value, Print& out) {
     if (!_registry->find(key)) {
       out.printf("Clé inconnue: %s\n", key);
     }
+  }
+}
+
+// ============================================================================
+// "relay <n> on|off|auto" — seul point d'entrée pour piloter un relais.
+// Pas de clé "set relay.N.state" (l'état ON/OFF n'est pas une settings
+// persistée, cf. Settings::Relay). "on"/"off" bascule le matériel
+// (RelayHal::setManualState, qui met à jour l'état connu — RAM + mirroir
+// scratch, cf. RelayHal::begin()) et arme l'override manuel :
+// Relay::updateCutoff/updatePeriodic (hal/relay/Relay.cpp) cessent de
+// reprendre la main sur ce relais jusqu'à "relay <n> auto".
+// ============================================================================
+void CommandHandler::cmdRelay(const char* args, Print& out) {
+  int relayNum = 0;
+  char verb[16] = {0};
+  if (sscanf(args, "%d %15s", &relayNum, verb) != 2 ||
+      relayNum < 1 || relayNum > RELAY_COUNT) {
+    out.println("Usage: relay <n> on|off|auto");
+    return;
+  }
+
+  uint8_t idx = relayNum - 1;
+
+  if (strcmp(verb, "on") == 0 || strcmp(verb, "off") == 0) {
+    bool on = strcmp(verb, "on") == 0;
+    if (!_relay->setManualState(idx, on)) {
+      out.printf("Attention: expandeur relais (TCA9555) non détecté, pas d'action matérielle\n");
+    }
+    out.printf("Relais %d = %s (mode manuel, 'relay %d auto' pour rendre la main)\n",
+      relayNum, on ? "ON" : "OFF", relayNum);
+    if (_event_log) {
+      _event_log->log(EVENT_RELAY_MANUAL_SET, relayNum, on ? 1 : 0);
+    }
+    return;
+  }
+
+  if (strcmp(verb, "auto") != 0) {
+    out.println("Usage: relay <n> on|off|auto");
+    return;
+  }
+
+  _relay->clearManualOverride(idx);
+  out.printf("Relais %d rendu à l'automatisme (cutoff/périodique actifs)\n", relayNum);
+  if (_event_log) {
+    _event_log->log(EVENT_RELAY_MANUAL_CLEARED, relayNum, 0);
   }
 }
 

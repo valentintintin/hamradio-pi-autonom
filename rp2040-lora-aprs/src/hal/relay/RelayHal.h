@@ -33,17 +33,36 @@ public:
   explicit RelayHal(Tca9555Hal& expander)
     : _expander(&expander), _initialized(false) {}
 
-  // `channels` doit pointer vers settings.relay (persisté), `count` = RELAY_COUNT
-  bool begin(Settings::Relay* channels, uint8_t count);
+  // `count` = RELAY_COUNT. L'état ON/OFF n'est pas une settings persistée
+  // (cf. Settings::Relay) : begin() le restaure depuis un registre watchdog
+  // scratch (always-on, cf. core/ScratchRegisters.h) si ce reset est "à
+  // chaud" (watchdog/reboot()), sinon repart à "éteint" (vraie coupure
+  // d'alimentation — le relais physique bistable, lui, n'a pas bougé).
+  bool begin(uint8_t count);
 
-  // Bascule le relais `index` (impulsion I2C) et persiste le nouvel état.
+  // Bascule le relais `index` (impulsion I2C) et met à jour l'état connu
+  // (RAM + mirroir scratch, cf. begin()). Utilisée par l'automatisme
+  // (Relay::updateCutoff/updatePeriodic) — ne touche jamais le flag de
+  // contrôle manuel (cf. setManualState() plus bas).
   bool setState(uint8_t index, bool on);
   bool getState(uint8_t index) const;
   bool isInitialized() const { return _initialized; }
 
+  // --- Contrôle manuel (override) -------------------------------------------
+  // Un utilisateur qui commande explicitement un relais (CLI "relay N on/off",
+  // message APRS privilégié...) doit garder la main : plus aucune action de
+  // Relay::updateCutoff/updatePeriodic sur ce relais tant que
+  // clearManualOverride() n'a pas été appelé explicitement (cf. commande CLI
+  // "relay N auto"). Volatile (RAM uniquement, pas dans Settings::Relay) —
+  // un reboot repart toujours en automatique, par choix produit.
+  bool setManualState(uint8_t index, bool on);
+  void clearManualOverride(uint8_t index);
+  bool isManualOverride(uint8_t index) const;
+
 private:
   Tca9555Hal* _expander;
   bool _initialized;
-  Settings::Relay* _channels = nullptr;
   uint8_t _count = 0;
+  bool _state[RELAY_COUNT] = {false, false, false, false};
+  bool _manual_override[RELAY_COUNT] = {false, false, false, false};
 };

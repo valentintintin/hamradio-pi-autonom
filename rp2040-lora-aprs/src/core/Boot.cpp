@@ -211,7 +211,7 @@ void bootInitRelays() {
   if (!modeHasTelemetry(settings.system.mode)) {
     return;
   }
-  relay_hal.begin(settings.relay, RELAY_COUNT);
+  relay_hal.begin(RELAY_COUNT);
 }
 
 void bootInitMeshAndAprs() {

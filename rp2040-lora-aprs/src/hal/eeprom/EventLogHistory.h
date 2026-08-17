@@ -43,6 +43,8 @@ enum EventCode : uint16_t {
   EVENT_MPPT_SHUTDOWN_ALERT,       // data0 = source (0=GPIO, 1=I2C ALERT)
   EVENT_LOW_VOLTAGE_CUTOFF,        // data0 = numéro de relais (1..RELAY_COUNT), data1 = tension mV
   EVENT_LOW_VOLTAGE_RESTORE,       // data0 = numéro de relais (1..RELAY_COUNT), data1 = tension mV
+  EVENT_RELAY_MANUAL_SET,          // data0 = numéro de relais (1..RELAY_COUNT), data1 = 1 (on) / 0 (off)
+  EVENT_RELAY_MANUAL_CLEARED,      // data0 = numéro de relais (1..RELAY_COUNT) — "relay N auto"
 };
 
 inline const char* eventCodeName(uint16_t code) {
@@ -52,6 +54,8 @@ inline const char* eventCodeName(uint16_t code) {
     case EVENT_MPPT_SHUTDOWN_ALERT:       return "MPPT_SHUTDOWN";
     case EVENT_LOW_VOLTAGE_CUTOFF:        return "LOW_VOLTAGE_CUTOFF";
     case EVENT_LOW_VOLTAGE_RESTORE:       return "LOW_VOLTAGE_RESTORE";
+    case EVENT_RELAY_MANUAL_SET:          return "RELAY_MANUAL_SET";
+    case EVENT_RELAY_MANUAL_CLEARED:      return "RELAY_MANUAL_CLEARED";
     default:                              return "?";
   }
 }

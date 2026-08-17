@@ -5,6 +5,7 @@
 #include "core/Log.h"
 #include "core/StringPrint.h"
 #include "hal/Telemetry.h"
+#include "hal/relay/RelayHal.h"
 #include "cli/CommandHandler.h"
 #include "config/Settings.h"
 #include "target.h"  // mesh_radio_driver / aprs_radio_driver (SimRadio, cf. variant_native/target.h)
@@ -23,6 +24,7 @@
 extern TelemetryData telemetry;
 extern CommandHandler command_handler;
 extern Settings settings;
+extern RelayHal relay_hal;
 
 namespace {
 
@@ -136,7 +138,7 @@ std::string buildStateJson() {
 
     JsonArray relays = doc["relays"].to<JsonArray>();
     for (int i = 0; i < RELAY_COUNT; i++) {
-      relays.add(settings.relay[i].state);
+      relays.add(relay_hal.getState(i));
     }
 
     JsonArray radioLog = doc["radio_log"].to<JsonArray>();

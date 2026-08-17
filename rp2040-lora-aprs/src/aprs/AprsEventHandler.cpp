@@ -6,8 +6,8 @@
 #define TAG "APRS-EVT"
 
 AprsEventHandler::AprsEventHandler(AprsEngine& engine, CommandHandler& commandHandler,
-                                   TelemetryData& telemetry, Settings& settings)
-  : _engine(&engine), _cmd(&commandHandler), _telemetry(&telemetry), _settings(&settings)
+                                   TelemetryData& telemetry, Settings& settings, RelayHal& relay)
+  : _engine(&engine), _cmd(&commandHandler), _telemetry(&telemetry), _settings(&settings), _relay(&relay)
 {
 }
 
@@ -71,10 +71,10 @@ void AprsEventHandler::fillTelemetryData(aprs::Telemetry& telemetry) {
   setAnalog(telemetry.analog[2], "BattI", "mA", _telemetry->battery_mppt.current_ma);
   setAnalog(telemetry.analog[3], "SolI",  "mA", _telemetry->solar_mppt.current_ma);
 
-  setBool(telemetry.boolean[0], "WiFi", _settings->relay[0].state);
-  setBool(telemetry.boolean[1], "Cam", _settings->relay[1].state);
-  setBool(telemetry.boolean[2], "Pi", _settings->relay[2].state);
-  // setBool(telemetry.boolean[3], "", _settings->relay[3].state);
+  setBool(telemetry.boolean[0], "WiFi", _relay->getState(0));
+  setBool(telemetry.boolean[1], "Cam", _relay->getState(1));
+  setBool(telemetry.boolean[2], "Pi", _relay->getState(2));
+  // setBool(telemetry.boolean[3], "", _relay->getState(3));
 
   strncpy(telemetry.projectName, "LoRa APRS + Meshcore", sizeof(telemetry.projectName) - 1);
 }

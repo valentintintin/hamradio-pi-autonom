@@ -19,11 +19,12 @@
 #include "hal/Telemetry.h"
 #include "cli/CommandHandler.h"
 #include "config/Settings.h"
+#include "hal/relay/RelayHal.h"
 
 class AprsEventHandler : public AprsEventCallback {
 public:
   AprsEventHandler(AprsEngine& engine, CommandHandler& commandHandler,
-                   TelemetryData& telemetry, Settings& settings);
+                   TelemetryData& telemetry, Settings& settings, RelayHal& relay);
 
   void onAprsMessageReceived(const char* from, const char* message) override;
   void fillTelemetryData(aprs::Telemetry& telemetry) override;
@@ -35,4 +36,5 @@ private:
   CommandHandler* _cmd;
   TelemetryData* _telemetry;
   Settings* _settings;
+  RelayHal* _relay;
 };

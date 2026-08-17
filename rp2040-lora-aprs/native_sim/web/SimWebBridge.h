@@ -9,7 +9,7 @@
 //     SIM_DATA_DIR/web/state.json (écriture atomique, temp + rename) ;
 //   - consomme les fichiers de commande déposés par server.py dans
 //     SIM_DATA_DIR/web/commands/ — chacun contient une ligne de commande au
-//     format CLI ("sim rx aprs ascii ...", "set relay.2.state on"...),
+//     format CLI ("sim rx aprs ascii ...", "relay 2 on"...),
 //     passée telle quelle à simHandleCommand()/CommandHandler::execute()
 //     (même pipeline que tasks/task_cli.cpp) puis supprimée.
 //

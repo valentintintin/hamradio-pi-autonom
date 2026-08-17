@@ -1,5 +1,6 @@
 #include "tasks.h"
 #include "core/Log.h"
+#include "core/ScratchRegisters.h"
 #include "config/Settings.h"
 #include "hal/eeprom/EventLogHistory.h"
 #include "task_heartbeat.h"
@@ -35,8 +36,9 @@ extern EventLogHistory event_log;
 #define WATCHDOG_HEALTHY_UPTIME_MS  (5UL * 60UL * 1000UL)  // 5 min sans blocage = boot considéré sain
 #define WATCHDOG_MAX_CONSECUTIVE_REBOOTS 5
 
-// Registre scratch utilisé comme compteur persistant de reboots watchdog consécutifs
-#define WDT_SCRATCH_REBOOT_COUNT 0
+// Registre scratch utilisé comme compteur persistant de reboots watchdog
+// consécutifs (cf. core/ScratchRegisters.h pour la table complète des index)
+#define WDT_SCRATCH_REBOOT_COUNT SCRATCH_WDT_REBOOT_COUNT
 
 static bool isTaskStale(HeartbeatTask task, uint32_t max_age_ms) {
   unsigned long last = g_heartbeat_ms[task];

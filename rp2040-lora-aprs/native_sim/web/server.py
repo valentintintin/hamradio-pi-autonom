@@ -6,8 +6,8 @@ C++ (variant_native/, cf. native_sim/web/SimWebBridge.cpp) via deux fichiers
 sous SIM_DATA_DIR/web/ :
   - state.json     : instantané d'état, réécrit ~3x/s par le simulateur.
   - commands/*.cmd  : fichiers déposés ici, une ligne de commande CLI par
-                      fichier ("sim rx aprs ascii ...", "set relay.2.state
-                      on"...) — le simulateur les consomme et les supprime.
+                      fichier ("sim rx aprs ascii ...", "relay 2 on"...) —
+                      le simulateur les consomme et les supprime.
 
 Aucune dépendance : bibliothèque standard uniquement (http.server).
 
@@ -146,7 +146,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         elif self.path == "/api/relay":
             n = params.get("n", "0")
             on = params.get("on", "0") == "1"
-            submit_command(f"set relay.{n}.state {'on' if on else 'off'}")
+            # "relay <n> on|off" (pas "set relay.N.state") : bascule le
+            # matériel immédiatement et arme l'override manuel — cf.
+            # CommandHandler::cmdRelay.
+            submit_command(f"relay {n} {'on' if on else 'off'}")
             self._send_json({"ok": True})
 
         elif self.path == "/api/cmd":
