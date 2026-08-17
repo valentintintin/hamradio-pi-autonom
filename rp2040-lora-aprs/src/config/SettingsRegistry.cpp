@@ -121,19 +121,19 @@ void SettingsRegistry::init(Settings& s) {
 
   // --- Réveil périodique par relais (cf. energy/Relay.cpp) ------------------
   add("relay_periodic.1.enabled",      ST_BOOL,   &s.relay[0].periodic_enabled);
-  add("relay_periodic.1.interval_ms",  ST_UINT32, &s.relay[0].interval_ms,     60000.0f, 86400000.0f);
+  add("relay_periodic.1.interval_ms",  ST_UINT32, &s.relay[0].interval_ms,     5000.0f, 86400000.0f);
   add("relay_periodic.1.on_duration_ms", ST_UINT32, &s.relay[0].on_duration_ms, 1000.0f, 3600000.0f);
   add("relay_periodic.1.override_low_voltage", ST_BOOL, &s.relay[0].override_low_voltage);
   add("relay_periodic.2.enabled",      ST_BOOL,   &s.relay[1].periodic_enabled);
-  add("relay_periodic.2.interval_ms",  ST_UINT32, &s.relay[1].interval_ms,     60000.0f, 86400000.0f);
+  add("relay_periodic.2.interval_ms",  ST_UINT32, &s.relay[1].interval_ms,     5000.0f, 86400000.0f);
   add("relay_periodic.2.on_duration_ms", ST_UINT32, &s.relay[1].on_duration_ms, 1000.0f, 3600000.0f);
   add("relay_periodic.2.override_low_voltage", ST_BOOL, &s.relay[1].override_low_voltage);
   add("relay_periodic.3.enabled",      ST_BOOL,   &s.relay[2].periodic_enabled);
-  add("relay_periodic.3.interval_ms",  ST_UINT32, &s.relay[2].interval_ms,     60000.0f, 86400000.0f);
+  add("relay_periodic.3.interval_ms",  ST_UINT32, &s.relay[2].interval_ms,     5000.0f, 86400000.0f);
   add("relay_periodic.3.on_duration_ms", ST_UINT32, &s.relay[2].on_duration_ms, 1000.0f, 3600000.0f);
   add("relay_periodic.3.override_low_voltage", ST_BOOL, &s.relay[2].override_low_voltage);
   add("relay_periodic.4.enabled",      ST_BOOL,   &s.relay[3].periodic_enabled);
-  add("relay_periodic.4.interval_ms",  ST_UINT32, &s.relay[3].interval_ms,     60000.0f, 86400000.0f);
+  add("relay_periodic.4.interval_ms",  ST_UINT32, &s.relay[3].interval_ms,     5000.0f, 86400000.0f);
   add("relay_periodic.4.on_duration_ms", ST_UINT32, &s.relay[3].on_duration_ms, 1000.0f, 3600000.0f);
   add("relay_periodic.4.override_low_voltage", ST_BOOL, &s.relay[3].override_low_voltage);
 }

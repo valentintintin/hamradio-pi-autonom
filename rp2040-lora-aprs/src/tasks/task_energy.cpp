@@ -13,7 +13,7 @@
 #include "tasks.h"
 #include "core/Log.h"
 #include "config/Settings.h"
-#include "energy/Relay.h"
+#include "../hal/relay/Relay.h"
 #include "hal/Telemetry.h"
 #include "hal/sensors/Ina3221Hal.h"
 #include "hal/chargers/MpptChargerHal.h"

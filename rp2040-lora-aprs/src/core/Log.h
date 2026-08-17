@@ -37,12 +37,27 @@ inline const char* logLevelPrefix(LogLevel lvl) {
   }
 }
 
+// Uptime "hh:mm:ss.mmm" depuis millis() — pas l'heure RTC : Log.h est inclus
+// quasiment partout (y compris par le code RTC lui-même), donc dépendre de
+// rtc_clock créerait un cycle d'include, et l'uptime reste dispo avant même
+// que l'horloge soit synchronisée au boot.
+inline const char* logUptime() {
+  static char buf[16];
+  unsigned long ms = millis();
+  unsigned int hh = ms / 3600000UL;
+  unsigned int mm = (ms / 60000UL) % 60;
+  unsigned int ss = (ms / 1000UL) % 60;
+  unsigned int mmm = ms % 1000UL;
+  snprintf(buf, sizeof(buf), "%02u:%02u:%02u.%03u", hh, mm, ss, mmm);
+  return buf;
+}
+
 // Natif : en plus de Serial (stdout), les lignes sont dupliquées dans un
 // buffer circulaire (SimWorld::log_ring) affiché par le dashboard web — cf.
 // native/sim/SimLogTee.cpp.
 #ifdef NATIVE_BUILD
-void nativeLogTee(const char* prefix, const char* tag, const char* fmt, ...);
-#define NATIVE_LOG_TEE(lvl, tag, fmt, ...) nativeLogTee(logLevelPrefix(lvl), tag, fmt, ##__VA_ARGS__);
+void nativeLogTee(const char* prefix, const char* uptime, const char* tag, const char* fmt, ...);
+#define NATIVE_LOG_TEE(lvl, tag, fmt, ...) nativeLogTee(logLevelPrefix(lvl), logUptime(), tag, fmt, ##__VA_ARGS__);
 #else
 #define NATIVE_LOG_TEE(lvl, tag, fmt, ...)
 #endif
@@ -51,7 +66,7 @@ void nativeLogTee(const char* prefix, const char* tag, const char* fmt, ...);
 #define LOG_MSG(lvl, tag, fmt, ...) \
   do { \
     if ((lvl) <= g_log_level) { \
-      Serial.printf("%s [%-8s] " fmt "\n", logLevelPrefix(lvl), tag, ##__VA_ARGS__); \
+      Serial.printf("%s [%s] [%-8s] " fmt "\n", logLevelPrefix(lvl), logUptime(), tag, ##__VA_ARGS__); \
       NATIVE_LOG_TEE(lvl, tag, fmt, ##__VA_ARGS__) \
     } \
   } while(0)

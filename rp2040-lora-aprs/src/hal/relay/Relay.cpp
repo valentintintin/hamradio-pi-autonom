@@ -1,4 +1,4 @@
-#include "Relay.h"
+#include "hal/relay//Relay.h"
 #include "core/Log.h"
 
 #define TAG "RELAY"
@@ -95,6 +95,7 @@ void Relay::updatePeriodic(float voltage_mv) {
   if (!cfg.periodic_enabled) {
     if (state == PeriodicState::Active && _cutoff_state == CutoffState::Overridden) {
       _cutoff_state = CutoffState::Idle; // ne pas laisser cutoff bloqué en Overridden
+      LOG_T(TAG, "Relais %u : désactivation", _index + 1);
     }
     state = PeriodicState::Disabled;
     return;
@@ -104,6 +105,7 @@ void Relay::updatePeriodic(float voltage_mv) {
     // Règle tout juste (ré)activée : démarre l'attente
     _periodic_timer.setInterval(cfg.interval_ms, true);
     state = PeriodicState::Waiting;
+    LOG_I(TAG, "Relais %u : début timer pour réveil périodique", _index + 1, (unsigned long)cfg.interval_ms);
   }
 
   if (!_periodic_timer.hasExpired()) {
@@ -114,11 +116,12 @@ void Relay::updatePeriodic(float voltage_mv) {
     // Fin de fenêtre ON
     if (_cutoff_state == CutoffState::Overridden) {
       _cutoff_state = CutoffState::Idle;
+      LOG_W(TAG, "Relais %u : fin fenêtre réveil périodique met surchargé donc on laisse à allumé", _index + 1);
     }
     _relay->setState(_index, false);
     _periodic_timer.setInterval(cfg.interval_ms, true);
     state = PeriodicState::Waiting;
-    LOG_T(TAG, "Relais %u : fin fenêtre réveil périodique", _index + 1);
+    LOG_I(TAG, "Relais %u : fin fenêtre réveil périodique (%lums)%s", _index + 1, (unsigned long)cfg.interval_ms);
     return;
   }
 
@@ -137,6 +140,6 @@ void Relay::updatePeriodic(float voltage_mv) {
   _relay->setState(_index, true);
   _periodic_timer.setInterval(cfg.on_duration_ms, true);
   state = PeriodicState::Active;
-  LOG_T(TAG, "Relais %u : début fenêtre réveil périodique (%lums)%s",
+  LOG_I(TAG, "Relais %u : début fenêtre réveil périodique (%lums)%s",
     _index + 1, (unsigned long)cfg.on_duration_ms, would_be_cut ? " [override sous-tension]" : "");
 }
